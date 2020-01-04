@@ -45,18 +45,29 @@ func (g *g1) newPoint() *pointG1 {
 }
 
 func (g *g1) fromBytes(in []byte) (*pointG1, error) {
-	if len(in) < 96 {
+	byteLen := g.f.limbSize * 8
+	if len(in) < 2*byteLen {
 		return nil, fmt.Errorf("input string should be equal or larger than 96")
 	}
-	x, err := g.f.newFieldElementFromBytes(in[:48])
+	x, err := g.f.newFieldElementFromBytes(in[:byteLen])
 	if err != nil {
 		return nil, err
 	}
-	y, err := g.f.newFieldElementFromBytes(in[48:])
+	y, err := g.f.newFieldElementFromBytes(in[byteLen:])
 	if err != nil {
 		return nil, err
 	}
 	return &pointG1{x, y, g.f.one}, nil
+}
+
+func (g *g1) toBytes(p *pointG1) []byte {
+	byteLen := g.f.limbSize * 8
+	out := make([]byte, 2*byteLen)
+	a := g.newPoint()
+	g.affine(a, p)
+	copy(out[:byteLen], g.f.toBytes(a[0]))
+	copy(out[byteLen:], g.f.toBytes(a[1]))
+	return out
 }
 
 func (g *g1) copy(q, p *pointG1) *pointG1 {
@@ -77,26 +88,18 @@ func (g *g1) affine(q, p *pointG1) *pointG1 {
 	g.f.mul(q[0], p[0], t[1])
 	g.f.mul(t[0], t[0], t[1])
 	g.f.mul(q[1], p[1], t[0])
-	q[2] = g.f.one
-	// g.copy(q[2], g.f.one)
-	// TODO: find a nice copy way
-	// var err error
-	// q[2], err = g.f.newFieldElementFromBytes(g.f.toBytes(g.f.one))
-	// if err != nil {
-	// 	panic(err)
-	// }
+	g.f.cpy(q[2], g.f.one)
 	return q
 }
 
-func (g *g1) toBytes(p *pointG1) []byte {
-	out := make([]byte, 96)
-	a := g.newPoint()
-	g.affine(a, p)
-	copy(out[:48], g.f.toBytes(a[0]))
-	copy(out[48:], g.f.toBytes(a[1]))
-	return out
+func (g *g1) toString(p *pointG1) string {
+	return fmt.Sprintf(
+		"x: %s y: %s, z: %s",
+		g.f.toString(p[0]),
+		g.f.toString(p[1]),
+		g.f.toString(p[2]),
+	)
 }
-
 func (g *g1) zero() *pointG1 {
 	return &pointG1{
 		g.f.zero,
@@ -110,6 +113,7 @@ func (g *g1) isZero(p *pointG1) bool {
 }
 
 func (g *g1) equal(p1, p2 *pointG1) bool {
+	// TODO: Affine equality ?
 	// TODO: P and -P equals why?
 	if g.isZero(p1) {
 		return g.isZero(p2)
@@ -290,7 +294,7 @@ func (g *g1) neg(r, p *pointG1) *pointG1 {
 }
 
 func (g *g1) sub(c, a, b *pointG1) *pointG1 {
-	d := &pointG1{}
+	d := g.newPoint()
 	g.neg(d, b)
 	g.add(c, a, d)
 	return c
