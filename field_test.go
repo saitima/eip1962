@@ -478,6 +478,10 @@ func TestExponentiation(t *testing.T) {
 				}
 				a := field.randFieldElement(rand.Reader)
 				u := field.newFieldElement()
+				field.exp(u, field.zero, big.NewInt(0))
+				if !field.equal(u, field.one) {
+					t.Fatalf("a^0 == 1")
+				}
 				field.exp(u, a, big.NewInt(0))
 				if !field.equal(u, field.one) {
 					t.Fatalf("a^0 == 1")
