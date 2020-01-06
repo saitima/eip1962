@@ -37,18 +37,23 @@ func newG22(f *fq2, a, b, q []byte) (*g22, error) {
 	for i := 0; i < 9; i++ {
 		t[i] = f.zero()
 	}
-	return &g22{
+	g := &g22{
 		f:   f,
 		a:   a_,
 		b:   b_,
 		q:   new(big.Int).SetBytes(q),
 		t:   t,
 		inf: &pointG22{f.zero(), f.one(), f.zero()},
-	}, nil
+	}
+	g.inf = g.newPoint()
+	g.f.copy(g.inf[0], g.f.zero())
+	g.f.copy(g.inf[1], g.f.one())
+	g.f.copy(g.inf[2], g.f.zero())
+	return g, nil
 }
 
 func (g *g22) newPoint() *pointG22 {
-	return &pointG22{g.f.zero(), g.f.zero(), g.f.zero()}
+	return &pointG22{g.f.newElement(), g.f.newElement(), g.f.newElement()}
 }
 
 func (g *g22) fromBytes(in []byte) (*pointG22, error) {
@@ -64,7 +69,11 @@ func (g *g22) fromBytes(in []byte) (*pointG22, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &pointG22{x, y, g.f.one()}, nil
+	p := g.newPoint()
+	g.f.copy(p[0], x)
+	g.f.copy(p[1], y)
+	g.f.copy(p[2], g.f.one())
+	return p, nil
 }
 
 func (g *g22) toBytes(p *pointG22) []byte {
@@ -118,11 +127,11 @@ func (g *g22) toStringNoTransform(p *pointG22) string {
 }
 
 func (g *g22) zero() *pointG22 {
-	return &pointG22{
-		g.f.zero(),
-		g.f.one(),
-		g.f.zero(),
-	}
+	p := g.newPoint()
+	g.f.copy(p[0], g.f.zero())
+	g.f.copy(p[1], g.f.one())
+	g.f.copy(p[2], g.f.zero())
+	return p
 }
 
 func (g *g22) isZero(p *pointG22) bool {
@@ -346,8 +355,7 @@ func (g *g22) multiExp(r *pointG22, points []*pointG22, powers []*big.Int) (*poi
 	s := new(big.Int)
 	for i, m := 0, 0; i <= numBits; i, m = i+int(c), m+1 {
 		for i := 0; i < bucket_size; i++ {
-			bucket[i] = g.zero()
-			g.copy(bucket[i], zero)
+			bucket[i] = g.newPoint() // TODO: do it in a make or new func
 		}
 		for j := 0; j < len(powers); j++ {
 			s = powers[j]

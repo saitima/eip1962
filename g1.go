@@ -35,20 +35,28 @@ func newG1(f *field, a, b, q []byte) (*g1, error) {
 	}
 	t := [9]fieldElement{}
 	for i := 0; i < 9; i++ {
-		t[i] = f.zero
+		t[i] = f.newFieldElement()
 	}
-	return &g1{
-		f:   f,
-		a:   a_,
-		b:   b_,
-		q:   new(big.Int).SetBytes(q),
-		t:   t,
-		inf: &pointG1{f.zero, f.one, f.zero},
-	}, nil
+	g := &g1{
+		f: f,
+		a: a_,
+		b: b_,
+		q: new(big.Int).SetBytes(q),
+		t: t,
+	}
+	g.inf = g.newPoint()
+	g.f.cpy(g.inf[0], f.zero)
+	g.f.cpy(g.inf[1], f.one)
+	g.f.cpy(g.inf[2], f.zero)
+	return g, nil
 }
 
 func (g *g1) newPoint() *pointG1 {
-	return &pointG1{g.f.zero, g.f.zero, g.f.zero}
+	p := &pointG1{g.f.newFieldElement(), g.f.newFieldElement(), g.f.newFieldElement()}
+	g.f.cpy(p[0], g.f.zero)
+	g.f.cpy(p[1], g.f.zero)
+	g.f.cpy(p[2], g.f.zero)
+	return p
 }
 
 func (g *g1) fromBytes(in []byte) (*pointG1, error) {
@@ -64,7 +72,11 @@ func (g *g1) fromBytes(in []byte) (*pointG1, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &pointG1{x, y, g.f.one}, nil
+	p := g.newPoint()
+	g.f.cpy(p[0], x)
+	g.f.cpy(p[1], y)
+	g.f.cpy(p[2], g.f.one)
+	return p, nil
 }
 
 func (g *g1) toBytes(p *pointG1) []byte {
@@ -120,11 +132,11 @@ func (g *g1) toStringNoTransform(p *pointG1) string {
 }
 
 func (g *g1) zero() *pointG1 {
-	return &pointG1{
-		g.f.zero,
-		g.f.one,
-		g.f.zero,
-	}
+	p := g.newPoint()
+	g.f.cpy(p[0], g.f.zero)
+	g.f.cpy(p[1], g.f.one)
+	g.f.cpy(p[2], g.f.zero)
+	return p
 }
 
 func (g *g1) isZero(p *pointG1) bool {
@@ -348,8 +360,7 @@ func (g *g1) multiExp(r *pointG1, points []*pointG1, powers []*big.Int) (*pointG
 	s := new(big.Int)
 	for i, m := 0, 0; i <= numBits; i, m = i+int(c), m+1 {
 		for i := 0; i < bucket_size; i++ {
-			bucket[i] = g.zero()
-			g.copy(bucket[i], zero)
+			bucket[i] = g.newPoint() // TODO: do it in a make or new func
 		}
 		for j := 0; j < len(powers); j++ {
 			s = powers[j]
