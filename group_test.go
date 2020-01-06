@@ -109,7 +109,7 @@ func TestG1(t *testing.T) {
 
 	t.Run("Addition", func(t *testing.T) {
 		g.add(actual, zero, zero)
-		if !g.equal(actual, expected) {
+		if !g.equal(actual, zero) {
 			t.Fatal("bad addition 1")
 		}
 		g.add(actual, one, zero)
@@ -1031,15 +1031,18 @@ func TestBLS1238Pairing(t *testing.T) {
 	modulusBytes := bytes_(48, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
 	groupBytes := bytes_(48, "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")
 	f := newField(modulusBytes)
+
 	// G1
 	a, err := f.newFieldElementFromBytes(bytes_(48, "0x00"))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	b, err := f.newFieldElementFromBytes(bytes_(48, "0x04"))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	g1, err := newG1(f, nil, nil, groupBytes)
 	if err != nil {
 		panic(err)
@@ -1053,6 +1056,7 @@ func TestBLS1238Pairing(t *testing.T) {
 	}
 	f.neg(fq2.nonResidue, f.one)
 	fq2.calculateFrobeniusCoeffs()
+
 	// G2
 	g2, err := newG22(fq2, nil, nil, groupBytes)
 	if err != nil {
@@ -1110,7 +1114,6 @@ func TestBLS1238Pairing(t *testing.T) {
 	if !bls.g2.isOnCurve(g2One) {
 		panic("q is not on curve\n")
 	}
-
 	expectedBytes := bytes_(bytesLen,
 		"0x1250ebd871fc0a92a7b2d83168d0d727272d441befa15c503dd8e90ce98db3e7b6d194f60839c508a84305aaca1789b6",
 		"0x089a1c5b46e5110b86750ec6a532348868a84045483c92b7af5af689452eafabf1a8943e50439f1d59882a98eaa0170f",
@@ -1129,6 +1132,7 @@ func TestBLS1238Pairing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	t.Run("Expected", func(t *testing.T) {
 		actual := bls.pair(g1One, g2One)
 		if !bls.fq12.equal(expected, actual) {
@@ -1153,9 +1157,9 @@ func TestBLS1238Pairing(t *testing.T) {
 		var f1, f2 *fe12
 		// e(a*G1, b*G2) = e(G1, G2)^c
 		t.Run("First", func(t *testing.T) {
-			GG := bls.g1.affine(bls.g1.newPoint(), G)
-			HH := bls.g2.affine(bls.g2.newPoint(), H)
-			f1 = bls.pair(GG, HH)
+			bls.g1.affine(G, G)
+			bls.g2.affine(H, H)
+			f1 = bls.pair(G, H)
 			f2 = bls.pair(g1One, g2One)
 			bls.fq12.exp(f2, f2, c)
 			if !bls.fq12.equal(f1, f2) {

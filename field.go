@@ -53,7 +53,8 @@ func newField(p []byte) *field {
 	f.one = newFieldElementFromBigUnchecked(f.limbSize, R)
 	f.r2 = newFieldElementFromBigUnchecked(f.limbSize, R2)
 	f._one = newFieldElementFromBigUnchecked(f.limbSize, big.NewInt(1))
-	f.zero = newFieldElementFromBigUnchecked(f.limbSize, new(big.Int))
+	f.zero = newFieldElementFromBigUnchecked(f.limbSize, big.NewInt(0))
+
 	if inpT == nil {
 		return nil
 	}
@@ -391,12 +392,6 @@ func (f *field) inverse(inv, e fieldElement) {
 	bitSize := byteSize * 8
 	// Phase 1
 	for i := 0; i < bitSize*2; i++ {
-		// fmt.Println(i)
-		// fmt.Println(f.toStringNoTransform(v))
-		// fmt.Println(f.toStringNoTransform(u))
-		// fmt.Println(f.toStringNoTransform(s))
-		// fmt.Println(f.toStringNoTransform(r))
-
 		if f.equal(v, zero) {
 			found = true
 			break
@@ -404,25 +399,20 @@ func (f *field) inverse(inv, e fieldElement) {
 		if is_even(u) {
 			f.div_two(u)
 			f.mul_two(s)
-			// fmt.Println("a")
 		} else if is_even(v) {
 			f.div_two(v)
 			f.mul_two(r)
-			// fmt.Println("b")
 		} else if f.cmp(u, v) == 1 {
 			f.subn(u, v)
 			f.div_two(u)
 			f.addn(r, s)
 			f.mul_two(s)
-			// fmt.Println("c")
 		} else {
 			f.subn(v, u)
 			f.div_two(v)
 			f.addn(s, r)
 			f.mul_two(r)
-			// fmt.Println("d")
 		}
-		// fmt.Println()
 		k += 1
 	}
 	if !found {
