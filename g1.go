@@ -18,13 +18,20 @@ type g1 struct {
 }
 
 func newG1(f *field, a, b, q []byte) (*g1, error) {
-	a_, err := f.newFieldElementFromBytes(a)
-	if err != nil {
-		return nil, err
+	a_, b_ := f.newFieldElement(), f.newFieldElement()
+	var err error
+	if a != nil {
+		a_, err = f.newFieldElementFromBytes(a)
+		if err != nil {
+			return nil, err
+		}
 	}
-	b_, err := f.newFieldElementFromBytes(b)
-	if err != nil {
-		return nil, err
+
+	if b != nil {
+		b_, err = f.newFieldElementFromBytes(b)
+		if err != nil {
+			return nil, err
+		}
 	}
 	t := [9]fieldElement{}
 	for i := 0; i < 9; i++ {
@@ -77,7 +84,8 @@ func (g *g1) copy(q, p *pointG1) *pointG1 {
 	return q
 }
 
-func (g *g1) affine(q, p *pointG1) *pointG1 {
+func (g *g1) affine(r, p *pointG1) *pointG1 {
+	q := g.newPoint()
 	if g.isZero(p) {
 		g.copy(q, g.inf)
 		return q
@@ -89,7 +97,8 @@ func (g *g1) affine(q, p *pointG1) *pointG1 {
 	g.f.mul(t[0], t[0], t[1])
 	g.f.mul(q[1], p[1], t[0])
 	g.f.cpy(q[2], g.f.one)
-	return q
+	g.copy(r, q)
+	return r
 }
 
 func (g *g1) toString(p *pointG1) string {
@@ -100,6 +109,16 @@ func (g *g1) toString(p *pointG1) string {
 		g.f.toString(p[2]),
 	)
 }
+
+func (g *g1) toStringNoTransform(p *pointG1) string {
+	return fmt.Sprintf(
+		"x: %s y: %s, z: %s",
+		g.f.toStringNoTransform(p[0]),
+		g.f.toStringNoTransform(p[1]),
+		g.f.toStringNoTransform(p[2]),
+	)
+}
+
 func (g *g1) zero() *pointG1 {
 	return &pointG1{
 		g.f.zero,
@@ -109,7 +128,7 @@ func (g *g1) zero() *pointG1 {
 }
 
 func (g *g1) isZero(p *pointG1) bool {
-	return g.f.equal(p[2], g.f.zero)
+	return g.f.isZero(p[2])
 }
 
 func (g *g1) equal(p1, p2 *pointG1) bool {
@@ -301,7 +320,7 @@ func (g *g1) sub(c, a, b *pointG1) *pointG1 {
 }
 
 func (g *g1) mulScalar(c, p *pointG1, e *big.Int) *pointG1 {
-	q, n := g.zero(), g.zero()
+	q, n := g.newPoint(), g.newPoint()
 	g.copy(n, p)
 	l := e.BitLen()
 	for i := 0; i < l; i++ {

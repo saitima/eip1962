@@ -71,6 +71,14 @@ func (fq *fq2) toString(a *fe2) string {
 	)
 }
 
+func (fq *fq2) toStringNoTransform(a *fe2) string {
+	return fmt.Sprintf(
+		"c0: %s c1: %s\n",
+		fq.f.toStringNoTransform(a[0]),
+		fq.f.toStringNoTransform(a[1]),
+	)
+}
+
 func (fq *fq2) zero() *fe2 {
 	return fq.newElement()
 }

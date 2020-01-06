@@ -8,7 +8,7 @@ import (
 
 type pointG22 [3]*fe2
 
-type g2 struct {
+type g22 struct {
 	f   *fq2
 	a   *fe2
 	b   *fe2
@@ -17,7 +17,7 @@ type g2 struct {
 	inf *pointG22
 }
 
-func newG22(f *fq2, a, b, q []byte) (*g2, error) {
+func newG22(f *fq2, a, b, q []byte) (*g22, error) {
 	var err error
 	a_, b_ := f.newElement(), f.newElement()
 	if a != nil {
@@ -37,7 +37,7 @@ func newG22(f *fq2, a, b, q []byte) (*g2, error) {
 	for i := 0; i < 9; i++ {
 		t[i] = f.zero()
 	}
-	return &g2{
+	return &g22{
 		f:   f,
 		a:   a_,
 		b:   b_,
@@ -47,11 +47,11 @@ func newG22(f *fq2, a, b, q []byte) (*g2, error) {
 	}, nil
 }
 
-func (g *g2) newPoint() *pointG22 {
+func (g *g22) newPoint() *pointG22 {
 	return &pointG22{g.f.zero(), g.f.zero(), g.f.zero()}
 }
 
-func (g *g2) fromBytes(in []byte) (*pointG22, error) {
+func (g *g22) fromBytes(in []byte) (*pointG22, error) {
 	byteLen := g.f.f.limbSize * 16
 	if len(in) < 2*byteLen {
 		return nil, fmt.Errorf("input string should be equal or larger than 96")
@@ -67,7 +67,7 @@ func (g *g2) fromBytes(in []byte) (*pointG22, error) {
 	return &pointG22{x, y, g.f.one()}, nil
 }
 
-func (g *g2) toBytes(p *pointG22) []byte {
+func (g *g22) toBytes(p *pointG22) []byte {
 	l := (g.f.f.pbig.BitLen())/8 + 1 // TODO
 	out := make([]byte, 4*l)
 	a := g.newPoint()
@@ -77,14 +77,14 @@ func (g *g2) toBytes(p *pointG22) []byte {
 	return out
 }
 
-func (g *g2) copy(q, p *pointG22) *pointG22 {
+func (g *g22) copy(q, p *pointG22) *pointG22 {
 	g.f.copy(q[0], p[0])
 	g.f.copy(q[1], p[1])
 	g.f.copy(q[2], p[2])
 	return q
 }
 
-func (g *g2) affine(q, p *pointG22) *pointG22 {
+func (g *g22) affine(q, p *pointG22) *pointG22 {
 	if g.isZero(p) {
 		g.copy(q, g.inf)
 		return q
@@ -99,7 +99,7 @@ func (g *g2) affine(q, p *pointG22) *pointG22 {
 	return q
 }
 
-func (g *g2) toString(p *pointG22) string {
+func (g *g22) toString(p *pointG22) string {
 	return fmt.Sprintf(
 		"x: %s y: %s, z: %s",
 		g.f.toString(p[0]),
@@ -107,7 +107,17 @@ func (g *g2) toString(p *pointG22) string {
 		g.f.toString(p[2]),
 	)
 }
-func (g *g2) zero() *pointG22 {
+
+func (g *g22) toStringNoTransform(p *pointG22) string {
+	return fmt.Sprintf(
+		"x: %s y: %s, z: %s",
+		g.f.toStringNoTransform(p[0]),
+		g.f.toStringNoTransform(p[1]),
+		g.f.toStringNoTransform(p[2]),
+	)
+}
+
+func (g *g22) zero() *pointG22 {
 	return &pointG22{
 		g.f.zero(),
 		g.f.one(),
@@ -115,11 +125,11 @@ func (g *g2) zero() *pointG22 {
 	}
 }
 
-func (g *g2) isZero(p *pointG22) bool {
-	return g.f.equal(p[2], g.f.zero())
+func (g *g22) isZero(p *pointG22) bool {
+	return g.f.isZero(p[2])
 }
 
-func (g *g2) equal(p1, p2 *pointG22) bool {
+func (g *g22) equal(p1, p2 *pointG22) bool {
 	// TODO: Affine equality ?
 	// TODO: P and -P equals why?
 	if g.isZero(p1) {
@@ -143,7 +153,7 @@ func (g *g2) equal(p1, p2 *pointG22) bool {
 	return g.f.equal(t[0], t[1]) && g.f.equal(t[2], t[3])
 }
 
-func (g *g2) isOnCurve(p *pointG22) bool {
+func (g *g22) isOnCurve(p *pointG22) bool {
 	if g.isZero(p) {
 		return true
 	}
@@ -165,7 +175,7 @@ func (g *g2) isOnCurve(p *pointG22) bool {
 	return g.f.equal(t[0], t[1]) // Y2 == X3 + aZ4 + bZ6
 }
 
-func (g *g2) add(r, p1, p2 *pointG22) *pointG22 {
+func (g *g22) add(r, p1, p2 *pointG22) *pointG22 {
 	// http://www.hyperelliptic.org/EFD/gp/auto-shortw-jacobian-0.html#addition-add-2007-bl
 	if g.isZero(p1) {
 		g.copy(r, p2)
@@ -215,14 +225,14 @@ func (g *g2) add(r, p1, p2 *pointG22) *pointG22 {
 	return r
 }
 
-func (g *g2) double(r, p *pointG22) *pointG22 {
+func (g *g22) double(r, p *pointG22) *pointG22 {
 	if g.f.equal(g.a, g.f.zero()) {
 		return g.doubleZeroA(r, p)
 	}
 	return g.doubleNonZeroA(r, p)
 }
 
-func (g *g2) doubleNonZeroA(r, p *pointG22) *pointG22 {
+func (g *g22) doubleNonZeroA(r, p *pointG22) *pointG22 {
 	// http://www.hyperelliptic.org/EFD/gp/auto-shortw-jacobian.html#doubling-dbl-2007-bl
 	if g.isZero(p) {
 		g.copy(r, p)
@@ -261,7 +271,7 @@ func (g *g2) doubleNonZeroA(r, p *pointG22) *pointG22 {
 	return r
 }
 
-func (g *g2) doubleZeroA(r, p *pointG22) *pointG22 {
+func (g *g22) doubleZeroA(r, p *pointG22) *pointG22 {
 	// http://www.hyperelliptic.org/EFD/gp/auto-shortw-jacobian-0.html#doubling-dbl-2009-l
 	if g.isZero(p) {
 		g.copy(r, p)
@@ -293,22 +303,22 @@ func (g *g2) doubleZeroA(r, p *pointG22) *pointG22 {
 	return r
 }
 
-func (g *g2) neg(r, p *pointG22) *pointG22 {
+func (g *g22) neg(r, p *pointG22) *pointG22 {
 	g.f.copy(r[0], p[0])
 	g.f.neg(r[1], p[1])
 	g.f.copy(r[2], p[2])
 	return r
 }
 
-func (g *g2) sub(c, a, b *pointG22) *pointG22 {
+func (g *g22) sub(c, a, b *pointG22) *pointG22 {
 	d := g.newPoint()
 	g.neg(d, b)
 	g.add(c, a, d)
 	return c
 }
 
-func (g *g2) mulScalar(c, p *pointG22, e *big.Int) *pointG22 {
-	q, n := g.zero(), g.zero()
+func (g *g22) mulScalar(c, p *pointG22, e *big.Int) *pointG22 {
+	q, n := g.newPoint(), g.newPoint()
 	g.copy(n, p)
 	l := e.BitLen()
 	for i := 0; i < l; i++ {
@@ -321,7 +331,7 @@ func (g *g2) mulScalar(c, p *pointG22, e *big.Int) *pointG22 {
 	return c
 }
 
-func (g *g2) multiExp(r *pointG22, points []*pointG22, powers []*big.Int) (*pointG22, error) {
+func (g *g22) multiExp(r *pointG22, points []*pointG22, powers []*big.Int) (*pointG22, error) {
 	if len(points) != len(powers) {
 		return nil, fmt.Errorf("point and scalar vectors should be in same length")
 	}

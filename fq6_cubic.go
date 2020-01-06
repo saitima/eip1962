@@ -73,6 +73,14 @@ func (fq *fq6) toString(a *fe6) string {
 	)
 }
 
+func (fq *fq6) toStringNoTransform(a *fe6) string {
+	return fmt.Sprintf(
+		"c0: %s c1: %s\n",
+		fq.f.toStringNoTransform(a[0]),
+		fq.f.toStringNoTransform(a[1]),
+	)
+}
+
 func (fq *fq6) zero() *fe6 {
 	return fq.newElement()
 }
@@ -221,7 +229,7 @@ func (fq *fq6) exp(c, a *fe6, e *big.Int) {
 	fq.copy(c, z)
 }
 
-func (fq *fq6) mulBy01(e *[3]*fe2, c0, c1 *fe2) {
+func (fq *fq6) mulBy01(e *fe6, c0, c1 *fe2) {
 	t := fq.t
 	fq.f.mul(t[0], e[0], c0)
 	fq.f.mul(t[1], e[1], c1)
@@ -243,7 +251,8 @@ func (fq *fq6) mulBy01(e *[3]*fe2, c0, c1 *fe2) {
 	fq.f.copy(e[1], t[4])
 	fq.f.copy(e[2], t[3])
 }
-func (fq *fq6) mulBy1(e *[3]*fe2, c1 *fe2) {
+
+func (fq *fq6) mulBy1(e *fe6, c1 *fe2) {
 	t := fq.t
 	fq.f.mul(t[0], e[1], c1)
 	fq.f.add(t[1], e[1], e[2])
@@ -275,19 +284,19 @@ func (fq *fq6) calculateFrobeniusCoeffs() bool {
 		}
 	}
 	modulus := fq.f.f.pbig
-	bigOne, bigTwo, bigThree := big.NewInt(1), big.NewInt(2), big.NewInt(3)
+	bigOne, bigThree := big.NewInt(1), big.NewInt(3)
 	qPower, rem, power := new(big.Int).Set(modulus), new(big.Int), new(big.Int)
-	for i := 1; i <= 2; i++ {
+	fq.f.copy(fq.frobeniusCoeffs[0][0], fq.f.one())
+	fq.f.copy(fq.frobeniusCoeffs[1][0], fq.f.one())
+	for i := 1; i <= 3; i++ {
 		power.Sub(qPower, bigOne)
 		power.DivMod(power, bigThree, rem)
 		if rem.Uint64() != 0 {
 			return false
 		}
 		fq.f.exp(fq.frobeniusCoeffs[0][i], fq.nonResidue, power)
-		fq.f.exp(fq.frobeniusCoeffs[1][i], fq.frobeniusCoeffs[0][i], bigTwo)
+		fq.f.square(fq.frobeniusCoeffs[1][i], fq.frobeniusCoeffs[0][i])
 		qPower.Mul(qPower, modulus)
 	}
-	fq.f.copy(fq.frobeniusCoeffs[0][0], fq.f.one())
-	fq.f.copy(fq.frobeniusCoeffs[1][0], fq.f.one())
 	return true
 }

@@ -11,7 +11,7 @@ type fq12 struct {
 	f               *fq6
 	nonResidue      *fe6
 	t               []*fe6
-	frobeniusCoeffs *[12]fe2
+	frobeniusCoeffs *[12]*fe2
 }
 
 func newFq12(f *fq6, nonResidue []byte) (*fq12, error) {
@@ -39,7 +39,7 @@ func (fq *fq12) newElement() *fe12 {
 }
 
 func (fq *fq12) fromBytes(in []byte) (*fe12, error) {
-	byteLen := fq.f.f.f.limbSize * 8
+	byteLen := fq.f.f.f.limbSize * 8 * 2 * 3
 	if len(in) < len(&fe12{})*byteLen {
 		return nil, fmt.Errorf("input string should be larger than 64 bytes")
 	}
@@ -55,7 +55,7 @@ func (fq *fq12) fromBytes(in []byte) (*fe12, error) {
 }
 
 func (fq *fq12) toBytes(a *fe12) []byte {
-	byteLen := fq.f.f.f.limbSize * 8
+	byteLen := fq.f.f.f.limbSize * 8 * 2 * 3
 	out := make([]byte, len(a)*byteLen)
 	for i := 0; i < len(a); i++ {
 		copy(out[i*byteLen:(i+1)*byteLen], fq.f.toBytes(a[i]))
@@ -68,6 +68,14 @@ func (fq *fq12) toString(a *fe12) string {
 		"c0: %s c1: %s\n",
 		fq.f.toString(a[0]),
 		fq.f.toString(a[1]),
+	)
+}
+
+func (fq *fq12) toStringNoTransform(a *fe12) string {
+	return fmt.Sprintf(
+		"c0: %s c1: %s\n",
+		fq.f.toStringNoTransform(a[0]),
+		fq.f.toStringNoTransform(a[1]),
 	)
 }
 
@@ -189,55 +197,143 @@ func (fq *fq12) exp(c, a *fe12, e *big.Int) {
 	fq.copy(c, z)
 }
 
-// func (fq *fq12) mulBy034(f *fe12, c0, c3, c4 *fe2) {
-// 	o := fq.f.f.newElement() // base filed temp mem could be used :/
-// 	t := fq.t
-// 	fq.f.f.mul(t[0][0], f[0][0], c0)
-// 	fq.f.f.mul(t[0][1], f[0][1], c0)
-// 	fq.f.f.mul(t[0][2], f[0][2], c0)
-// 	fq.f.copy(t[1], f[1])
-// 	fq.f.mulBy01(t[1], c3, c4)
-// 	fq.f.f.add(o, c0, c3)
-// 	fq.f.add(t[2], f[1], f[0])
-// 	fq.f.mulBy01(t[2], o, c4)
-// 	fq.f.sub(t[2], t[2], t[0])
-// 	fq.f.sub(f[1], t[2], t[1])
-// 	fq.mulByNonResidue(t[1], t[1])
-// 	fq.f.add(f[0], t[0], t[1])
-// }
+func (fq *fq12) cyclotomicSquare(c, a *fe12) {
+	t := new([9]*fe2)
+	for i := 0; i < 9; i++ {
+		t[i] = fq.f.f.newElement()
+	}
+	fq.f.f.mul(t[0], a[0][0], a[1][1])
+	fq.f.f.add(t[1], a[0][0], a[1][1])
+	fq.f.mulByNonResidue(t[2], a[1][1])
+	fq.f.f.add(t[2], t[2], a[0][0])
+	fq.f.mulByNonResidue(t[3], t[0])
+	fq.f.f.mul(t[4], t[1], t[2])
+	fq.f.f.sub(t[4], t[4], t[0])
+	fq.f.f.sub(t[4], t[4], t[3])
+	fq.f.f.double(t[5], t[0])
+	fq.f.f.mul(t[0], a[1][0], a[0][2])
+	fq.f.f.add(t[1], a[1][0], a[0][2])
+	fq.f.mulByNonResidue(t[2], a[0][2])
+	fq.f.f.add(t[2], t[2], a[1][0])
+	fq.f.mulByNonResidue(t[3], t[0])
+	fq.f.f.mul(t[6], t[1], t[2])
+	fq.f.f.sub(t[6], t[6], t[0])
+	fq.f.f.sub(t[6], t[6], t[3])
+	fq.f.f.double(t[7], t[0])
+	fq.f.f.mul(t[0], a[0][1], a[1][2])
+	fq.f.f.add(t[1], a[0][1], a[1][2])
+	fq.f.mulByNonResidue(t[2], a[1][2])
+	fq.f.f.add(t[2], t[2], a[0][1])
+	fq.f.mulByNonResidue(t[3], t[0])
+	fq.f.f.mul(t[8], t[1], t[2])
+	fq.f.f.sub(t[8], t[8], t[0])
+	fq.f.f.sub(t[8], t[8], t[3])
+	fq.f.f.double(t[0], t[0])
+	fq.f.mulByNonResidue(t[0], t[0])
+	fq.f.f.sub(t[1], t[4], a[0][0])
+	fq.f.f.double(t[1], t[1])
+	fq.f.f.add(t[1], t[1], t[4])
+	fq.f.f.copy(c[0][0], t[1])
+	fq.f.f.add(t[1], t[5], a[1][1])
+	fq.f.f.double(t[1], t[1])
+	fq.f.f.add(t[1], t[1], t[5])
+	fq.f.f.copy(c[1][1], t[1])
+	fq.f.f.add(t[1], t[0], a[1][0])
+	fq.f.f.double(t[1], t[1])
+	fq.f.f.add(t[1], t[1], t[0])
+	fq.f.f.copy(c[1][0], t[1])
+	fq.f.f.sub(t[1], t[8], a[0][2])
+	fq.f.f.double(t[1], t[1])
+	fq.f.f.add(t[1], t[1], t[8])
+	fq.f.f.copy(c[0][2], t[1])
+	fq.f.f.sub(t[1], t[6], a[0][1])
+	fq.f.f.double(t[1], t[1])
+	fq.f.f.add(t[1], t[1], t[6])
+	fq.f.f.copy(c[0][1], t[1])
+	fq.f.f.add(t[1], t[7], a[1][2])
+	fq.f.f.double(t[1], t[1])
+	fq.f.f.add(t[1], t[1], t[7])
+	fq.f.f.copy(c[1][2], t[1])
+}
 
-// func (fq *fq12) mulBy014(e *fe12, c0, c1, c4 *fe2) {
-// 	o := fq.f.f.newElement() // base field temp mem could be used :/
-// 	t := fq.t
-// 	fq.f.copy(t[0], e[0])
-// 	fq.f.mulBy01(t[0], c0, c1)
-// 	fq.f.copy(t[1], e[1])
-// 	fq.f.mulBy1(t[1], c4)
-// 	fq.f.f.add(o, c1, c4)
-// 	fq.f.add(e[1], e[1], e[0])
-// 	fq.f.mulBy01(e[1], c0, o)
-// 	fq.f.sub(e[1], e[1], t[0])
-// 	fq.f.sub(e[1], e[1], t[1])
-// 	fq.mulByNonResidue(t[1], t[1])
-// 	fq.f.add(e[0], t[1], t[0])
-// }
+func (fq *fq12) cyclotomicExp(c, a *fe12, e *big.Int) {
+	z := fq.one()
+	for i := e.BitLen() - 1; i >= 0; i-- {
+		fq.cyclotomicSquare(z, z)
+		if e.Bit(i) == 1 {
+			fq.mul(z, z, a)
+		}
+	}
+	fq.copy(c, z)
+}
 
-// func (fq *fq12) frobeniusMap(c, a *fe12, power uint) {
-// 	fq.f.copy(c[0], a[0])
-// 	fq.f.mul(c[1], a[1], fq.frobeniusCoeffs[power%2])
-// }
+func (fq *fq12) mulBy034(f *fe12, c0, c3, c4 *fe2) {
+	o := fq.f.f.newElement() // base filed temp mem could be used :/
+	t := fq.t
+	fq.f.f.mul(t[0][0], f[0][0], c0)
+	fq.f.f.mul(t[0][1], f[0][1], c0)
+	fq.f.f.mul(t[0][2], f[0][2], c0)
+	fq.f.copy(t[1], f[1])
+	fq.f.mulBy01(t[1], c3, c4)
+	fq.f.f.add(o, c0, c3)
+	fq.f.add(t[2], f[1], f[0])
+	fq.f.mulBy01(t[2], o, c4)
+	fq.f.sub(t[2], t[2], t[0])
+	fq.f.sub(f[1], t[2], t[1])
+	fq.mulByNonResidue(t[1], t[1])
+	fq.f.add(f[0], t[0], t[1])
+}
 
-// func (fq *fq12) calculateFrobeniusCoeffs() bool {
-// 	if fq.frobeniusCoeffs == nil {
-// 		fq.frobeniusCoeffs = fq.newElement()
-// 	}
-// 	power, rem := new(big.Int), new(big.Int)
-// 	power.Sub(fq.f.pbig, big.NewInt(1))
-// 	power.DivMod(power, big.NewInt(2), rem)
-// 	if rem.Uint64() != 0 {
-// 		return false
-// 	}
-// 	fq.f.exp(fq.frobeniusCoeffs[1], fq.nonResidue, power)
-// 	fq.f.copy(fq.frobeniusCoeffs[0], fq.f.one())
-// 	return true
-// }
+func (fq *fq12) mulBy014(e *fe12, c0, c1, c4 *fe2) {
+	o := fq.f.f.newElement() // base field temp mem could be used :/
+	t := fq.t
+	fq.f.copy(t[0], e[0])
+	fq.f.mulBy01(t[0], c0, c1)
+	fq.f.copy(t[1], e[1])
+	fq.f.mulBy1(t[1], c4)
+	fq.f.f.add(o, c1, c4)
+	fq.f.add(e[1], e[1], e[0])
+	fq.f.mulBy01(e[1], c0, o)
+	fq.f.sub(e[1], e[1], t[0])
+	fq.f.sub(e[1], e[1], t[1])
+	fq.mulByNonResidue(t[1], t[1])
+	fq.f.add(e[0], t[1], t[0])
+}
+
+func (fq *fq12) frobeniusMap(c, a *fe12, power uint) {
+	fq.f.frobeniusMap(c[0], a[0], power)
+	fq.f.frobeniusMap(c[1], a[1], power)
+	fq.f.f.mul(c[1][0], c[1][0], fq.frobeniusCoeffs[power%12])
+	fq.f.f.mul(c[1][1], c[1][1], fq.frobeniusCoeffs[power%12])
+	fq.f.f.mul(c[1][2], c[1][2], fq.frobeniusCoeffs[power%12])
+}
+
+func (fq *fq12) calculateFrobeniusCoeffs() bool {
+	if fq.frobeniusCoeffs == nil {
+		fq.frobeniusCoeffs = new([12]*fe2)
+		for i := 0; i < 12; i++ {
+			fq.frobeniusCoeffs[i] = fq.f.f.newElement()
+		}
+	}
+	modulus := fq.f.f.f.pbig
+	f0 := fq.f.f.one()
+	fq.f.f.copy(fq.frobeniusCoeffs[0], f0)
+	qPower, rem, power := new(big.Int).Set(modulus), new(big.Int), new(big.Int)
+	for i := 1; i <= 6; i++ {
+		if i > 3 && i < 6 {
+			continue
+		}
+		power.Sub(qPower, big.NewInt(1))
+		power.DivMod(power, big.NewInt(6), rem)
+		if rem.Uint64() != 0 {
+			return false
+		}
+		fq.f.f.exp(fq.frobeniusCoeffs[i], fq.f.nonResidue, power)
+		if i == 3 {
+			qPower.Mul(qPower, qPower)
+		} else {
+			qPower.Mul(qPower, modulus)
+		}
+	}
+	return true
+}
