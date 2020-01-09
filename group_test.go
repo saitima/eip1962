@@ -16,6 +16,10 @@ var (
 		"0x00",
 		"0x00",
 	)
+	fq4One = bytes_(40,
+		"0x01", "0x00",
+		"0x00", "0x00",
+	)
 	fq6CubicOne = bytes_(48,
 		"0x01", "0x00",
 		"0x00", "0x00",
@@ -862,6 +866,170 @@ func TestFq3(t *testing.T) {
 	})
 }
 
+func TestFq4(t *testing.T) {
+	byteLen := 40
+	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
+	f := newField(modulusBytes)
+
+	fq2, err := newFq2(f, nil)
+	if err != nil {
+		panic(err)
+	}
+	nonResidue, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x11")) // decimal: 17
+	if err != nil {
+		panic(err)
+	}
+	f.neg(fq2.nonResidue, nonResidue)
+	fq2.calculateFrobeniusCoeffs()
+
+	fq4, err := newFq4(fq2, nil)
+	if err != nil {
+		panic(err)
+	}
+	fq4.nonResidue = fq2.zero()
+	fq4.f.f.cpy(fq4.nonResidue[0], fq2.nonResidue)
+	fq4.calculateFrobeniusCoeffs()
+
+	zero := fq4.zero()
+	one := fq4.one()
+	actual := fq4.newElement()
+	expected := fq4.newElement()
+
+	t.Run("FromBytes & ToBytes", func(t *testing.T) {
+		a, err := fq4.fromBytes(fq4One)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !fq4.equal(a, fq4.one()) {
+			t.Fatalf("bad fromBytes")
+		}
+		b, err := fq4.fromBytes(
+			fq4.toBytes(a),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !fq4.equal(a, b) {
+			t.Fatalf("not equal")
+		}
+	})
+
+	t.Run("Addition", func(t *testing.T) {
+		fq4.add(actual, zero, zero)
+		if !fq4.equal(actual, zero) {
+			t.Fatalf("bad add")
+		}
+		fq4.add(actual, one, zero)
+		if !fq4.equal(actual, one) {
+			t.Fatalf("bad add")
+		}
+		fq4.add(actual, zero, zero)
+		if !fq4.equal(actual, zero) {
+			t.Fatalf("bad add")
+		}
+	})
+	t.Run("Substraction", func(t *testing.T) {
+		fq4.sub(actual, zero, zero)
+		if !fq4.equal(actual, zero) {
+			t.Fatalf("bad substraction 1")
+		}
+		fq4.sub(actual, one, zero)
+		if !fq4.equal(actual, one) {
+			t.Fatalf("bad substraction 2")
+		}
+		fq4.sub(actual, one, one)
+		if !fq4.equal(actual, zero) {
+			t.Fatalf("bad substraction 3")
+		}
+	})
+
+	t.Run("Negation", func(t *testing.T) {
+		fq4.sub(expected, zero, one)
+		fq4.neg(actual, one)
+		if !fq4.equal(expected, actual) {
+			t.Fatalf("bad negation")
+		}
+	})
+	t.Run("Multiplication", func(t *testing.T) {
+		fq4.mul(actual, zero, zero)
+		if !fq4.equal(actual, zero) {
+			t.Fatalf("bad multiplication 1")
+		}
+		fq4.mul(actual, one, zero)
+		if !fq4.equal(actual, zero) {
+			t.Fatalf("bad multiplication 2")
+		}
+		fq4.mul(actual, zero, one)
+		if !fq4.equal(actual, zero) {
+			t.Fatalf("bad multiplication 2")
+		}
+		fq4.mul(actual, one, one)
+		if !fq4.equal(actual, one) {
+			t.Fatalf("bad multiplication 2")
+		}
+	})
+
+	t.Run("Squaring", func(t *testing.T) {
+		fq4.square(actual, zero)
+		if !fq4.equal(actual, zero) {
+			t.Fatalf("bad squaring 1")
+		}
+		fq4.square(actual, one)
+		if !fq4.equal(actual, one) {
+			t.Fatalf("bad squaring 2")
+		}
+		fq4.double(expected, one)
+		fq4.square(actual, expected)
+		fq4.mul(expected, expected, expected)
+		if !fq4.equal(expected, actual) {
+			t.Fatalf("bad squaring 3")
+		}
+	})
+
+	t.Run("Inverse", func(t *testing.T) {
+		fq4.inverse(actual, zero)
+		if !fq4.equal(actual, zero) {
+			t.Fatalf("bad inversion 1")
+		}
+		fq4.inverse(actual, one)
+		if !fq4.equal(actual, one) {
+			t.Fatalf("bad inversion 2")
+		}
+		fq4.double(expected, one)
+		fq4.inverse(actual, expected)
+		fq4.mul(expected, actual, expected)
+		if !fq4.equal(expected, one) {
+			t.Fatalf("bad inversion 3")
+		}
+	})
+
+	t.Run("Exponentiation", func(t *testing.T) {
+		fq4.exp(actual, zero, bigZero)
+		if !fq4.equal(actual, one) {
+			t.Fatalf("bad exponentiation 1")
+		}
+		fq4.exp(actual, zero, bigOne)
+		if !fq4.equal(actual, zero) {
+			t.Logf("actual %s\n", fq4.toString(actual))
+			t.Fatalf("bad exponentiation 2")
+		}
+		fq4.exp(actual, one, bigZero)
+		if !fq4.equal(actual, one) {
+			t.Fatalf("bad exponentiation 3")
+		}
+		fq4.exp(actual, one, bigOne)
+		if !fq4.equal(actual, one) {
+			t.Fatalf("bad exponentiation 4")
+		}
+		fq4.double(expected, one)
+		fq4.exp(actual, expected, big.NewInt(2))
+		fq4.square(expected, expected)
+		if !fq4.equal(expected, actual) {
+			t.Fatalf("bad exponentiation 4")
+		}
+	})
+}
+
 func TestFq12(t *testing.T) {
 	modulusBytes := bytes_(48, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
 	f := newField(modulusBytes)
@@ -1275,6 +1443,174 @@ func BenchmarkBLS(t *testing.B) {
 	for i := 0; i < t.N; i++ {
 		bls.pair(g1One, g2One)
 	}
+}
+
+func TestMNT4320Pairing(t *testing.T) {
+	byteLen := 40
+	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
+	groupBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
+	f := newField(modulusBytes)
+
+	// G1
+	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x02"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x03545a27639415585ea4d523234fc3edd2a2070a085c7b980f4e9cd21a515d4b0ef528ec0fd5"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	g1, err := newG1(f, nil, nil, groupBytes)
+	if err != nil {
+		panic(err)
+	}
+	f.cpy(g1.a, a)
+	f.cpy(g1.b, b)
+
+	fq2, err := newFq2(f, nil)
+	if err != nil {
+		panic(err)
+	}
+	nonResidue, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x011")) // decimal 17
+	if err != nil {
+		panic(err)
+	}
+	f.cpy(fq2.nonResidue, nonResidue)
+	fq2.calculateFrobeniusCoeffs()
+
+	fq4, err := newFq4(fq2, nil)
+	if err != nil {
+		panic(err)
+	}
+	fq4.nonResidue = fq2.zero()
+	fq4.f.f.cpy(fq4.nonResidue[0], fq2.nonResidue)
+	fq4.calculateFrobeniusCoeffs()
+
+	// G2
+	g2, err := newG22(fq2, nil, nil, groupBytes)
+	if err != nil {
+		panic(err)
+	}
+	// y^2 = x^3 + b/(9+u)
+	twist, twist2, twist3 := fq2.newElement(), fq2.newElement(), fq2.newElement()
+	f.cpy(twist[0], f.zero)
+	f.cpy(twist[1], f.one)
+	fq2.square(twist2, twist)
+	fq2.mul(twist3, twist2, twist)
+
+	a2, b2 := fq2.newElement(), fq2.newElement()
+	fq2.mulByFq(a2, twist2, a)
+	fq2.mulByFq(b2, twist3, b)
+	fq2.copy(g2.a, a2)
+	fq2.copy(g2.b, b2)
+
+	// mnt4 instance)
+	z, ok := new(big.Int).SetString("689871209842287392837045615510547309923794944", 10)
+	if !ok {
+		panic("invalid value")
+	}
+
+	expW0, ok := new(big.Int).SetString("689871209842287392837045615510547309923794945", 10)
+	if !ok {
+		panic("invalid expW0")
+	}
+	expW1 := big.NewInt(1)
+
+	mnt4 := newMnt4Instance(z, false, expW0, expW1, false, fq4, g1, g2, twist)
+
+	generatorBytes := bytes_(byteLen,
+		"0x7a2caf82a1ba85213fe6ca3875aee86aba8f73d69060c4079492b948dea216b5b9c8d2af46",
+		"0x2db619461cc82672f7f159fec2e89d0148dcc9862d36778c1afd96a71e29cba48e710a48ab2",
+	)
+	g1One, err := mnt4.g1.fromBytes(generatorBytes)
+	if err != nil {
+		panic(err)
+	}
+	if !mnt4.g1.isOnCurve(g1One) {
+		panic("p is not on curve\n")
+	}
+	generatorBytes = bytes_(byteLen,
+		"0x371780491c5660571ff542f2ef89001f205151e12a72cb14f01a931e72dba7903df6c09a9a4",
+		"0x4ba59a3f72da165def838081af697c851f002f576303302bb6c02c712c968be32c0ae0a989",
+		"0x4b471f33ffaad868a1c47d6605d31e5c4b3b2e0b60ec98f0f610a5aafd0d9522bca4e79f22",
+		"0x355d05a1c69a5031f3f81a5c100cb7d982f78ec9cfc3b5168ed8d75c7c484fb61a3cbf0e0f1",
+	)
+
+	g2One, err := mnt4.g2.fromBytes(generatorBytes)
+	if err != nil {
+		panic(err)
+	}
+	if !mnt4.g2.isOnCurve(g2One) {
+		panic("q is not on curve\n")
+	}
+	expectedBytes := bytes_(byteLen,
+		"0x000003653498b90d54a52c420cc4a73ad1882feb23bf2ae451037a96e17babd70402dd237238b101",
+		"0x000000cd0a4994729a71440144fedc4378511a7febdf4cdb0499253bcbea9e023c6cfa9cf9682784",
+		"0x000002532341e5b711a9f8f7049a99af28177e51d7a0c384d19cb7547352a7e65c44417babfe0089",
+		"0x0000030c15f867b221786f818a8e96ffa041ea4366fee9bdc9b2d845d6a9b9aded3d34d24b1a34b8",
+	)
+	expected, err := mnt4.fq4.fromBytes(expectedBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("Expected", func(t *testing.T) {
+		actual := mnt4.pair(g1One, g2One)
+		if !mnt4.fq4.equal(expected, actual) {
+			t.Logf("\nexpected: %s\b", mnt4.fq4.toString(expected))
+			t.Logf("\actual: %s\b", mnt4.fq4.toString(actual))
+			t.Fatalf("bad pairing-1")
+		}
+	})
+
+	t.Run("Bilinearity", func(t *testing.T) {
+		a, _ := rand.Int(rand.Reader, big.NewInt(100))
+		b, _ := rand.Int(rand.Reader, big.NewInt(100))
+		c := new(big.Int).Mul(a, b)
+		G, H := mnt4.g1.newPoint(), mnt4.g2.newPoint()
+		mnt4.g1.mulScalar(G, g1One, a)
+		mnt4.g2.mulScalar(H, g2One, b)
+		if !mnt4.g1.isOnCurve(G) {
+			t.Fatal("G isnt on the curve")
+		}
+		if !mnt4.g2.isOnCurve(H) {
+			t.Fatal("H isnt on the curve")
+		}
+
+		var f1, f2 *fe4
+		// e(a*G1, b*G2) = e(G1, G2)^c
+		t.Run("First", func(t *testing.T) {
+			mnt4.g1.affine(G, G)
+			mnt4.g2.affine(H, H)
+			f1 = mnt4.pair(G, H)
+			f2 = mnt4.pair(g1One, g2One)
+			mnt4.fq4.exp(f2, f2, c)
+			if !mnt4.fq4.equal(f1, f2) {
+				t.Errorf("bad pairing")
+			}
+		})
+		// e(a*G1, b*G2) = e(c*G1, G2)
+		t.Run("Second", func(t *testing.T) {
+			G = mnt4.g1.mulScalar(G, g1One, c)
+			mnt4.g1.affine(G, G)
+			f2 = mnt4.pair(G, g2One)
+			if !mnt4.fq4.equal(f1, f2) {
+				t.Errorf("bad pairing")
+			}
+		})
+		// e(a*G1, b*G2) = e(G1, c*G2)
+		t.Run("Third", func(t *testing.T) {
+			H = mnt4.g2.mulScalar(H, g2One, c)
+			mnt4.g2.affine(H, H)
+			f2 = mnt4.pair(g1One, H)
+			if !mnt4.fq4.equal(f1, f2) {
+				t.Errorf("bad pairing")
+			}
+		})
+	})
+
 }
 
 func TestBN254Pairing(t *testing.T) {
