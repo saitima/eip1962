@@ -217,7 +217,6 @@ func (bls *BLSInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*poi
 	for i := 0; i < len(g1Points); i++ {
 		coeffs[i] = make(ellCoeffs, bls.calculateCoeffLength())
 		bls.prepare(coeffs[i], g2Points[i])
-		// fmt.Printf("coeff: %s\n", bls.fq12.f.toStringNoTransform(coeffs[i][0]))
 	}
 
 	j := 0
@@ -237,7 +236,6 @@ func (bls *BLSInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*poi
 			}
 			j++
 		}
-
 	}
 
 	if bls.zIsnegative {
@@ -340,5 +338,5 @@ func (bls *BLSInstance) calculateCoeffLength() int {
 		}
 		j++
 	}
-	return j + 2
+	return j
 }
