@@ -57,7 +57,7 @@ func (g *g22) newPoint() *pointG22 {
 }
 
 func (g *g22) fromBytes(in []byte) (*pointG22, error) {
-	byteLen := g.f.f.limbSize * 16
+	byteLen := g.f.f.limbSize * 8 * 2
 	if len(in) < 2*byteLen {
 		return nil, fmt.Errorf("input string should be equal or larger than 96")
 	}
@@ -77,12 +77,12 @@ func (g *g22) fromBytes(in []byte) (*pointG22, error) {
 }
 
 func (g *g22) toBytes(p *pointG22) []byte {
-	l := (g.f.f.pbig.BitLen())/8 + 1 // TODO
-	out := make([]byte, 4*l)
+	l := g.f.f.limbSize * 8 * 2
+	out := make([]byte, 2*l)
 	a := g.newPoint()
 	g.affine(a, p)
-	copy(out[:2*l], g.f.toBytes(a[0]))
-	copy(out[2*l:], g.f.toBytes(a[1]))
+	copy(out[:l], g.f.toBytes(a[0]))
+	copy(out[l:], g.f.toBytes(a[1]))
 	return out
 }
 
