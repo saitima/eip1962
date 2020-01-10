@@ -17,6 +17,7 @@ const (
 	MAX_ATE_PAIRING_ATE_LOOP_COUNT   = 2032
 	SIGN_ENCODING_LENGTH             = 1
 	MAX_BN_SIX_U_PLUS_TWO_HAMMING    = 128
+	MAX_BLS12_X_HAMMING              = 128
 )
 
 func split(in []byte, offset int) ([]byte, []byte, error) {

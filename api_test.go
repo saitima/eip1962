@@ -73,3 +73,26 @@ func TestBNPairing(t *testing.T) {
 		t.Fatalf("not equal")
 	}
 }
+func TestBLSPairing(t *testing.T) {
+	file := "test_vectors/custom/384.json"
+	v, err := newTestVectorJSONFromFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in, expected, err := v.makeBLSPairingBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	api := new(pairingApi)
+	actual, err := api.pair(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(actual, expected) {
+		t.Logf("actual %x\n", actual)
+		t.Logf("expected %x\n", expected)
+		t.Fatalf("not equal")
+	}
+}
