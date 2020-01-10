@@ -75,9 +75,10 @@ func (fq *fq3) toString(a *fe3) string {
 
 func (fq *fq3) toStringNoTransform(a *fe3) string {
 	return fmt.Sprintf(
-		"c0: %s c1: %s\n",
+		"c0: %s c1: %s c2: %s\n",
 		fq.f.toStringNoTransform(a[0]),
 		fq.f.toStringNoTransform(a[1]),
+		fq.f.toStringNoTransform(a[2]),
 	)
 }
 
@@ -237,8 +238,8 @@ func (fq *fq3) mulByFq(c, a *fe3, b fieldElement) {
 
 func (fq *fq3) frobeniusMap(c, a *fe3, power uint) {
 	fq.copy(c, a)
-	fq.f.mul(c[1], a[1], fq.frobeniusCoeffs[0][power%2])
-	fq.f.mul(c[2], a[2], fq.frobeniusCoeffs[1][power%2])
+	fq.f.mul(c[1], a[1], fq.frobeniusCoeffs[0][power%3])
+	fq.f.mul(c[2], a[2], fq.frobeniusCoeffs[1][power%3])
 }
 
 func (fq *fq3) calculateFrobeniusCoeffs() bool {
