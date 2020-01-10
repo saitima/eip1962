@@ -25,6 +25,10 @@ var (
 		"0x00", "0x00",
 		"0x00", "0x00",
 	)
+	fq6QuadraticOne = bytes_(40,
+		"0x01", "0x00", "0x00",
+		"0x00", "0x00", "0x00",
+	)
 	fq12One = bytes_(48,
 		"0x01", "0x00",
 		"0x00", "0x00",
@@ -35,180 +39,6 @@ var (
 	)
 	bigZero, bigOne = big.NewInt(0), big.NewInt(1)
 )
-
-func TestG1(t *testing.T) {
-	// base field
-	modulus, ok := new(big.Int).SetString("1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab", 16)
-	if !ok {
-		panic("invalid modulus") // @TODO
-	}
-	q, ok := new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
-	if !ok {
-		panic("invalid g1 order")
-	}
-	f := newField(modulus.Bytes())
-	a := bytes_(48, "0x00")
-	b := bytes_(48, "0x04")
-	g, err := newG1(f, a, b, q.Bytes())
-	if err != nil {
-		panic(err)
-	}
-	zero := g.zero()
-	oneBytes := bytes_(48,
-		"0x17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb",
-		"0x08b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1",
-	)
-	actual, expected := g.newPoint(), g.zero()
-	one := g.newPoint()
-	t.Run("FromBytes & ToBytes", func(t *testing.T) {
-		one, err = g.fromBytes(oneBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		q, err := g.fromBytes(
-			g.toBytes(one),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !g.equal(one, q) {
-			t.Logf("invalid out ")
-		}
-	})
-
-	t.Run("Is on curve", func(t *testing.T) {
-		if !g.isOnCurve(one) {
-			t.Fatalf("point is not on the curve")
-		}
-	})
-
-	t.Run("Copy", func(t *testing.T) {
-		q := g.newPoint()
-		g.copy(q, one)
-		if !g.equal(q, one) {
-			t.Fatalf("bad point copy")
-		}
-	})
-
-	t.Run("Equality", func(t *testing.T) {
-		if !g.equal(zero, zero) {
-			t.Fatal("bad equality 1")
-		}
-		if !g.equal(one, one) {
-			t.Fatal("bad equality 2")
-		}
-		if g.equal(one, zero) {
-			// t.Fatal("bad equality 3") // TODO: affine equality
-		}
-	})
-
-	t.Run("Affine", func(t *testing.T) {
-		g.double(actual, one)
-		g.sub(expected, actual, one)
-		g.affine(expected, expected)
-		if !g.equal(expected, one) {
-			t.Fatal("invalid affine ops")
-		}
-	})
-
-	t.Run("Addition", func(t *testing.T) {
-		g.add(actual, zero, zero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad addition 1")
-		}
-		g.add(actual, one, zero)
-		if !g.equal(actual, one) {
-			t.Fatal("bad addition 2")
-		}
-		g.add(actual, zero, one)
-		if !g.equal(actual, one) {
-			t.Fatal("bad addition 3")
-		}
-	})
-	t.Run("Substraction", func(t *testing.T) {
-		g.sub(actual, zero, zero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad substraction 1")
-		}
-		g.sub(actual, one, zero)
-		if !g.equal(actual, one) {
-			t.Fatal("bad substraction 2")
-		}
-		g.sub(actual, one, one)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad substraction 3")
-		}
-	})
-	t.Run("Negation", func(t *testing.T) {
-		g.neg(actual, zero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad negation 1")
-		}
-		g.neg(actual, one)
-		g.sub(expected, zero, one)
-		if !g.equal(actual, expected) {
-			t.Fatal("bad negation 2")
-		}
-	})
-
-	t.Run("Doubling", func(t *testing.T) {
-		g.double(actual, zero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad doubling 1")
-		}
-		g.add(expected, one, one)
-		g.double(actual, one)
-		if !g.equal(actual, expected) {
-			t.Fatal("bad addition 2")
-		}
-	})
-
-	t.Run("Scalar Multiplication", func(t *testing.T) {
-		g.mulScalar(actual, zero, bigZero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad scalar multiplication 1")
-		}
-		g.mulScalar(actual, zero, bigOne)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad scalar multiplication 2")
-		}
-		g.mulScalar(actual, one, bigZero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad scalar multiplication 3")
-		}
-		g.mulScalar(actual, one, bigOne)
-		if !g.equal(actual, one) {
-			t.Fatal("bad scalar multiplication 4")
-		}
-	})
-
-	t.Run("Multi Exponentiation", func(t *testing.T) {
-		count := 1000
-		bases := make([]*pointG1, count)
-		scalars := make([]*big.Int, count)
-		// prepare bases
-		// bases: S[0]*G, S[1]*G ... S[n-1]*G
-		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
-			// TODO : make sure that s is unique
-			scalars[j], _ = rand.Int(rand.Reader, big.NewInt(10000))
-			bases[i] = g.zero()
-			g.mulScalar(bases[i], one, scalars[j])
-		}
-
-		// expected
-		//  S[n-1]*P[1], S[n-2]*P[2] ... S[0]*P[n-1]
-		expected, tmp := g.zero(), g.zero()
-		for i := 0; i < count; i++ {
-			g.mulScalar(tmp, bases[i], scalars[i])
-			g.add(expected, expected, tmp)
-		}
-		result := g.zero()
-		g.multiExp(result, bases, scalars)
-		if !g.equal(expected, result) {
-			t.Fatalf("bad multi-exponentiation")
-		}
-	})
-}
 
 func TestFq2(t *testing.T) {
 	modulusBytes := bytes_(48, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
@@ -356,197 +186,6 @@ func TestFq2(t *testing.T) {
 		fq2.square(expected, expected)
 		if !fq2.equal(expected, actual) {
 			t.Fatalf("bad exponentiation 4")
-		}
-	})
-}
-
-func TestG22(t *testing.T) {
-	// base field
-	modulus, ok := new(big.Int).SetString("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787", 10)
-	if !ok {
-		panic("invalid modulus") // @TODO
-	}
-	q, ok := new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
-	if !ok {
-		panic("invalid g1 order")
-	}
-	f := newField(modulus.Bytes())
-	fq2, err := newFq2(f, nil)
-	if err != nil {
-		panic(err)
-	}
-	f.neg(fq2.nonResidue, f.one)
-	fq2.calculateFrobeniusCoeffs()
-
-	g, err := newG22(fq2, nil, nil, q.Bytes())
-	if err != nil {
-		panic(err)
-	}
-	zero := g.zero()
-	oneBytes := bytes_(48,
-		"0x024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8",
-		"0x13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e",
-		"0x0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801",
-		"0x0606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be",
-	)
-	actual, expected := g.newPoint(), g.zero()
-	one := g.newPoint()
-	t.Run("FromBytes & ToBytes", func(t *testing.T) {
-		one, err = g.fromBytes(oneBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		q, err := g.fromBytes(
-			g.toBytes(one),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !g.equal(one, q) {
-			t.Logf("invalid out ")
-		}
-	})
-	b, err := f.newFieldElementFromBytes(bytes_(48, "0x04"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	a2, b2 := fq2.zero(), fq2.newElement()
-	f.cpy(b2[0], b)
-	f.cpy(b2[1], b)
-	fq2.copy(g.a, a2)
-	fq2.copy(g.b, b2)
-
-	t.Run("Is on curve", func(t *testing.T) {
-		if !g.isOnCurve(one) {
-			t.Fatalf("point is not on the curve")
-		}
-	})
-
-	t.Run("Copy", func(t *testing.T) {
-		q := g.newPoint()
-		g.copy(q, one)
-		if !g.equal(q, one) {
-			t.Fatalf("bad point copy")
-		}
-	})
-
-	t.Run("Equality", func(t *testing.T) {
-		if !g.equal(zero, zero) {
-			t.Fatal("bad equality 1")
-		}
-		if !g.equal(one, one) {
-			t.Fatal("bad equality 2")
-		}
-		if g.equal(one, zero) {
-			// t.Fatal("bad equality 3") // TODO: affine equality
-		}
-	})
-
-	t.Run("Affine", func(t *testing.T) {
-		g.double(actual, one)
-		g.sub(expected, actual, one)
-		g.affine(expected, expected)
-		if !g.equal(expected, one) {
-			t.Fatal("invalid affine ops")
-		}
-	})
-
-	t.Run("Addition", func(t *testing.T) {
-		g.add(actual, zero, zero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad addition 1")
-		}
-		g.add(actual, one, zero)
-		if !g.equal(actual, one) {
-			t.Fatal("bad addition 2")
-		}
-		g.add(actual, zero, one)
-		if !g.equal(actual, one) {
-			t.Fatal("bad addition 3")
-		}
-	})
-
-	t.Run("Substraction", func(t *testing.T) {
-		g.sub(actual, zero, zero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad substraction 1")
-		}
-		g.sub(actual, one, zero)
-		if !g.equal(actual, one) {
-			t.Fatal("bad substraction 2")
-		}
-		g.sub(actual, one, one)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad substraction 3")
-		}
-	})
-	t.Run("Negation", func(t *testing.T) {
-		g.neg(actual, zero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad negation 1")
-		}
-		g.neg(actual, one)
-		g.sub(expected, zero, one)
-		if !g.equal(actual, expected) {
-			t.Fatal("bad negation 2")
-		}
-	})
-
-	t.Run("Doubling", func(t *testing.T) {
-		g.double(actual, zero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad doubling 1")
-		}
-		g.add(expected, one, one)
-		g.double(actual, one)
-		if !g.equal(actual, expected) {
-			t.Fatal("bad addition 2")
-		}
-	})
-
-	t.Run("Scalar Multiplication", func(t *testing.T) {
-		g.mulScalar(actual, zero, bigZero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad scalar multiplication 1")
-		}
-		g.mulScalar(actual, zero, bigOne)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad scalar multiplication 2")
-		}
-		g.mulScalar(actual, one, bigZero)
-		if !g.equal(actual, zero) {
-			t.Fatal("bad scalar multiplication 3")
-		}
-		g.mulScalar(actual, one, bigOne)
-		if !g.equal(actual, one) {
-			t.Fatal("bad scalar multiplication 4")
-		}
-	})
-
-	t.Run("Multi Exponentiation", func(t *testing.T) {
-		count := 1000
-		bases := make([]*pointG22, count)
-		scalars := make([]*big.Int, count)
-		// prepare bases
-		// bases: S[0]*G, S[1]*G ... S[n-1]*G
-		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
-			// TODO : make sure that s is unique
-			scalars[j], _ = rand.Int(rand.Reader, big.NewInt(10000))
-			bases[i] = g.zero()
-			g.mulScalar(bases[i], one, scalars[j])
-		}
-
-		// expected
-		//  S[n-1]*P[1], S[n-2]*P[2] ... S[0]*P[n-1]
-		expected, tmp := g.zero(), g.zero()
-		for i := 0; i < count; i++ {
-			g.mulScalar(tmp, bases[i], scalars[i])
-			g.add(expected, expected, tmp)
-		}
-		result := g.zero()
-		g.multiExp(result, bases, scalars)
-		if !g.equal(expected, result) {
-			t.Fatalf("bad multi-exponentiation")
 		}
 	})
 }
@@ -1030,6 +669,170 @@ func TestFq4(t *testing.T) {
 	})
 }
 
+func TestFq6Quadratic(t *testing.T) {
+	byteLen := 40
+	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
+	f := newField(modulusBytes)
+
+	fq3, err := newFq3(f, nil)
+	if err != nil {
+		panic(err)
+	}
+	nonResidue, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x05"))
+	if err != nil {
+		panic(err)
+	}
+	f.neg(fq3.nonResidue, nonResidue)
+	fq3.calculateFrobeniusCoeffs()
+
+	fq6, err := newFq6Quadratic(fq3, nil)
+	if err != nil {
+		panic(err)
+	}
+	fq6.nonResidue = fq3.zero()
+	fq6.f.f.cpy(fq6.nonResidue[0], fq3.nonResidue)
+	fq6.calculateFrobeniusCoeffs()
+
+	zero := fq6.zero()
+	one := fq6.one()
+	actual := fq6.newElement()
+	expected := fq6.newElement()
+
+	t.Run("FromBytes & ToBytes", func(t *testing.T) {
+		a, err := fq6.fromBytes(fq6QuadraticOne)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !fq6.equal(a, fq6.one()) {
+			t.Fatalf("bad fromBytes")
+		}
+		b, err := fq6.fromBytes(
+			fq6.toBytes(a),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !fq6.equal(a, b) {
+			t.Fatalf("not equal")
+		}
+	})
+
+	t.Run("Addition", func(t *testing.T) {
+		fq6.add(actual, zero, zero)
+		if !fq6.equal(actual, zero) {
+			t.Fatalf("bad add")
+		}
+		fq6.add(actual, one, zero)
+		if !fq6.equal(actual, one) {
+			t.Fatalf("bad add")
+		}
+		fq6.add(actual, zero, zero)
+		if !fq6.equal(actual, zero) {
+			t.Fatalf("bad add")
+		}
+	})
+	t.Run("Substraction", func(t *testing.T) {
+		fq6.sub(actual, zero, zero)
+		if !fq6.equal(actual, zero) {
+			t.Fatalf("bad substraction 1")
+		}
+		fq6.sub(actual, one, zero)
+		if !fq6.equal(actual, one) {
+			t.Fatalf("bad substraction 2")
+		}
+		fq6.sub(actual, one, one)
+		if !fq6.equal(actual, zero) {
+			t.Fatalf("bad substraction 3")
+		}
+	})
+
+	t.Run("Negation", func(t *testing.T) {
+		fq6.sub(expected, zero, one)
+		fq6.neg(actual, one)
+		if !fq6.equal(expected, actual) {
+			t.Fatalf("bad negation")
+		}
+	})
+	t.Run("Multiplication", func(t *testing.T) {
+		fq6.mul(actual, zero, zero)
+		if !fq6.equal(actual, zero) {
+			t.Fatalf("bad multiplication 1")
+		}
+		fq6.mul(actual, one, zero)
+		if !fq6.equal(actual, zero) {
+			t.Fatalf("bad multiplication 2")
+		}
+		fq6.mul(actual, zero, one)
+		if !fq6.equal(actual, zero) {
+			t.Fatalf("bad multiplication 2")
+		}
+		fq6.mul(actual, one, one)
+		if !fq6.equal(actual, one) {
+			t.Fatalf("bad multiplication 2")
+		}
+	})
+
+	t.Run("Squaring", func(t *testing.T) {
+		fq6.square(actual, zero)
+		if !fq6.equal(actual, zero) {
+			t.Fatalf("bad squaring 1")
+		}
+		fq6.square(actual, one)
+		if !fq6.equal(actual, one) {
+			t.Fatalf("bad squaring 2")
+		}
+		fq6.double(expected, one)
+		fq6.square(actual, expected)
+		fq6.mul(expected, expected, expected)
+		if !fq6.equal(expected, actual) {
+			t.Fatalf("bad squaring 3")
+		}
+	})
+
+	t.Run("Inverse", func(t *testing.T) {
+		fq6.inverse(actual, zero)
+		if !fq6.equal(actual, zero) {
+			t.Fatalf("bad inversion 1")
+		}
+		fq6.inverse(actual, one)
+		if !fq6.equal(actual, one) {
+			t.Fatalf("bad inversion 2")
+		}
+		fq6.double(expected, one)
+		fq6.inverse(actual, expected)
+		fq6.mul(expected, actual, expected)
+		if !fq6.equal(expected, one) {
+			t.Fatalf("bad inversion 3")
+		}
+	})
+
+	t.Run("Exponentiation", func(t *testing.T) {
+		fq6.exp(actual, zero, bigZero)
+		if !fq6.equal(actual, one) {
+			t.Fatalf("bad exponentiation 1")
+		}
+		fq6.exp(actual, zero, bigOne)
+		if !fq6.equal(actual, zero) {
+			t.Logf("actual %s\n", fq6.toString(actual))
+			t.Fatalf("bad exponentiation 2")
+		}
+		fq6.exp(actual, one, bigZero)
+		if !fq6.equal(actual, one) {
+			t.Fatalf("bad exponentiation 3")
+		}
+		fq6.exp(actual, one, bigOne)
+		if !fq6.equal(actual, one) {
+			t.Fatalf("bad exponentiation 4")
+		}
+		fq6.double(expected, one)
+		fq6.exp(actual, expected, big.NewInt(2))
+		fq6.square(expected, expected)
+		if !fq6.equal(expected, actual) {
+			t.Fatalf("bad exponentiation 4")
+		}
+	})
+}
+
 func TestFq12(t *testing.T) {
 	modulusBytes := bytes_(48, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
 	f := newField(modulusBytes)
@@ -1191,6 +994,571 @@ func TestFq12(t *testing.T) {
 		fq12.square(expected, expected)
 		if !fq12.equal(expected, actual) {
 			t.Fatalf("bad exponentiation 4")
+		}
+	})
+}
+
+func TestG1(t *testing.T) {
+	// base field
+	modulus, ok := new(big.Int).SetString("1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab", 16)
+	if !ok {
+		panic("invalid modulus") // @TODO
+	}
+	q, ok := new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
+	if !ok {
+		panic("invalid g1 order")
+	}
+	f := newField(modulus.Bytes())
+	a := bytes_(48, "0x00")
+	b := bytes_(48, "0x04")
+	g, err := newG1(f, a, b, q.Bytes())
+	if err != nil {
+		panic(err)
+	}
+	zero := g.zero()
+	oneBytes := bytes_(48,
+		"0x17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb",
+		"0x08b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1",
+	)
+	actual, expected := g.newPoint(), g.zero()
+	one := g.newPoint()
+	t.Run("FromBytes & ToBytes", func(t *testing.T) {
+		one, err = g.fromBytes(oneBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		q, err := g.fromBytes(
+			g.toBytes(one),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !g.equal(one, q) {
+			t.Logf("invalid out ")
+		}
+	})
+
+	t.Run("Is on curve", func(t *testing.T) {
+		if !g.isOnCurve(one) {
+			t.Fatalf("point is not on the curve")
+		}
+	})
+
+	t.Run("Copy", func(t *testing.T) {
+		q := g.newPoint()
+		g.copy(q, one)
+		if !g.equal(q, one) {
+			t.Fatalf("bad point copy")
+		}
+	})
+
+	t.Run("Equality", func(t *testing.T) {
+		if !g.equal(zero, zero) {
+			t.Fatal("bad equality 1")
+		}
+		if !g.equal(one, one) {
+			t.Fatal("bad equality 2")
+		}
+		if g.equal(one, zero) {
+			// t.Fatal("bad equality 3") // TODO: affine equality
+		}
+	})
+
+	t.Run("Affine", func(t *testing.T) {
+		g.double(actual, one)
+		g.sub(expected, actual, one)
+		g.affine(expected, expected)
+		if !g.equal(expected, one) {
+			t.Fatal("invalid affine ops")
+		}
+	})
+
+	t.Run("Addition", func(t *testing.T) {
+		g.add(actual, zero, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad addition 1")
+		}
+		g.add(actual, one, zero)
+		if !g.equal(actual, one) {
+			t.Fatal("bad addition 2")
+		}
+		g.add(actual, zero, one)
+		if !g.equal(actual, one) {
+			t.Fatal("bad addition 3")
+		}
+	})
+	t.Run("Substraction", func(t *testing.T) {
+		g.sub(actual, zero, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad substraction 1")
+		}
+		g.sub(actual, one, zero)
+		if !g.equal(actual, one) {
+			t.Fatal("bad substraction 2")
+		}
+		g.sub(actual, one, one)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad substraction 3")
+		}
+	})
+	t.Run("Negation", func(t *testing.T) {
+		g.neg(actual, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad negation 1")
+		}
+		g.neg(actual, one)
+		g.sub(expected, zero, one)
+		if !g.equal(actual, expected) {
+			t.Fatal("bad negation 2")
+		}
+	})
+
+	t.Run("Doubling", func(t *testing.T) {
+		g.double(actual, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad doubling 1")
+		}
+		g.add(expected, one, one)
+		g.double(actual, one)
+		if !g.equal(actual, expected) {
+			t.Fatal("bad addition 2")
+		}
+	})
+
+	t.Run("Scalar Multiplication", func(t *testing.T) {
+		g.mulScalar(actual, zero, bigZero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 1")
+		}
+		g.mulScalar(actual, zero, bigOne)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 2")
+		}
+		g.mulScalar(actual, one, bigZero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 3")
+		}
+		g.mulScalar(actual, one, bigOne)
+		if !g.equal(actual, one) {
+			t.Fatal("bad scalar multiplication 4")
+		}
+	})
+
+	t.Run("Multi Exponentiation", func(t *testing.T) {
+		count := 1000
+		bases := make([]*pointG1, count)
+		scalars := make([]*big.Int, count)
+		// prepare bases
+		// bases: S[0]*G, S[1]*G ... S[n-1]*G
+		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
+			// TODO : make sure that s is unique
+			scalars[j], _ = rand.Int(rand.Reader, big.NewInt(10000))
+			bases[i] = g.zero()
+			g.mulScalar(bases[i], one, scalars[j])
+		}
+
+		// expected
+		//  S[n-1]*P[1], S[n-2]*P[2] ... S[0]*P[n-1]
+		expected, tmp := g.zero(), g.zero()
+		for i := 0; i < count; i++ {
+			g.mulScalar(tmp, bases[i], scalars[i])
+			g.add(expected, expected, tmp)
+		}
+		result := g.zero()
+		g.multiExp(result, bases, scalars)
+		if !g.equal(expected, result) {
+			t.Fatalf("bad multi-exponentiation")
+		}
+	})
+}
+
+func TestG22(t *testing.T) {
+	// base field
+	modulus, ok := new(big.Int).SetString("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787", 10)
+	if !ok {
+		panic("invalid modulus") // @TODO
+	}
+	q, ok := new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
+	if !ok {
+		panic("invalid g1 order")
+	}
+	f := newField(modulus.Bytes())
+	fq2, err := newFq2(f, nil)
+	if err != nil {
+		panic(err)
+	}
+	f.neg(fq2.nonResidue, f.one)
+	fq2.calculateFrobeniusCoeffs()
+
+	g, err := newG22(fq2, nil, nil, q.Bytes())
+	if err != nil {
+		panic(err)
+	}
+	zero := g.zero()
+	oneBytes := bytes_(48,
+		"0x024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8",
+		"0x13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e",
+		"0x0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801",
+		"0x0606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be",
+	)
+	actual, expected := g.newPoint(), g.zero()
+	one := g.newPoint()
+	t.Run("FromBytes & ToBytes", func(t *testing.T) {
+		one, err = g.fromBytes(oneBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		q, err := g.fromBytes(
+			g.toBytes(one),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !g.equal(one, q) {
+			t.Logf("invalid out ")
+		}
+	})
+	b, err := f.newFieldElementFromBytes(bytes_(48, "0x04"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a2, b2 := fq2.zero(), fq2.newElement()
+	f.cpy(b2[0], b)
+	f.cpy(b2[1], b)
+	fq2.copy(g.a, a2)
+	fq2.copy(g.b, b2)
+
+	t.Run("Is on curve", func(t *testing.T) {
+		if !g.isOnCurve(one) {
+			t.Fatalf("point is not on the curve")
+		}
+	})
+
+	t.Run("Copy", func(t *testing.T) {
+		q := g.newPoint()
+		g.copy(q, one)
+		if !g.equal(q, one) {
+			t.Fatalf("bad point copy")
+		}
+	})
+
+	t.Run("Equality", func(t *testing.T) {
+		if !g.equal(zero, zero) {
+			t.Fatal("bad equality 1")
+		}
+		if !g.equal(one, one) {
+			t.Fatal("bad equality 2")
+		}
+		if g.equal(one, zero) {
+			// t.Fatal("bad equality 3") // TODO: affine equality
+		}
+	})
+
+	t.Run("Affine", func(t *testing.T) {
+		g.double(actual, one)
+		g.sub(expected, actual, one)
+		g.affine(expected, expected)
+		if !g.equal(expected, one) {
+			t.Fatal("invalid affine ops")
+		}
+	})
+
+	t.Run("Addition", func(t *testing.T) {
+		g.add(actual, zero, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad addition 1")
+		}
+		g.add(actual, one, zero)
+		if !g.equal(actual, one) {
+			t.Fatal("bad addition 2")
+		}
+		g.add(actual, zero, one)
+		if !g.equal(actual, one) {
+			t.Fatal("bad addition 3")
+		}
+	})
+
+	t.Run("Substraction", func(t *testing.T) {
+		g.sub(actual, zero, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad substraction 1")
+		}
+		g.sub(actual, one, zero)
+		if !g.equal(actual, one) {
+			t.Fatal("bad substraction 2")
+		}
+		g.sub(actual, one, one)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad substraction 3")
+		}
+	})
+	t.Run("Negation", func(t *testing.T) {
+		g.neg(actual, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad negation 1")
+		}
+		g.neg(actual, one)
+		g.sub(expected, zero, one)
+		if !g.equal(actual, expected) {
+			t.Fatal("bad negation 2")
+		}
+	})
+
+	t.Run("Doubling", func(t *testing.T) {
+		g.double(actual, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad doubling 1")
+		}
+		g.add(expected, one, one)
+		g.double(actual, one)
+		if !g.equal(actual, expected) {
+			t.Fatal("bad addition 2")
+		}
+	})
+
+	t.Run("Scalar Multiplication", func(t *testing.T) {
+		g.mulScalar(actual, zero, bigZero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 1")
+		}
+		g.mulScalar(actual, zero, bigOne)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 2")
+		}
+		g.mulScalar(actual, one, bigZero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 3")
+		}
+		g.mulScalar(actual, one, bigOne)
+		if !g.equal(actual, one) {
+			t.Fatal("bad scalar multiplication 4")
+		}
+	})
+
+	t.Run("Multi Exponentiation", func(t *testing.T) {
+		count := 1000
+		bases := make([]*pointG22, count)
+		scalars := make([]*big.Int, count)
+		// prepare bases
+		// bases: S[0]*G, S[1]*G ... S[n-1]*G
+		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
+			// TODO : make sure that s is unique
+			scalars[j], _ = rand.Int(rand.Reader, big.NewInt(10000))
+			bases[i] = g.zero()
+			g.mulScalar(bases[i], one, scalars[j])
+		}
+
+		// expected
+		//  S[n-1]*P[1], S[n-2]*P[2] ... S[0]*P[n-1]
+		expected, tmp := g.zero(), g.zero()
+		for i := 0; i < count; i++ {
+			g.mulScalar(tmp, bases[i], scalars[i])
+			g.add(expected, expected, tmp)
+		}
+		result := g.zero()
+		g.multiExp(result, bases, scalars)
+		if !g.equal(expected, result) {
+			t.Fatalf("bad multi-exponentiation")
+		}
+	})
+}
+
+func TestG23(t *testing.T) {
+	byteLen := 40
+	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
+	groupBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
+
+	f := newField(modulusBytes)
+
+	fq3, err := newFq3(f, nil)
+	if err != nil {
+		panic(err)
+	}
+	fq3.nonResidue, err = f.newFieldElementFromBytes(bytes_(byteLen, "0x05"))
+	if err != nil {
+		panic(err)
+	}
+	fq3.calculateFrobeniusCoeffs()
+
+	g, err := newG23(fq3, nil, nil, groupBytes)
+	if err != nil {
+		panic(err)
+	}
+
+	zero := g.zero()
+	oneBytes := bytes_(byteLen,
+		"0x34f7320a12b56ce532bccb3b44902cbaa723cd60035ada7404b743ad2e644ad76257e4c6813",
+		"0xcf41620baa52eec50e61a70ab5b45f681952e0109340fec84f1b2890aba9b15cac5a0c80fa",
+		"0x11f99170e10e326433cccb8032fb48007ca3c4e105cf31b056ac767e2cb01258391bd4917ce",
+		"0x3a65968f03cc64d62ad05c79c415e07ebd38b363ec48309487c0b83e1717a582c1b60fecc91",
+		"0xca5e8427e5db1506c1a24cefc2451ab3accaea5db82dcb0c7117cc74402faa5b2c37685c6e",
+		"0xf75d2dd88302c9a4ef941307629a1b3e197277d83abb715f647c2e55a27baf782f5c60e7f7",
+	)
+	actual, expected := g.newPoint(), g.zero()
+	one := g.newPoint()
+	t.Run("FromBytes & ToBytes", func(t *testing.T) {
+		one, err = g.fromBytes(oneBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		q, err := g.fromBytes(
+			g.toBytes(one),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !g.equal(one, q) {
+			t.Logf("invalid out ")
+		}
+	})
+	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xd68c7b1dc5dd042e957b71c44d3d6c24e683fc09b420b1a2d263fde47ddba59463d0c65282"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	twist, twist2, twist3 := fq3.newElement(), fq3.newElement(), fq3.newElement()
+	f.cpy(twist[0], f.zero)
+	f.cpy(twist[1], f.one)
+	fq3.square(twist2, twist)
+	fq3.mul(twist3, twist2, twist)
+	fq3.mulByFq(g.a, twist2, a)
+	fq3.mulByFq(g.b, twist3, b)
+
+	t.Run("Is on curve", func(t *testing.T) {
+		if !g.isOnCurve(one) {
+			t.Fatalf("point is not on the curve")
+		}
+	})
+
+	t.Run("Copy", func(t *testing.T) {
+		q := g.newPoint()
+		g.copy(q, one)
+		if !g.equal(q, one) {
+			t.Fatalf("bad point copy")
+		}
+	})
+
+	t.Run("Equality", func(t *testing.T) {
+		if !g.equal(zero, zero) {
+			t.Fatal("bad equality 1")
+		}
+		if !g.equal(one, one) {
+			t.Fatal("bad equality 2")
+		}
+		if g.equal(one, zero) {
+			// t.Fatal("bad equality 3") // TODO: affine equality
+		}
+	})
+
+	t.Run("Affine", func(t *testing.T) {
+		g.double(actual, one)
+		g.sub(expected, actual, one)
+		g.affine(expected, expected)
+		if !g.equal(expected, one) {
+			t.Fatal("invalid affine ops")
+		}
+	})
+
+	t.Run("Addition", func(t *testing.T) {
+		g.add(actual, zero, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad addition 1")
+		}
+		g.add(actual, one, zero)
+		if !g.equal(actual, one) {
+			t.Fatal("bad addition 2")
+		}
+		g.add(actual, zero, one)
+		if !g.equal(actual, one) {
+			t.Fatal("bad addition 3")
+		}
+	})
+
+	t.Run("Substraction", func(t *testing.T) {
+		g.sub(actual, zero, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad substraction 1")
+		}
+		g.sub(actual, one, zero)
+		if !g.equal(actual, one) {
+			t.Fatal("bad substraction 2")
+		}
+		g.sub(actual, one, one)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad substraction 3")
+		}
+	})
+	t.Run("Negation", func(t *testing.T) {
+		g.neg(actual, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad negation 1")
+		}
+		g.neg(actual, one)
+		g.sub(expected, zero, one)
+		if !g.equal(actual, expected) {
+			t.Fatal("bad negation 2")
+		}
+	})
+
+	t.Run("Doubling", func(t *testing.T) {
+		g.double(actual, zero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad doubling 1")
+		}
+		g.add(expected, one, one)
+		g.double(actual, one)
+		if !g.equal(actual, expected) {
+			t.Fatal("bad addition 2")
+		}
+	})
+
+	t.Run("Scalar Multiplication", func(t *testing.T) {
+		g.mulScalar(actual, zero, bigZero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 1")
+		}
+		g.mulScalar(actual, zero, bigOne)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 2")
+		}
+		g.mulScalar(actual, one, bigZero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 3")
+		}
+		g.mulScalar(actual, one, bigOne)
+		if !g.equal(actual, one) {
+			t.Fatal("bad scalar multiplication 4")
+		}
+	})
+
+	t.Run("Multi Exponentiation", func(t *testing.T) {
+		count := 1000
+		bases := make([]*pointG23, count)
+		scalars := make([]*big.Int, count)
+		// prepare bases
+		// bases: S[0]*G, S[1]*G ... S[n-1]*G
+		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
+			// TODO : make sure that s is unique
+			scalars[j], _ = rand.Int(rand.Reader, big.NewInt(10000))
+			bases[i] = g.zero()
+			g.mulScalar(bases[i], one, scalars[j])
+		}
+
+		// expected
+		//  S[n-1]*P[1], S[n-2]*P[2] ... S[0]*P[n-1]
+		expected, tmp := g.zero(), g.zero()
+		for i := 0; i < count; i++ {
+			g.mulScalar(tmp, bases[i], scalars[i])
+			g.add(expected, expected, tmp)
+		}
+		result := g.zero()
+		g.multiExp(result, bases, scalars)
+		if !g.equal(expected, result) {
+			t.Fatalf("bad multi-exponentiation")
 		}
 	})
 }
@@ -1776,6 +2144,171 @@ func TestBN254Pairing(t *testing.T) {
 			bn.g2.affine(H, H)
 			f2 = bn.pair(g1One, H)
 			if !bn.fq12.equal(f1, f2) {
+				t.Errorf("bad pairing")
+			}
+		})
+	})
+
+}
+
+func TestMNT6320Pairing(t *testing.T) {
+	byteLen := 40
+	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
+	groupBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
+	f := newField(modulusBytes)
+
+	// G1
+	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xd68c7b1dc5dd042e957b71c44d3d6c24e683fc09b420b1a2d263fde47ddba59463d0c65282"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	g1, err := newG1(f, nil, nil, groupBytes)
+	if err != nil {
+		panic(err)
+	}
+	f.cpy(g1.a, a)
+	f.cpy(g1.b, b)
+
+	fq3, err := newFq3(f, nil)
+	if err != nil {
+		panic(err)
+	}
+	nonResidue, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x05"))
+	if err != nil {
+		panic(err)
+	}
+	f.cpy(fq3.nonResidue, nonResidue)
+	fq3.calculateFrobeniusCoeffs()
+
+	fq6, err := newFq6Quadratic(fq3, nil)
+	if err != nil {
+		panic(err)
+	}
+	fq6.nonResidue = fq3.zero()
+	fq6.f.f.cpy(fq6.nonResidue[0], fq3.nonResidue)
+	fq6.calculateFrobeniusCoeffs()
+
+	// G2
+	g2, err := newG23(fq3, nil, nil, groupBytes)
+	if err != nil {
+		panic(err)
+	}
+
+	twist, twist2, twist3 := fq3.newElement(), fq3.newElement(), fq3.newElement()
+	f.cpy(twist[0], f.zero)
+	f.cpy(twist[1], f.one)
+	fq3.square(twist2, twist)
+	fq3.mul(twist3, twist2, twist)
+	fq3.mulByFq(g2.a, twist2, a)
+	fq3.mulByFq(g2.b, twist3, b)
+
+	// mnt6 instance)
+	z, ok := new(big.Int).SetString("689871209842287392837045615510547309923794944", 10)
+	if !ok {
+		panic("invalid value")
+	}
+
+	expW0, ok := new(big.Int).SetString("689871209842287392837045615510547309923794944", 10)
+	if !ok {
+		panic("invalid expW0")
+	}
+	expW1 := big.NewInt(1)
+
+	mnt6 := newMNT6Instance(z, true, expW0, expW1, true, fq6, g1, g2, twist)
+
+	generatorBytes := bytes_(byteLen,
+		"0x2a4feee24fd2c69d1d90471b2ba61ed56f9bad79b57e0b4c671392584bdadebc01abbc0447d",
+		"0x32986c245f6db2f82f4e037bf7afd69cbfcbff07fc25d71e9c75e1b97208a333d73d91d3028",
+	)
+	g1One, err := mnt6.g1.fromBytes(generatorBytes)
+	if err != nil {
+		panic(err)
+	}
+	if !mnt6.g1.isOnCurve(g1One) {
+		panic("p is not on curve\n")
+	}
+	generatorBytes = bytes_(byteLen,
+		"0x34f7320a12b56ce532bccb3b44902cbaa723cd60035ada7404b743ad2e644ad76257e4c6813",
+		"0xcf41620baa52eec50e61a70ab5b45f681952e0109340fec84f1b2890aba9b15cac5a0c80fa",
+		"0x11f99170e10e326433cccb8032fb48007ca3c4e105cf31b056ac767e2cb01258391bd4917ce",
+		"0x3a65968f03cc64d62ad05c79c415e07ebd38b363ec48309487c0b83e1717a582c1b60fecc91",
+		"0xca5e8427e5db1506c1a24cefc2451ab3accaea5db82dcb0c7117cc74402faa5b2c37685c6e",
+		"0xf75d2dd88302c9a4ef941307629a1b3e197277d83abb715f647c2e55a27baf782f5c60e7f7",
+	)
+	g2One, err := mnt6.g2.fromBytes(generatorBytes)
+	if err != nil {
+		panic(err)
+	}
+	if !mnt6.g2.isOnCurve(g2One) {
+		panic("q is not on curve\n")
+	}
+	expectedBytes := bytes_(byteLen,
+		"0x0000014ac12149eebffe74a1c75a7225deb91ca243c49eef01392080ff519ab6209431f81b50ec03",
+		"0x000001ba8ab5bc93186b5bc2b1936fee360528228ab953fbce3c7b84f71d6c0e87b293d0de36eb93",
+		"0x00000323a5728ce32f5a04635ca9f84857882e9c13a2b415a021985921c79f303f1f0b69557c5c3d",
+		"0x0000032e067f62de41a786c2a43da960855694f3e0da14a964377a32ddad42cf9dd6b80bdc8d4300",
+		"0x000000bf02fd56dcd4f6b1d132c8b56a9f8801696d77cdb911a35335360f07eba30bc3083ecaa394",
+		"0x0000028a449b7699751b6bf17003c141307311241614b886c0fb6ffaf5b39896e182bddd85859e9c",
+	)
+	expected, err := mnt6.fq6.fromBytes(expectedBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("Expected", func(t *testing.T) {
+		actual := mnt6.pair(g1One, g2One)
+		if !mnt6.fq6.equal(expected, actual) {
+			t.Fatalf("bad pairing-1")
+		}
+	})
+
+	t.Run("Bilinearity", func(t *testing.T) {
+		a, _ := rand.Int(rand.Reader, big.NewInt(100))
+		b, _ := rand.Int(rand.Reader, big.NewInt(100))
+		c := new(big.Int).Mul(a, b)
+		G, H := mnt6.g1.newPoint(), mnt6.g2.newPoint()
+		mnt6.g1.mulScalar(G, g1One, a)
+		mnt6.g2.mulScalar(H, g2One, b)
+		if !mnt6.g1.isOnCurve(G) {
+			t.Fatal("G isnt on the curve")
+		}
+		if !mnt6.g2.isOnCurve(H) {
+			t.Fatal("H isnt on the curve")
+		}
+
+		var f1, f2 *fe6q
+		// e(a*G1, b*G2) = e(G1, G2)^c
+		t.Run("First", func(t *testing.T) {
+			mnt6.g1.affine(G, G)
+			mnt6.g2.affine(H, H)
+			f1 = mnt6.pair(G, H)
+			f2 = mnt6.pair(g1One, g2One)
+			mnt6.fq6.exp(f2, f2, c)
+			if !mnt6.fq6.equal(f1, f2) {
+				t.Errorf("bad pairing")
+			}
+		})
+		// e(a*G1, b*G2) = e(c*G1, G2)
+		t.Run("Second", func(t *testing.T) {
+			G = mnt6.g1.mulScalar(G, g1One, c)
+			mnt6.g1.affine(G, G)
+			f2 = mnt6.pair(G, g2One)
+			if !mnt6.fq6.equal(f1, f2) {
+				t.Errorf("bad pairing")
+			}
+		})
+		// e(a*G1, b*G2) = e(G1, c*G2)
+		t.Run("Third", func(t *testing.T) {
+			H = mnt6.g2.mulScalar(H, g2One, c)
+			mnt6.g2.affine(H, H)
+			f2 = mnt6.pair(g1One, H)
+			if !mnt6.fq6.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}
 		})
