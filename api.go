@@ -31,8 +31,7 @@ func (api *API) run(in []byte) ([]byte, error) {
 	case 0x05:
 		return new(g2Api).mulPoint(rest)
 	case 0x06:
-		// TODO: multiexp
-		return new(g2Api).mulPoint(rest)
+		return new(g2Api).multiExp(rest)
 	case 0x07:
 		return pairBLS(rest)
 	case 0x08:
@@ -263,6 +262,65 @@ func (api *g2Api) mulPoint(in []byte) ([]byte, error) {
 	}
 	g2.mulScalar(q, q, s)
 	out := g2.toBytes(q)
+	return out, nil
+}
+
+func (api *g2Api) multiExp(in []byte) ([]byte, error) {
+	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	if err != nil {
+		return nil, err
+	}
+	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, false)
+	if err != nil {
+		return nil, err
+	}
+	a2, b2, rest, err := decodeBAInExtField2FromEncoding(rest, modulusLen, fq2)
+	if err != nil {
+		return nil, err
+	}
+	orderLen, order, rest, err := parseGroupOrder(rest, modulusLen)
+	if err != nil {
+		return nil, err
+	}
+	g2, err := newG22(fq2, nil, nil, order.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	fq2.copy(g2.a, a2)
+	fq2.copy(g2.b, b2)
+
+	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
+	if err != nil {
+		return pairingError, errors.New("Input is not long enough to get number of pairs")
+	}
+	numPairs := int(numPairsBuf[0])
+	if numPairs == 0 {
+		return pairingError, errors.New("zero pairs encoded")
+	}
+	if len(rest) != (4*modulusLen+orderLen)*numPairs {
+		return nil, errors.New("Input length is invalid for number of pairs")
+	}
+	bases := make([]*pointG22, numPairs)
+	scalars := make([]*big.Int, numPairs)
+	for i := 0; i < numPairs; i++ {
+		g2Point, localRest, err := decodeG22Point(rest, modulusLen, g2)
+		if err != nil {
+			return pairingError, err
+		}
+		scalar, localRest, err := decodeScalar(localRest, orderLen, order)
+		g2.copy(bases[i], g2Point)
+		scalars[i] = new(big.Int).Set(scalar)
+		rest = localRest
+	}
+	if len(rest) != 0 {
+		return pairingError, errors.New("Input contains garbage at the end")
+	}
+	if len(bases) != len(scalars) || len(bases) == 0 {
+		return pairingSuccess, nil // success
+	}
+	p := g2.newPoint()
+	g2.multiExp(p, bases, scalars)
+	out := g2.toBytes(p)
 	return out, nil
 }
 
