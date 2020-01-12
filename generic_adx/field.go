@@ -27,7 +27,7 @@ type field struct {
 	rbig     *big.Int
 	equal    func(a, b fieldElement) bool
 	cmp      func(a, b fieldElement) int8
-	cpy      func(dst, stc fieldElement)
+	copy     func(dst, stc fieldElement)
 	_mul     func(c, a, b, p fieldElement, inp uint64)
 	_add     func(c, a, b, p fieldElement)
 	_double  func(c, a, p fieldElement)
@@ -61,7 +61,7 @@ func newField(p []byte) *field {
 	switch f.limbSize {
 	case 4:
 		f.equal = eq4
-		f.cpy = cpy4
+		f.copy = cpy4
 		f.cmp = cmp4
 		f.addn = addn4
 		f.subn = subn4
@@ -74,7 +74,7 @@ func newField(p []byte) *field {
 		f.mul_two = mul_two_4
 	case 5:
 		f.equal = eq5
-		f.cpy = cpy5
+		f.copy = cpy5
 		f.cmp = cmp5
 		f.addn = addn5
 		f.subn = subn5
@@ -87,7 +87,7 @@ func newField(p []byte) *field {
 		f.mul_two = mul_two_5
 	case 6:
 		f.equal = eq6
-		f.cpy = cpy6
+		f.copy = cpy6
 		f.cmp = cmp6
 		f.addn = addn6
 		f.subn = subn6
@@ -100,7 +100,7 @@ func newField(p []byte) *field {
 		f.mul_two = mul_two_6
 	case 7:
 		f.equal = eq7
-		f.cpy = cpy7
+		f.copy = cpy7
 		f.cmp = cmp7
 		f.addn = addn7
 		f.subn = subn7
@@ -113,7 +113,7 @@ func newField(p []byte) *field {
 		f.mul_two = mul_two_7
 	case 8:
 		f.equal = eq8
-		f.cpy = cpy8
+		f.copy = cpy8
 		f.cmp = cmp8
 		f.addn = addn8
 		f.subn = subn8
@@ -152,7 +152,7 @@ func (f *field) sub(c, a, b fieldElement) {
 
 func (f *field) neg(c, a fieldElement) {
 	if f.equal(a, f.zero) {
-		f.cpy(a, f.zero)
+		f.copy(a, f.zero)
 		return
 	}
 	f._neg(c, a, f.p)
@@ -164,14 +164,14 @@ func (f *field) mul(c, a, b fieldElement) {
 
 func (f *field) exp(c, a fieldElement, e *big.Int) {
 	z := f.newFieldElement()
-	f.cpy(z, f.r)
+	f.copy(z, f.r)
 	for i := e.BitLen(); i >= 0; i-- {
 		f.mul(z, z, z)
 		if e.Bit(i) == 1 {
 			f.mul(z, z, a)
 		}
 	}
-	f.cpy(c, z)
+	f.copy(c, z)
 }
 
 func (f *field) isValid(fe []byte) bool {
@@ -382,21 +382,15 @@ func (f *field) inverse(inv, e fieldElement) {
 		f.newFieldElement(),
 		f.newFieldElement()
 	zero := f.newFieldElement()
-	f.cpy(u, f.p)
-	f.cpy(v, e)
-	f.cpy(s, f._one)
+	f.copy(u, f.p)
+	f.copy(v, e)
+	f.copy(s, f._one)
 	var k int
 	var found = false
 	byteSize := f.byteSize()
 	bitSize := byteSize * 8
 	// Phase 1
 	for i := 0; i < bitSize*2; i++ {
-		// fmt.Println(i)
-		// fmt.Println(f.toStringNoTransform(v))
-		// fmt.Println(f.toStringNoTransform(u))
-		// fmt.Println(f.toStringNoTransform(s))
-		// fmt.Println(f.toStringNoTransform(r))
-
 		if f.equal(v, zero) {
 			found = true
 			break
@@ -404,69 +398,43 @@ func (f *field) inverse(inv, e fieldElement) {
 		if is_even(u) {
 			f.div_two(u)
 			f.mul_two(s)
-			// fmt.Println("a")
 		} else if is_even(v) {
 			f.div_two(v)
 			f.mul_two(r)
-			// fmt.Println("b")
 		} else if f.cmp(u, v) == 1 {
 			f.subn(u, v)
 			f.div_two(u)
 			f.addn(r, s)
 			f.mul_two(s)
-			// fmt.Println("c")
 		} else {
 			f.subn(v, u)
 			f.div_two(v)
 			f.addn(s, r)
 			f.mul_two(r)
-			// fmt.Println("d")
 		}
-		// fmt.Println()
 		k += 1
 	}
 	if !found {
-		f.cpy(inv, zero)
+		f.copy(inv, zero)
 		return
 	}
 	if k < bitSize {
 		/*
 			THIS IS UNEXPECTED
 		*/
-		f.cpy(inv, zero)
+		f.copy(inv, zero)
 		return
 	}
 
 	if f.cmp(r, f.p) != -1 {
 		f.subn(r, f.p)
 	}
-	f.cpy(u, f.p)
+	f.copy(u, f.p)
 	f.subn(u, r)
 
 	// Phase 2
 	for i := k; i < bitSize*2; i++ {
 		f.double(u, u)
 	}
-	f.cpy(inv, u)
-
+	f.copy(inv, u)
 }
-
-// func fieldElementToBytes2(out []byte, in fieldElement) error {
-// 	byteSize := len(out)
-// 	limbSize := byteSize / 8
-// 	if byteSize%8 != 0 && limbSize < 1 {
-// 		return fmt.Errorf("bad output allocation")
-// 	}
-// 	var data []byte
-// 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&data))
-// 	sh.Data = uintptr(in)
-// 	sh.Len, sh.Cap = byteSize, byteSize
-// 	for i := 0; i < limbSize; i++ {
-// 		l := i * 8
-// 		binary.BigEndian.PutUint64(
-// 			out[byteSize-l-8:byteSize-l],
-// 			binary.LittleEndian.Uint64(data[l:l+8]),
-// 		)
-// 	}
-// 	return nil
-// }
