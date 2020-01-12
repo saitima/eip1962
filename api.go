@@ -34,7 +34,13 @@ func (api *API) run(in []byte) ([]byte, error) {
 		// TODO: multiexp
 		return new(g2Api).mulPoint(rest)
 	case 0x07:
-		return new(pairingApi).pair(rest)
+		return pairBLS(rest)
+	case 0x08:
+		return pairBN(rest)
+	case 0x09:
+		return pairMNT4(rest)
+	case 0x0a:
+		return pairMNT6(rest)
 	default:
 		return zero, errors.New("Unknown operation type")
 	}
@@ -199,11 +205,11 @@ func (api *g2Api) addPoints(in []byte) ([]byte, error) {
 	}
 	g2.a = a2
 	g2.b = b2
-	q0, rest, err := decodeG2Point(rest, modulusLen, g2)
+	q0, rest, err := decodeG22Point(rest, modulusLen, g2)
 	if err != nil {
 		return nil, err
 	}
-	q1, rest, err := decodeG2Point(rest, modulusLen, g2)
+	q1, rest, err := decodeG22Point(rest, modulusLen, g2)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +250,7 @@ func (api *g2Api) mulPoint(in []byte) ([]byte, error) {
 	}
 	fq2.copy(g2.a, a2)
 	fq2.copy(g2.b, b2)
-	q, rest, err := decodeG2Point(rest, modulusLen, g2)
+	q, rest, err := decodeG22Point(rest, modulusLen, g2)
 	if err != nil {
 		return nil, err
 	}
@@ -258,32 +264,6 @@ func (api *g2Api) mulPoint(in []byte) ([]byte, error) {
 	g2.mulScalar(q, q, s)
 	out := g2.toBytes(q)
 	return out, nil
-}
-
-type pairingApi struct{}
-
-func (api *pairingApi) pair(in []byte) ([]byte, error) {
-	curveTypeBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
-	if err != nil {
-		return zero, errors.New("Input should be longer than curve type encoding")
-	}
-	curveType := curveTypeBuf[0]
-	switch curveType {
-	case 0x01:
-		// bls
-		return pairBN(rest)
-	case 0x02:
-		// bn
-		return pairBN(rest)
-	case 0x03:
-		// mnt4
-		return pairBN(rest)
-	case 0x04:
-		// mnt6
-		return pairBN(rest)
-	default:
-		return zero, errors.New("Unknown curve type")
-	}
 }
 
 func pairBN(in []byte) ([]byte, error) {
@@ -377,6 +357,9 @@ func pairBN(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
+	if u.Cmp(big.NewInt(0)) != 0 {
+		return pairingError, errors.New("Loop count parameters can not be zero")
+	}
 	// u is negative
 	uIsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
 	if err != nil {
@@ -429,7 +412,7 @@ func pairBN(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
-		g2Point, localRest, err := decodeG2Point(localRest, modulusLen, g2)
+		g2Point, localRest, err := decodeG22Point(localRest, modulusLen, g2)
 		if err != nil {
 			return pairingError, err
 		}
@@ -557,10 +540,13 @@ func pairBLS(in []byte) ([]byte, error) {
 		fq2.mulByFq(g2.b, fq6NonResidueInv, b)
 	}
 
-	// u
+	// z
 	z, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
 		return pairingError, err
+	}
+	if z.Cmp(big.NewInt(0)) != 0 {
+		return pairingError, errors.New("Loop count parameters can not be zero")
 	}
 	// u is negative
 	zIsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
@@ -602,7 +588,7 @@ func pairBLS(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
-		g2Point, localRest, err := decodeG2Point(localRest, modulusLen, g2)
+		g2Point, localRest, err := decodeG22Point(localRest, modulusLen, g2)
 		if err != nil {
 			return pairingError, err
 		}
@@ -638,6 +624,382 @@ func pairBLS(in []byte) ([]byte, error) {
 	)
 	result := engine.multiPair(g1Points, g2Points)
 	if !fq12.equal(result, fq12.one()) {
+		return pairingError, nil
+	}
+	return pairingSuccess, nil
+}
+
+func pairMNT4(in []byte) ([]byte, error) {
+	// base field
+	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	if err != nil {
+		return pairingError, err
+	}
+	// g1
+	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
+	if err != nil {
+		return pairingError, err
+	}
+	_, order, rest, err := parseGroupOrder(rest, modulusLen)
+	if err != nil {
+		return pairingError, err
+	}
+	g1, err := newG1(field, nil, nil, order.Bytes())
+	g1.f.cpy(g1.a, a)
+	g1.f.cpy(g1.b, b)
+	if err != nil {
+		return pairingError, err
+	}
+	// ext2
+	nonResidue, rest, err := decodeFp(rest, modulusLen, field)
+	if err != nil {
+		return pairingError, err
+	}
+	if !isNonNThRoot(field, nonResidue, 2) {
+		return pairingError, errors.New("Non-residue for Fp2 is actually a residue")
+	}
+	fq2, err := newFq2(field, nil)
+	if err != nil {
+		return pairingError, err
+	}
+	fq2.f.cpy(fq2.nonResidue, nonResidue)
+	if ok := fq2.calculateFrobeniusCoeffs(); !ok {
+		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp2")
+	}
+	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
+	if err != nil {
+		return pairingError, err
+	}
+	if !isNonNThRootFp2(fq2, fq2NonResidue, 6) {
+		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
+	}
+	fq4, err := newFq4(fq2, nil)
+	fq2.f.cpy(fq2.nonResidue, nonResidue)
+	if err != nil {
+		return pairingError, err
+	}
+	if ok := fq4.calculateFrobeniusCoeffs(); !ok {
+		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp2")
+	}
+	// g2
+	g2, err := newG22(fq2, nil, nil, order.Bytes())
+	if err != nil {
+		return pairingError, err
+	}
+	twist, twist2, twist3 := fq2.one(), fq2.newElement(), fq2.newElement()
+	fq2.square(twist2, twist)
+	fq2.mul(twist3, twist2, twist)
+	fq2.mulByFq(g2.a, twist2, g1.a)
+	fq2.mulByFq(g2.b, twist3, g1.b)
+
+	// x
+	x, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
+	if err != nil {
+		return pairingError, err
+	}
+	if x.Cmp(big.NewInt(0)) != 0 {
+		return pairingError, errors.New("Ate pairing loop count parameters can not be zero")
+	}
+
+	if weight := calculateHammingWeight(x); weight > MAX_ATE_PAIRING_ATE_LOOP_COUNT_HAMMING {
+		return pairingError, errors.New("x has too large hamming weight")
+	}
+
+	// u is negative
+	xIsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
+	if err != nil {
+		return pairingError, errors.New("x is not encoded properly")
+	}
+	// maybe better? uIsNegativeBuf[0 : SIGN_ENCODING_LENGTH-1]
+	var xIsNegative bool
+	switch xIsNegativeBuf[0] {
+	case 0x01:
+		xIsNegative = true
+		break
+	case 0x00:
+		xIsNegative = false
+		break
+	default:
+		return pairingError, errors.New("Unknown parameter x sign")
+	}
+
+	// expW0
+	expW0, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
+	if err != nil {
+		return pairingError, err
+	}
+	if expW0.Cmp(big.NewInt(0)) != 0 {
+		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
+	}
+	// expW1
+	expW1, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
+	if err != nil {
+		return pairingError, err
+	}
+	if expW1.Cmp(big.NewInt(0)) != 0 {
+		return pairingError, errors.New("Final exp w1 loop count parameters can not be zero")
+	}
+
+	expW0IsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
+	if err != nil {
+		return pairingError, errors.New("Exp_w0 sign is not encoded properly")
+	}
+	var expW0IsNegative bool
+	switch expW0IsNegativeBuf[0] {
+	case 0x01:
+		expW0IsNegative = true
+		break
+	case 0x00:
+		expW0IsNegative = false
+		break
+	default:
+		return pairingError, errors.New("Unknown expW0 sign")
+	}
+
+	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
+	if err != nil {
+		return pairingError, errors.New("Input is not long enough to get number of pairs")
+	}
+	numPairs := int(numPairsBuf[0])
+	if numPairs == 0 {
+		return pairingError, errors.New("zero pairs encoded")
+	}
+
+	var g1Points []*pointG1
+	var g2Points []*pointG22
+	g1zero, g2zero := g1.zero(), g2.zero()
+	g1Tmp, g2Tmp := g1.newPoint(), g2.newPoint()
+	for i := 0; i < numPairs; i++ {
+		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		if err != nil {
+			return pairingError, err
+		}
+		g2Point, localRest, err := decodeG22Point(localRest, modulusLen, g2)
+		if err != nil {
+			return pairingError, err
+		}
+		g1.mulScalar(g1Tmp, g1Point, order)
+		if !g1.equal(g1Tmp, g1zero) {
+			return pairingError, errors.New("G1 point is not in the expected subgroup")
+		}
+		g2.mulScalar(g2Tmp, g2Point, order)
+		if !g2.equal(g2Tmp, g2zero) {
+			return pairingError, errors.New("G2 point is not in the expected subgroup")
+		}
+		if !g1.equal(g1zero, g1Point) && !g2.equal(g2zero, g2Point) {
+			g1Points = append(g1Points, g1Point)
+			g2Points = append(g2Points, g2Point)
+		}
+		rest = localRest
+	}
+	if len(rest) != 0 {
+		return pairingError, errors.New("Input contains garbage at the end")
+	}
+	if len(g1Points) == 0 {
+		return pairingSuccess, nil // success
+	}
+
+	engine := newMnt4Instance(
+		x,
+		xIsNegative,
+		expW0,
+		expW1,
+		expW0IsNegative,
+		fq4,
+		g1,
+		g2,
+		twist,
+	)
+	result := engine.multiPair(g1Points, g2Points)
+	if !fq4.equal(result, fq4.one()) {
+		return pairingError, nil
+	}
+	return pairingSuccess, nil
+}
+
+func pairMNT6(in []byte) ([]byte, error) {
+	// base field
+	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	if err != nil {
+		return pairingError, err
+	}
+	// g1
+	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
+	if err != nil {
+		return pairingError, err
+	}
+	_, order, rest, err := parseGroupOrder(rest, modulusLen)
+	if err != nil {
+		return pairingError, err
+	}
+	g1, err := newG1(field, nil, nil, order.Bytes())
+	g1.f.cpy(g1.a, a)
+	g1.f.cpy(g1.b, b)
+	if err != nil {
+		return pairingError, err
+	}
+	// ext3
+	nonResidue, rest, err := decodeFp(rest, modulusLen, field)
+	if err != nil {
+		return pairingError, err
+	}
+	if !isNonNThRoot(field, nonResidue, 3) {
+		return pairingError, errors.New("Non-residue for Fp2 is actually a residue")
+	}
+	fq3, err := newFq3(field, nil)
+	if err != nil {
+		return pairingError, err
+	}
+	fq3.f.cpy(fq3.nonResidue, nonResidue)
+	if ok := fq3.calculateFrobeniusCoeffs(); !ok {
+		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp2")
+	}
+	fq3NonResidue, rest, err := decodeFp3(rest, modulusLen, fq3)
+	if err != nil {
+		return pairingError, err
+	}
+	if !isNonNThRootFp3(fq3, fq3NonResidue, 3) {
+		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
+	}
+	fq6, err := newFq6Quadratic(fq3, nil)
+	fq3.f.cpy(fq3.nonResidue, nonResidue)
+	if err != nil {
+		return pairingError, err
+	}
+	if ok := fq6.calculateFrobeniusCoeffs(); !ok {
+		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp2")
+	}
+	// g2
+	g2, err := newG23(fq3, nil, nil, order.Bytes())
+	if err != nil {
+		return pairingError, err
+	}
+	twist, twist2, twist3 := fq3.one(), fq3.newElement(), fq3.newElement()
+	fq3.square(twist2, twist)
+	fq3.mul(twist3, twist2, twist)
+	fq3.mulByFq(g2.a, twist2, g1.a)
+	fq3.mulByFq(g2.b, twist3, g1.b)
+
+	// x
+	x, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
+	if err != nil {
+		return pairingError, err
+	}
+	if x.Cmp(big.NewInt(0)) != 0 {
+		return pairingError, errors.New("Ate pairing loop count parameters can not be zero")
+	}
+
+	if weight := calculateHammingWeight(x); weight > MAX_ATE_PAIRING_ATE_LOOP_COUNT_HAMMING {
+		return pairingError, errors.New("x has too large hamming weight")
+	}
+
+	// u is negative
+	xIsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
+	if err != nil {
+		return pairingError, errors.New("x is not encoded properly")
+	}
+	// maybe better? uIsNegativeBuf[0 : SIGN_ENCODING_LENGTH-1]
+	var xIsNegative bool
+	switch xIsNegativeBuf[0] {
+	case 0x01:
+		xIsNegative = true
+		break
+	case 0x00:
+		xIsNegative = false
+		break
+	default:
+		return pairingError, errors.New("Unknown parameter x sign")
+	}
+
+	// expW0
+	expW0, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
+	if err != nil {
+		return pairingError, err
+	}
+	if expW0.Cmp(big.NewInt(0)) != 0 {
+		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
+	}
+	// expW1
+	expW1, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
+	if err != nil {
+		return pairingError, err
+	}
+	if expW1.Cmp(big.NewInt(0)) != 0 {
+		return pairingError, errors.New("Final exp w1 loop count parameters can not be zero")
+	}
+
+	expW0IsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
+	if err != nil {
+		return pairingError, errors.New("Exp_w0 sign is not encoded properly")
+	}
+	var expW0IsNegative bool
+	switch expW0IsNegativeBuf[0] {
+	case 0x01:
+		expW0IsNegative = true
+		break
+	case 0x00:
+		expW0IsNegative = false
+		break
+	default:
+		return pairingError, errors.New("Unknown expW0 sign")
+	}
+
+	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
+	if err != nil {
+		return pairingError, errors.New("Input is not long enough to get number of pairs")
+	}
+	numPairs := int(numPairsBuf[0])
+	if numPairs == 0 {
+		return pairingError, errors.New("zero pairs encoded")
+	}
+
+	var g1Points []*pointG1
+	var g2Points []*pointG23
+	g1zero, g2zero := g1.zero(), g2.zero()
+	g1Tmp, g2Tmp := g1.newPoint(), g2.newPoint()
+	for i := 0; i < numPairs; i++ {
+		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		if err != nil {
+			return pairingError, err
+		}
+		g2Point, localRest, err := decodeG23Point(localRest, modulusLen, g2)
+		if err != nil {
+			return pairingError, err
+		}
+		g1.mulScalar(g1Tmp, g1Point, order)
+		if !g1.equal(g1Tmp, g1zero) {
+			return pairingError, errors.New("G1 point is not in the expected subgroup")
+		}
+		g2.mulScalar(g2Tmp, g2Point, order)
+		if !g2.equal(g2Tmp, g2zero) {
+			return pairingError, errors.New("G2 point is not in the expected subgroup")
+		}
+		if !g1.equal(g1zero, g1Point) && !g2.equal(g2zero, g2Point) {
+			g1Points = append(g1Points, g1Point)
+			g2Points = append(g2Points, g2Point)
+		}
+		rest = localRest
+	}
+	if len(rest) != 0 {
+		return pairingError, errors.New("Input contains garbage at the end")
+	}
+	if len(g1Points) == 0 {
+		return pairingSuccess, nil // success
+	}
+
+	engine := newMNT6Instance(
+		x,
+		xIsNegative,
+		expW0,
+		expW1,
+		expW0IsNegative,
+		fq6,
+		g1,
+		g2,
+		twist,
+	)
+	result := engine.multiPair(g1Points, g2Points)
+	if !fq6.equal(result, fq6.one()) {
 		return pairingError, nil
 	}
 	return pairingSuccess, nil

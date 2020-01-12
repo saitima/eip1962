@@ -68,6 +68,8 @@ type TestVectorJSON struct {
 	R                 string                       `json:"r"`
 	T                 string                       `json:"t"`
 	X                 string                       `json:"x"`
+	ExpW0             string                       `json:"expW0"`
+	ExpW1             string                       `json:"expW1"`
 }
 
 func ceilBitLen(n int) int {
@@ -207,7 +209,7 @@ func (v *TestVectorJSON) makeG2MulBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeBNPairingBinary() ([]byte, []byte, error) {
-	v.buf.WriteByte(0x01)                  // curve type
+	v.buf.WriteByte(0x08)                  // curve type
 	v.makeBaseFieldBinary()                // base field
 	v.makeG1GroupBinary()                  // g1
 	v.buf.Write(v.encode(v.NonResidue))    // non residue
@@ -260,7 +262,7 @@ func (v *TestVectorJSON) makeBNPairingBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeBLSPairingBinary() ([]byte, []byte, error) {
-	v.buf.WriteByte(0x02)                  // curve type
+	v.buf.WriteByte(0x07)                  // op type
 	v.makeBaseFieldBinary()                // base field
 	v.makeG1GroupBinary()                  // g1
 	v.buf.Write(v.encode(v.NonResidue))    // non residue
@@ -289,6 +291,126 @@ func (v *TestVectorJSON) makeBLSPairingBinary() ([]byte, []byte, error) {
 		v.buf.Write(bytes_(length, v.X)) // x encoded
 		v.buf.WriteByte(0x00)
 	}
+	v.buf.WriteByte(byte(0x02)) // num pairs
+	// e(P, Q)*e(-P, Q)=1
+	// first pair
+	v.buf.Write(v.encode(v.G1x))
+	v.buf.Write(v.encode(v.G1y))
+	v.buf.Write(v.encode(v.G2x0))
+	v.buf.Write(v.encode(v.G2x1))
+	v.buf.Write(v.encode(v.G2y0))
+	v.buf.Write(v.encode(v.G2y1))
+
+	// second pair
+	pYBuf := v.encode(v.G1y)
+	pY := new(big.Int).SetBytes(pYBuf)
+	pYStr := new(big.Int).Sub(v.modulusBig, pY).Text(16) // -p.y
+	v.buf.Write(v.encode(v.G1x))
+	v.buf.Write(v.encode(pYStr))
+	v.buf.Write(v.encode(v.G2x0))
+	v.buf.Write(v.encode(v.G2x1))
+	v.buf.Write(v.encode(v.G2y0))
+	v.buf.Write(v.encode(v.G2y1))
+
+	if len(v.buf.Bytes()) < (16*32)+(6*1)+(len(v.X)-2)/2 {
+		return nil, nil, errors.New("can't assemble pairing binary data")
+	}
+	input := v.buf.Bytes()
+	output := []byte{0x01}
+	return input, output, nil
+}
+
+func (v *TestVectorJSON) makeMNT4PairingBinary() ([]byte, []byte, error) {
+	v.buf.WriteByte(0x09)                  // op type
+	v.makeBaseFieldBinary()                // base field
+	v.makeG1GroupBinary()                  // g1
+	v.buf.Write(v.encode(v.NonResidue))    // non residue
+	v.buf.Write(v.encode(v.NonResidue2_0)) // quadratic non residue
+	v.buf.Write(v.encode(v.NonResidue2_1))
+
+	writeExp := func(in string) {
+		if in[:1] == "-" {
+			length := len(in[3:]) / 2
+			if length%2 != 0 {
+				length++
+			}
+			v.buf.WriteByte(byte(length))       // x length
+			v.buf.Write(bytes_(length, in[1:])) // x encoded
+			v.buf.WriteByte(0x01)               // sign of x
+		} else {
+			length := len(in[2:]) / 2
+			if length%2 != 0 {
+				length++
+			}
+			v.buf.WriteByte(byte(length))   // x length
+			v.buf.Write(bytes_(length, in)) // x encoded
+			v.buf.WriteByte(0x00)
+		}
+	}
+
+	writeExp(v.X)
+	writeExp(v.ExpW0)
+	writeExp(v.ExpW1)
+	v.buf.WriteByte(byte(0x02)) // num pairs
+	// e(P, Q)*e(-P, Q)=1
+	// first pair
+	v.buf.Write(v.encode(v.G1x))
+	v.buf.Write(v.encode(v.G1y))
+	v.buf.Write(v.encode(v.G2x0))
+	v.buf.Write(v.encode(v.G2x1))
+	v.buf.Write(v.encode(v.G2y0))
+	v.buf.Write(v.encode(v.G2y1))
+
+	// second pair
+	pYBuf := v.encode(v.G1y)
+	pY := new(big.Int).SetBytes(pYBuf)
+	pYStr := new(big.Int).Sub(v.modulusBig, pY).Text(16) // -p.y
+	v.buf.Write(v.encode(v.G1x))
+	v.buf.Write(v.encode(pYStr))
+	v.buf.Write(v.encode(v.G2x0))
+	v.buf.Write(v.encode(v.G2x1))
+	v.buf.Write(v.encode(v.G2y0))
+	v.buf.Write(v.encode(v.G2y1))
+
+	if len(v.buf.Bytes()) < (16*32)+(6*1)+(len(v.X)-2)/2 {
+		return nil, nil, errors.New("can't assemble pairing binary data")
+	}
+	input := v.buf.Bytes()
+	output := []byte{0x01}
+	return input, output, nil
+}
+
+func (v *TestVectorJSON) makeMNT6PairingBinary() ([]byte, []byte, error) {
+	v.buf.WriteByte(0x0a)                  // op type
+	v.makeBaseFieldBinary()                // base field
+	v.makeG1GroupBinary()                  // g1
+	v.buf.Write(v.encode(v.NonResidue))    // non residue
+	v.buf.Write(v.encode(v.NonResidue2_0)) // quadratic non residue
+	v.buf.Write(v.encode(v.NonResidue2_1))
+
+	writeExp := func(in string) {
+		if in[:1] == "-" {
+			length := len(in[3:]) / 2
+			if length%2 != 0 {
+				length++
+			}
+			v.buf.WriteByte(byte(length))       // x length
+			v.buf.Write(bytes_(length, in[1:])) // x encoded
+			v.buf.WriteByte(0x01)               // sign of x
+		} else {
+			length := len(in[2:]) / 2
+			if length%2 != 0 {
+				length++
+			}
+			v.buf.WriteByte(byte(length))   // x length
+			v.buf.Write(bytes_(length, in)) // x encoded
+			v.buf.WriteByte(0x00)
+		}
+	}
+
+	writeExp(v.X)
+	writeExp(v.ExpW0)
+	writeExp(v.ExpW1)
 	v.buf.WriteByte(byte(0x02)) // num pairs
 	// e(P, Q)*e(-P, Q)=1
 	// first pair
