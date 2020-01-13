@@ -135,7 +135,7 @@ func (fq *fq4) conjugate(c, a *fe4) *fe4 {
 
 func (fq *fq4) mulByNonResidue(c, a *fe2) {
 	o := fq.f.newElement()
-	fq.f.f.cpy(o[1], a[0])
+	fq.f.f.copy(o[1], a[0])
 	fq.f.mulByNonResidue(o[0], a[1])
 	fq.f.copy(c, o)
 }
@@ -212,8 +212,8 @@ func (fq *fq4) calculateFrobeniusCoeffs() bool {
 	}
 	modulus := fq.f.f.pbig
 	f0 := fq.f.f.one
-	fq.f.f.cpy(fq.frobeniusCoeffs[0], f0)
-	fq.f.f.cpy(fq.frobeniusCoeffs[3], fq.f.f.zero)
+	fq.f.f.copy(fq.frobeniusCoeffs[0], f0)
+	fq.f.f.copy(fq.frobeniusCoeffs[3], fq.f.f.zero)
 	qPower, rem, power := new(big.Int).Set(modulus), new(big.Int), new(big.Int)
 	for i := 1; i <= 2; i++ {
 		power.Sub(qPower, big.NewInt(1))

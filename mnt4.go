@@ -73,8 +73,8 @@ func newMnt4Instance(z *big.Int, zIsnegative bool, expW0, expW1 *big.Int, expW0I
 }
 
 func (mnt4 *mnt4Instance) precomputeG1(precomputedG1 *precomputedG1, g1Point *pointG1) {
-	mnt4.fq4.f.f.cpy(precomputedG1.x, g1Point[0])
-	mnt4.fq4.f.f.cpy(precomputedG1.y, g1Point[1])
+	mnt4.fq4.f.f.copy(precomputedG1.x, g1Point[0])
+	mnt4.fq4.f.f.copy(precomputedG1.y, g1Point[1])
 	mnt4.fq4.f.mulByFq(precomputedG1.xx, mnt4.twist, g1Point[0])
 	mnt4.fq4.f.mulByFq(precomputedG1.yy, mnt4.twist, g1Point[1])
 }
@@ -285,7 +285,7 @@ func (mnt4 *mnt4Instance) atePairingLoop(f *fe4, g1Point *pointG1, g2Point *poin
 	mnt4.precomputeG2(q, g2Point, twistInv)
 
 	l1Coeff := fq4.f.zero()
-	fq4.f.f.cpy(l1Coeff[0], p.x)
+	fq4.f.f.copy(l1Coeff[0], p.x)
 	fq4.f.sub(l1Coeff, l1Coeff, q.xx)
 
 	ff := fq4.one()

@@ -26,15 +26,15 @@ func newFq2(f *field, nonResidue []byte) (*fq2, error) {
 	t := make([]fieldElement, 4)
 	for i := 0; i < 4; i++ {
 		t[i] = f.newFieldElement()
-		f.cpy(t[i], f.zero)
+		f.copy(t[i], f.zero)
 	}
 	return &fq2{f, nonResidue_, t, nil}, nil
 }
 
 func (fq *fq2) newElement() *fe2 {
 	fe := &fe2{fq.f.newFieldElement(), fq.f.newFieldElement()}
-	fq.f.cpy(fe[0], fq.f.zero)
-	fq.f.cpy(fe[1], fq.f.zero)
+	fq.f.copy(fe[0], fq.f.zero)
+	fq.f.copy(fe[1], fq.f.zero)
 	return fe
 }
 
@@ -85,7 +85,7 @@ func (fq *fq2) zero() *fe2 {
 
 func (fq *fq2) one() *fe2 {
 	a := fq.newElement()
-	fq.f.cpy(a[0], fq.f.one)
+	fq.f.copy(a[0], fq.f.one)
 	return a
 }
 
@@ -98,8 +98,8 @@ func (fq *fq2) equal(a, b *fe2) bool {
 }
 
 func (fq *fq2) copy(c, a *fe2) *fe2 {
-	fq.f.cpy(c[0], a[0])
-	fq.f.cpy(c[1], a[1])
+	fq.f.copy(c[0], a[0])
+	fq.f.copy(c[1], a[1])
 	return c
 }
 
@@ -137,6 +137,13 @@ func (fq *fq2) mulByNonResidue(c, a fieldElement) {
 	fq.f.mul(c, a, fq.nonResidue)
 }
 
+func (fq *fq2) mulByNonResidue12(c, a *fe2) {
+	t := fq.t
+	fq.f.sub(t[0], a[0], a[1])
+	fq.f.add(c[1], a[0], a[1])
+	fq.f.copy(c[0], t[0])
+}
+
 func (fq *fq2) mul(c, a, b *fe2) {
 	t := fq.t
 	// c0 = (a0 * b0) + β * (a1 * b1)
@@ -149,7 +156,7 @@ func (fq *fq2) mul(c, a, b *fe2) {
 	fq.f.add(t[1], a[0], a[1])     // a0 + a1
 	fq.f.add(t[2], b[0], b[1])     // b0 + b1
 	fq.f.mul(t[1], t[1], t[2])     // (a0 + a1)(b0 + b1)
-	fq.f.cpy(c[0], t[3])           // c0 = β * v1 + v0
+	fq.f.copy(c[0], t[3])          // c0 = β * v1 + v0
 	fq.f.sub(c[1], t[1], t[0])     // c1 = (a0 + a1)(b0 + b1) - (v0+v1)
 }
 
@@ -199,7 +206,7 @@ func (fq *fq2) mulByFq(c, a *fe2, b fieldElement) {
 }
 
 func (fq *fq2) frobeniusMap(c, a *fe2, power uint) {
-	fq.f.cpy(c[0], a[0])
+	fq.f.copy(c[0], a[0])
 	fq.f.mul(c[1], a[1], fq.frobeniusCoeffs[power%2])
 }
 
@@ -214,6 +221,6 @@ func (fq *fq2) calculateFrobeniusCoeffs() bool {
 		return false
 	}
 	fq.f.exp(fq.frobeniusCoeffs[1], fq.nonResidue, power)
-	fq.f.cpy(fq.frobeniusCoeffs[0], fq.f.one)
+	fq.f.copy(fq.frobeniusCoeffs[0], fq.f.one)
 	return true
 }

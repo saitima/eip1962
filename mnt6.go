@@ -73,8 +73,8 @@ func newMNT6Instance(z *big.Int, zIsnegative bool, expW0, expW1 *big.Int, expW0I
 }
 
 func (mnt6 *mnt6Instance) precomputeG1(precomputedG1_6 *precomputedG1_6, g1Point *pointG1) {
-	mnt6.fq6.f.f.cpy(precomputedG1_6.x, g1Point[0])
-	mnt6.fq6.f.f.cpy(precomputedG1_6.y, g1Point[1])
+	mnt6.fq6.f.f.copy(precomputedG1_6.x, g1Point[0])
+	mnt6.fq6.f.f.copy(precomputedG1_6.y, g1Point[1])
 	mnt6.fq6.f.mulByFq(precomputedG1_6.xx, mnt6.twist, g1Point[0])
 	mnt6.fq6.f.mulByFq(precomputedG1_6.yy, mnt6.twist, g1Point[1])
 }
@@ -285,7 +285,7 @@ func (mnt6 *mnt6Instance) atePairingLoop(f *fe6q, g1Point *pointG1, g2Point *poi
 	mnt6.precomputeG2(q, g2Point, twistInv)
 
 	l1Coeff := fq6.f.zero()
-	fq6.f.f.cpy(l1Coeff[0], p.x)
+	fq6.f.f.copy(l1Coeff[0], p.x)
 	fq6.f.sub(l1Coeff, l1Coeff, q.xx)
 
 	ff := fq6.one()

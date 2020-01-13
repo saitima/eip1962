@@ -17,7 +17,7 @@ type BLSInstance struct {
 }
 
 type (
-	ellCoeffs = []fe6
+// []fe6 = []fe6
 )
 
 // NewBLSInstance ..
@@ -39,7 +39,7 @@ func newBLSInstance(z *big.Int, zIsnegative bool, twistType uint8, g1 *g1, g2 *g
 	return bls
 }
 
-func (bls *BLSInstance) doublingStep(coeff fe6, r *pointG22, twoInv fieldElement) {
+func (bls *BLSInstance) doublingStep(coeff *fe6, r *pointG22, twoInv fieldElement) {
 	fq2 := bls.fq12.f.f
 	t := bls.t2
 	// X*Y/2
@@ -92,22 +92,25 @@ func (bls *BLSInstance) doublingStep(coeff fe6, r *pointG22, twoInv fieldElement
 	// -2*Y*Z
 	fq2.neg(t[15], t[9])
 
+	coeff[0] = *fq2.newElement()
+	coeff[1] = *fq2.newElement()
+	coeff[2] = *fq2.newElement()
 	switch bls.twistType {
 	case 1: // M
-		fq2.copy(coeff[0], t[10]) // 3*b*Z^2 - Y^2
-		fq2.copy(coeff[1], t[14]) // 3*X^2
-		fq2.copy(coeff[2], t[15]) // -2*Y*Z
+		fq2.copy(&coeff[0], t[10]) // 3*b*Z^2 - Y^2
+		fq2.copy(&coeff[1], t[14]) // 3*X^2
+		fq2.copy(&coeff[2], t[15]) // -2*Y*Z
 		break
 	case 2:
-		fq2.copy(coeff[0], t[15]) // -2*Y*Z
-		fq2.copy(coeff[1], t[14]) // 3*X^2
-		fq2.copy(coeff[2], t[10]) // 3*b*Z^2 - Y^2
+		fq2.copy(&coeff[0], t[15]) // -2*Y*Z
+		fq2.copy(&coeff[1], t[14]) // 3*X^2
+		fq2.copy(&coeff[2], t[10]) // 3*b*Z^2 - Y^2
 		break
 	}
 
 }
 
-func (bls *BLSInstance) additionStep(coeff fe6, r *pointG22, q *pointG22) {
+func (bls *BLSInstance) additionStep(coeff *fe6, r *pointG22, q *pointG22) {
 	fq2 := bls.fq12.f.f
 	t := bls.t2
 	// theta = Y - y*Z
@@ -147,39 +150,41 @@ func (bls *BLSInstance) additionStep(coeff fe6, r *pointG22, q *pointG22) {
 	fq2.sub(t[11], t[11], t[10])
 	// -theta
 	fq2.neg(t[0], t[0])
-
+	coeff[0] = *fq2.newElement()
+	coeff[1] = *fq2.newElement()
+	coeff[2] = *fq2.newElement()
 	switch bls.twistType {
 	case 1: // M
-		fq2.copy(coeff[0], t[11]) // theata*x - lambda*y
-		fq2.copy(coeff[1], t[0])  // -theta
-		fq2.copy(coeff[2], t[1])  // lambda
+		fq2.copy(&coeff[0], t[11]) // theata*x - lambda*y
+		fq2.copy(&coeff[1], t[0])  // -theta
+		fq2.copy(&coeff[2], t[1])  // lambda
 		break
 	case 2: // D
-		fq2.copy(coeff[0], t[1])  // lambda
-		fq2.copy(coeff[1], t[0])  // -theta
-		fq2.copy(coeff[2], t[11]) // theata*x - lambda*y
+		fq2.copy(&coeff[0], t[1])  // lambda
+		fq2.copy(&coeff[1], t[0])  // -theta
+		fq2.copy(&coeff[2], t[11]) // theata*x - lambda*y
 		break
 	}
 
 }
 
-func (bls *BLSInstance) ell(f *fe12, coeffs fe6, p *pointG1) {
+func (bls *BLSInstance) ell(f *fe12, coeffs *fe6, p *pointG1) {
 	// TODO: p needs to be affine/normalized
 	fq2 := bls.fq12.f.f
 	switch bls.twistType {
 	case 1: // M
-		fq2.mulByFq(coeffs[2], coeffs[2], p[1])
-		fq2.mulByFq(coeffs[1], coeffs[1], p[0])
-		bls.fq12.mulBy014(f, coeffs[0], coeffs[1], coeffs[2])
+		fq2.mulByFq(&coeffs[2], &coeffs[2], p[1])
+		fq2.mulByFq(&coeffs[1], &coeffs[1], p[0])
+		bls.fq12.mulBy014(f, &coeffs[0], &coeffs[1], &coeffs[2])
 	case 2: // D
-		fq2.mulByFq(coeffs[0], coeffs[0], p[1])
-		fq2.mulByFq(coeffs[1], coeffs[1], p[0])
-		bls.fq12.mulBy034(f, coeffs[0], coeffs[1], coeffs[2])
+		fq2.mulByFq(&coeffs[0], &coeffs[0], p[1])
+		fq2.mulByFq(&coeffs[1], &coeffs[1], p[0])
+		bls.fq12.mulBy034(f, &coeffs[0], &coeffs[1], &coeffs[2])
 	}
 }
 
 // TODO: twistPoint should be a affine point
-func (bls *BLSInstance) prepare(coeffs ellCoeffs, Q *pointG22) {
+func (bls *BLSInstance) prepare(coeffs *[]fe6, Q *pointG22) {
 	f := bls.fq12.f.f.f
 	twoInw := f.newFieldElement()
 	f.double(twoInw, f.one)
@@ -195,12 +200,10 @@ func (bls *BLSInstance) prepare(coeffs ellCoeffs, Q *pointG22) {
 	j := 0
 	//  skip first msb bit
 	for i := bls.z.BitLen() - 2; i >= 0; i-- {
-		coeffs[j] = *bls.fq12.f.newElement()
-		bls.doublingStep(coeffs[j], T, twoInw)
+		bls.doublingStep(&(*coeffs)[j], T, twoInw)
 		j++
 		if bls.z.Bit(int(i)) != 0 {
-			coeffs[j] = *bls.fq12.f.newElement()
-			bls.additionStep(coeffs[j], T, Q)
+			bls.additionStep(&(*coeffs)[j], T, Q)
 			j++
 		}
 	}
@@ -210,13 +213,13 @@ func (bls *BLSInstance) prepare(coeffs ellCoeffs, Q *pointG22) {
 }
 
 func (bls *BLSInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*pointG22) {
-	coeffs := make([]ellCoeffs, len(g1Points))
+	coeffs := make([][]fe6, len(g1Points))
 	// prepare and collect miller lines for each pair (Pi,Qi)
 	// TODO: check points that are normalized/affine form?
 	// fmt.Printf("length: %d\n", bls.calculateCoeffLength())
 	for i := 0; i < len(g1Points); i++ {
-		coeffs[i] = make(ellCoeffs, bls.calculateCoeffLength())
-		bls.prepare(coeffs[i], g2Points[i])
+		coeffs[i] = make([]fe6, bls.calculateCoeffLength())
+		bls.prepare(&coeffs[i], g2Points[i])
 	}
 
 	j := 0
@@ -226,13 +229,13 @@ func (bls *BLSInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*poi
 		}
 		// doubling coeffs
 		for k, point := range g1Points {
-			bls.ell(f, coeffs[k][j], point)
+			bls.ell(f, &(coeffs[k])[j], point)
 		}
 		j++
 		// addition coeffs
 		if bls.z.Bit(int(i)) != 0 {
 			for k, point := range g1Points {
-				bls.ell(f, coeffs[k][j], point)
+				bls.ell(f, &(coeffs)[k][j], point)
 			}
 			j++
 		}

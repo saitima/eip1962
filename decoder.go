@@ -88,8 +88,8 @@ func decodeFp2(in []byte, modulusLen int, field *fq2) (*fe2, []byte, error) {
 		return nil, nil, err
 	}
 	elem := field.newElement()
-	field.f.cpy(elem[0], c0)
-	field.f.cpy(elem[1], c1)
+	field.f.copy(elem[0], c0)
+	field.f.copy(elem[1], c1)
 	return elem, rest, nil
 }
 
@@ -119,9 +119,9 @@ func decodeFp3(in []byte, modulusLen int, field *fq3) (*fe3, []byte, error) {
 		return nil, nil, err
 	}
 	elem := field.newElement()
-	field.f.cpy(elem[0], c0)
-	field.f.cpy(elem[1], c1)
-	field.f.cpy(elem[2], c2)
+	field.f.copy(elem[0], c0)
+	field.f.copy(elem[1], c1)
+	field.f.copy(elem[2], c2)
 	return elem, rest, nil
 }
 
@@ -195,9 +195,9 @@ func decodeG1Point(in []byte, modulusLen int, g1 *g1) (*pointG1, []byte, error) 
 		return nil, nil, err
 	}
 	p := g1.newPoint()
-	g1.f.cpy(p[0], x)
-	g1.f.cpy(p[1], y)
-	g1.f.cpy(p[2], g1.f.one)
+	g1.f.copy(p[0], x)
+	g1.f.copy(p[1], y)
+	g1.f.copy(p[2], g1.f.one)
 	if !g1.isOnCurve(p) {
 		return nil, nil, errors.New("g1 point isn't on the curve")
 	}
@@ -273,7 +273,7 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, froben
 	}
 
 	fq2, err := newFq2(field, nil)
-	fq2.f.cpy(fq2.nonResidue, nonResidue)
+	fq2.f.copy(fq2.nonResidue, nonResidue)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -301,7 +301,7 @@ func createExtension3FieldParams(in []byte, modulusLen int, field *field, froben
 	}
 
 	fq3, err := newFq3(field, nil)
-	fq3.f.cpy(fq3.nonResidue, nonResidue)
+	fq3.f.copy(fq3.nonResidue, nonResidue)
 	if err != nil {
 		return nil, nil, err
 	}

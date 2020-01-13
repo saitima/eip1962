@@ -26,16 +26,16 @@ func newFq3(f *field, nonResidue []byte) (*fq3, error) {
 	t := make([]fieldElement, 6)
 	for i := 0; i < 6; i++ {
 		t[i] = f.newFieldElement()
-		f.cpy(t[i], f.zero)
+		f.copy(t[i], f.zero)
 	}
 	return &fq3{f, nonResidue_, t, nil}, nil
 }
 
 func (fq *fq3) newElement() *fe3 {
 	fe := &fe3{fq.f.newFieldElement(), fq.f.newFieldElement(), fq.f.newFieldElement()}
-	fq.f.cpy(fe[0], fq.f.zero)
-	fq.f.cpy(fe[1], fq.f.zero)
-	fq.f.cpy(fe[2], fq.f.zero)
+	fq.f.copy(fe[0], fq.f.zero)
+	fq.f.copy(fe[1], fq.f.zero)
+	fq.f.copy(fe[2], fq.f.zero)
 	return fe
 }
 
@@ -88,7 +88,7 @@ func (fq *fq3) zero() *fe3 {
 
 func (fq *fq3) one() *fe3 {
 	a := fq.newElement()
-	fq.f.cpy(a[0], fq.f.one)
+	fq.f.copy(a[0], fq.f.one)
 	return a
 }
 
@@ -101,9 +101,9 @@ func (fq *fq3) equal(a, b *fe3) bool {
 }
 
 func (fq *fq3) copy(c, a *fe3) *fe3 {
-	fq.f.cpy(c[0], a[0])
-	fq.f.cpy(c[1], a[1])
-	fq.f.cpy(c[2], a[2])
+	fq.f.copy(c[0], a[0])
+	fq.f.copy(c[1], a[1])
+	fq.f.copy(c[2], a[2])
 	return c
 }
 
@@ -170,7 +170,7 @@ func (fq *fq3) mul(c, a, b *fe3) {
 	fq.f.add(t[4], t[0], t[2])
 	fq.f.sub(t[3], t[3], t[4])
 	fq.f.add(c[2], t[1], t[3])
-	fq.f.cpy(c[0], t[5])
+	fq.f.copy(c[0], t[5])
 }
 
 func (fq *fq3) square(c, a *fe3) {
@@ -261,7 +261,7 @@ func (fq *fq3) calculateFrobeniusCoeffs() bool {
 		fq.f.exp(fq.frobeniusCoeffs[1][i], fq.frobeniusCoeffs[0][i], bigTwo)
 		qPower.Mul(qPower, modulus)
 	}
-	fq.f.cpy(fq.frobeniusCoeffs[0][0], fq.f.one)
-	fq.f.cpy(fq.frobeniusCoeffs[1][0], fq.f.one)
+	fq.f.copy(fq.frobeniusCoeffs[0][0], fq.f.one)
+	fq.f.copy(fq.frobeniusCoeffs[1][0], fq.f.one)
 	return true
 }

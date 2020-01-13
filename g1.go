@@ -45,17 +45,17 @@ func newG1(f *field, a, b, q []byte) (*g1, error) {
 		t: t,
 	}
 	g.inf = g.newPoint()
-	g.f.cpy(g.inf[0], f.zero)
-	g.f.cpy(g.inf[1], f.one)
-	g.f.cpy(g.inf[2], f.zero)
+	g.f.copy(g.inf[0], f.zero)
+	g.f.copy(g.inf[1], f.one)
+	g.f.copy(g.inf[2], f.zero)
 	return g, nil
 }
 
 func (g *g1) newPoint() *pointG1 {
 	p := &pointG1{g.f.newFieldElement(), g.f.newFieldElement(), g.f.newFieldElement()}
-	g.f.cpy(p[0], g.f.zero)
-	g.f.cpy(p[1], g.f.zero)
-	g.f.cpy(p[2], g.f.zero)
+	g.f.copy(p[0], g.f.zero)
+	g.f.copy(p[1], g.f.zero)
+	g.f.copy(p[2], g.f.zero)
 	return p
 }
 
@@ -73,9 +73,9 @@ func (g *g1) fromBytes(in []byte) (*pointG1, error) {
 		return nil, err
 	}
 	p := g.newPoint()
-	g.f.cpy(p[0], x)
-	g.f.cpy(p[1], y)
-	g.f.cpy(p[2], g.f.one)
+	g.f.copy(p[0], x)
+	g.f.copy(p[1], y)
+	g.f.copy(p[2], g.f.one)
 	return p, nil
 }
 
@@ -90,9 +90,9 @@ func (g *g1) toBytes(p *pointG1) []byte {
 }
 
 func (g *g1) copy(q, p *pointG1) *pointG1 {
-	g.f.cpy(q[0], p[0])
-	g.f.cpy(q[1], p[1])
-	g.f.cpy(q[2], p[2])
+	g.f.copy(q[0], p[0])
+	g.f.copy(q[1], p[1])
+	g.f.copy(q[2], p[2])
 	return q
 }
 
@@ -108,7 +108,7 @@ func (g *g1) affine(r, p *pointG1) *pointG1 {
 	g.f.mul(q[0], p[0], t[1])
 	g.f.mul(t[0], t[0], t[1])
 	g.f.mul(q[1], p[1], t[0])
-	g.f.cpy(q[2], g.f.one)
+	g.f.copy(q[2], g.f.one)
 	g.copy(r, q)
 	return r
 }
@@ -133,9 +133,9 @@ func (g *g1) toStringNoTransform(p *pointG1) string {
 
 func (g *g1) zero() *pointG1 {
 	p := g.newPoint()
-	g.f.cpy(p[0], g.f.zero)
-	g.f.cpy(p[1], g.f.one)
-	g.f.cpy(p[2], g.f.zero)
+	g.f.copy(p[0], g.f.zero)
+	g.f.copy(p[1], g.f.one)
+	g.f.copy(p[2], g.f.zero)
 	return p
 }
 
@@ -274,7 +274,7 @@ func (g *g1) doubleNonZeroA(r, p *pointG1) *pointG1 {
 	g.f.square(t[3], t[0])    // m^2
 	g.f.double(t[4], t[2])    // 2s
 	g.f.sub(t[3], t[3], t[4]) // t = m^2 - 2s
-	g.f.cpy(r[0], t[3])       // x3 = t
+	g.f.copy(r[0], t[3])       // x3 = t
 	g.f.sub(t[2], t[2], t[3]) // s - t
 	g.f.mul(t[0], t[0], t[2]) // m * (s - t)
 	g.f.double(t[1], t[1])    //
@@ -312,15 +312,15 @@ func (g *g1) doubleZeroA(r, p *pointG1) *pointG1 {
 	g.f.mul(t[0], t[0], t[1]) // e * (d - x3)
 	g.f.sub(t[1], t[0], t[2]) // x3 = e * (d - x3) - 8c
 	g.f.mul(t[0], p[1], p[2]) // y1 * z1
-	g.f.cpy(r[1], t[1])       //
+	g.f.copy(r[1], t[1])       //
 	g.f.double(r[2], t[0])    // z3 = 2(y1 * z1)
 	return r
 }
 
 func (g *g1) neg(r, p *pointG1) *pointG1 {
-	g.f.cpy(r[0], p[0])
+	g.f.copy(r[0], p[0])
 	g.f.neg(r[1], p[1])
-	g.f.cpy(r[2], p[2])
+	g.f.copy(r[2], p[2])
 	return r
 }
 

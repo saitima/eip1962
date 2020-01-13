@@ -134,8 +134,8 @@ func (fq *fq6q) conjugate(c, a *fe6q) *fe6q {
 
 func (fq *fq6q) mulByNonResidue(c, a *fe3) {
 	o := fq.f.newElement()
-	fq.f.f.cpy(o[2], a[1])
-	fq.f.f.cpy(o[1], a[0])
+	fq.f.f.copy(o[2], a[1])
+	fq.f.f.copy(o[1], a[0])
 	fq.f.mulByNonResidue(o[0], a[2])
 	fq.f.copy(c, o)
 }
@@ -212,10 +212,10 @@ func (fq *fq6q) calculateFrobeniusCoeffs() bool {
 	}
 	modulus := fq.f.f.pbig
 	f0 := fq.f.f.one
-	fq.f.f.cpy(fq.frobeniusCoeffs[0], f0)
-	fq.f.f.cpy(fq.frobeniusCoeffs[2], fq.f.f.zero)
-	fq.f.f.cpy(fq.frobeniusCoeffs[4], fq.f.f.zero)
-	fq.f.f.cpy(fq.frobeniusCoeffs[5], fq.f.f.zero)
+	fq.f.f.copy(fq.frobeniusCoeffs[0], f0)
+	fq.f.f.copy(fq.frobeniusCoeffs[2], fq.f.f.zero)
+	fq.f.f.copy(fq.frobeniusCoeffs[4], fq.f.f.zero)
+	fq.f.f.copy(fq.frobeniusCoeffs[5], fq.f.f.zero)
 	qPower, rem, power := new(big.Int).Set(modulus), new(big.Int), new(big.Int)
 	for i := 1; i <= 3; i++ {
 		if i == 2 {
