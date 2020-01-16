@@ -267,7 +267,7 @@ func (fq *fq3) calculateFrobeniusCoeffs() bool {
 	return true
 }
 
-func (fq *fq3) calculateFrobeniusCoeffsWithPrecomputation(f1 fieldElement) bool {
+func (fq *fq3) calculateFrobeniusCoeffsWithPrecomputation(f1 fieldElement) {
 	if fq.frobeniusCoeffs == nil {
 		fq.frobeniusCoeffs = new([2]*fe3)
 		fq.frobeniusCoeffs[0] = fq.newElement()
@@ -282,5 +282,4 @@ func (fq *fq3) calculateFrobeniusCoeffsWithPrecomputation(f1 fieldElement) bool 
 		fq.f.square(fq.frobeniusCoeffs[1][i], fq.frobeniusCoeffs[0][i])
 		fq.f.square(fq.frobeniusCoeffs[1][i], fq.frobeniusCoeffs[0][i])
 	}
-	return true
 }

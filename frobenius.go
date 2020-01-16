@@ -45,3 +45,11 @@ func constructBaseForFq3AndFq6(f *field, nonResidue fieldElement) (fieldElement,
 
 	return f1, nil
 }
+
+func constructBaseForFq2AndFq4(f *field, nonResidue fieldElement) fieldElement {
+	modulus := f.pbig
+	power := new(big.Int).Rsh(modulus, 2)
+	f1 := f.newFieldElement()
+	f.exp(f1, nonResidue, power)
+	return f1
+}

@@ -226,3 +226,16 @@ func (fq *fq4) calculateFrobeniusCoeffs() bool {
 	}
 	return true
 }
+
+func (fq *fq4) calculateFrobeniusCoeffsWithPrecomputation(f1 fieldElement) {
+	if fq.frobeniusCoeffs == nil {
+		fq.frobeniusCoeffs = new([4]fieldElement)
+		for i := 0; i < 4; i++ {
+			fq.frobeniusCoeffs[i] = fq.f.f.newFieldElement()
+		}
+	}
+	fq.f.f.copy(fq.frobeniusCoeffs[0], fq.f.f.one)
+	fq.f.f.copy(fq.frobeniusCoeffs[1], f1)
+	fq.f.f.square(fq.frobeniusCoeffs[2], fq.frobeniusCoeffs[1])
+	fq.f.f.copy(fq.frobeniusCoeffs[3], fq.f.f.zero)
+}
