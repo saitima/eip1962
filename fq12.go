@@ -316,6 +316,17 @@ func (fq *fq12) cyclotomicExp(c, a *fe12, e *big.Int) {
 	fq.copy(c, z)
 }
 
+func (fq *fq12) cyclotomicExp2(c, a *fe12, e *big.Int) {
+	z := fq.one()
+	for i := e.BitLen() - 1; i >= 0; i-- {
+		fq.cyclotomicSquare2(z, z)
+		if e.Bit(i) == 1 {
+			fq.mul(z, z, a)
+		}
+	}
+	fq.copy(c, z)
+}
+
 func (fq *fq12) mulBy034(f *fe12, c0, c3, c4 *fe2) {
 	o := fq.f.f.newElement() // base filed temp mem could be used :/
 	t := fq.t
@@ -372,8 +383,8 @@ func (fq *fq12) calculateFrobeniusCoeffs() bool {
 		if i > 3 && i < 6 {
 			continue
 		}
-		power.Sub(qPower, big.NewInt(1))
-		power.DivMod(power, big.NewInt(6), rem)
+		power := power.Sub(qPower, big.NewInt(1))
+		power, rem = power.DivMod(power, big.NewInt(6), rem)
 		if rem.Uint64() != 0 {
 			return false
 		}
@@ -384,5 +395,21 @@ func (fq *fq12) calculateFrobeniusCoeffs() bool {
 			qPower.Mul(qPower, modulus)
 		}
 	}
+	return true
+}
+
+func (fq *fq12) calculateFrobeniusCoeffsWithPrecomputation(f1, f2 *fe2) bool {
+	if fq.frobeniusCoeffs == nil {
+		fq.frobeniusCoeffs = new([12]*fe2)
+		for i := 0; i < 12; i++ {
+			fq.frobeniusCoeffs[i] = fq.f.f.newElement()
+		}
+	}
+	fq.f.f.copy(fq.frobeniusCoeffs[0], fq.f.f.one())
+	fq.f.f.copy(fq.frobeniusCoeffs[1], f1)
+	fq.f.f.copy(fq.frobeniusCoeffs[2], f2)
+	fq.f.f.frobeniusMap(fq.frobeniusCoeffs[3], f2, 1)
+	fq.f.f.mul(fq.frobeniusCoeffs[3], fq.frobeniusCoeffs[3], fq.frobeniusCoeffs[1])
+	fq.f.f.exp(fq.frobeniusCoeffs[6], fq.frobeniusCoeffs[2], big.NewInt(3))
 	return true
 }

@@ -300,3 +300,27 @@ func (fq *fq6) calculateFrobeniusCoeffs() bool {
 	}
 	return true
 }
+
+func (fq *fq6) calculateFrobeniusCoeffsWithPrecomputation(f1, f2 *fe2) bool {
+	if fq.frobeniusCoeffs == nil {
+		fq.frobeniusCoeffs = new([2][6]*fe2)
+		for i := 0; i < 6; i++ {
+			fq.frobeniusCoeffs[0][i] = fq.f.newElement()
+			fq.frobeniusCoeffs[1][i] = fq.f.newElement()
+		}
+	}
+	fq.f.copy(fq.frobeniusCoeffs[0][0], fq.f.one())
+	fq.f.copy(fq.frobeniusCoeffs[1][0], fq.f.one())
+	fq.f.square(fq.frobeniusCoeffs[0][1], f1)
+	fq.f.square(fq.frobeniusCoeffs[0][2], f2)
+	fq.f.frobeniusMap(fq.frobeniusCoeffs[0][3], fq.frobeniusCoeffs[0][2], 1)
+	fq.f.mul(fq.frobeniusCoeffs[0][3], fq.frobeniusCoeffs[0][3], fq.frobeniusCoeffs[0][1])
+	for i := 1; i <= 3; i++ {
+		fq.f.square(fq.frobeniusCoeffs[1][i], fq.frobeniusCoeffs[0][i])
+	}
+	fq.f.copy(fq.frobeniusCoeffs[0][4], fq.f.zero())
+	fq.f.copy(fq.frobeniusCoeffs[1][4], fq.f.zero())
+	fq.f.copy(fq.frobeniusCoeffs[0][5], fq.f.zero())
+	fq.f.copy(fq.frobeniusCoeffs[1][5], fq.f.zero())
+	return true
+}

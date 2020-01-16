@@ -531,13 +531,19 @@ func pairBN(in []byte) ([]byte, error) {
 	if twistType != 0x01 && twistType != 0x02 {
 		return pairingError, errors.New("Unknown twist type supplied")
 	}
+
+	f1, f2, err := constructBaseForFq6AndFq12(fq2, fq2NonResidue)
+	if err != nil {
+		return pairingError, errors.New("Can not make base precomputations for Fp6/Fp12 frobenius")
+	}
+
 	// ext6
 	fq6, err := newFq6(fq2, nil)
 	if err != nil {
 		return pairingError, err
 	}
 	fq2.copy(fq6.nonResidue, fq2NonResidue)
-	if ok := fq6.calculateFrobeniusCoeffs(); !ok {
+	if ok := fq6.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp6")
 	}
 	// ext12
@@ -545,7 +551,7 @@ func pairBN(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if ok := fq12.calculateFrobeniusCoeffs(); !ok {
+	if ok := fq12.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp12")
 	}
 	// g2

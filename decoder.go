@@ -53,8 +53,8 @@ func parseBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, error
 	if len(rest) < modulusLen {
 		return nil, nil, 0, nil, errors.New("Input is not long enough")
 	}
-	fmt.Printf("modulus: %x\n", modulus.Bytes())
-	field := newField(modulus.Bytes())
+	modulusBytes := bytes_(modulusLen, modulus.Text(16))
+	field := newField(modulusBytes)
 	return field, modulus, modulusLen, rest, nil
 }
 
@@ -232,6 +232,7 @@ func decodeG23Point(in []byte, modulusLen int, g2 *g23) (*pointG23, []byte, erro
 	if err != nil {
 		return nil, nil, err
 	}
+	// TODO: use gg2.fromBytes() instead
 	q := g2.newPoint()
 	g2.f.copy(q[0], x)
 	g2.f.copy(q[1], y)
@@ -256,15 +257,7 @@ func decodeScalar(in []byte, orderLen int, order *big.Int) (*big.Int, []byte, er
 
 // G2
 func createExtension2FieldParams(in []byte, modulusLen int, field *field, frobenius bool) (*fq2, []byte, error) {
-	degreeBuf, rest, err := split(in, EXTENSION_DEGREE_LENGTH_ENCODING)
-	if err != nil {
-		return nil, nil, errors.New("cant decode extension degree length")
-	}
-	degree := int(degreeBuf[0])
-	if degree != EXTENSION_TWO_DEGREE {
-		return nil, nil, errors.New("Extension degree expected to be 2")
-	}
-	nonResidue, rest, err := decodeFp(rest, modulusLen, field)
+	nonResidue, rest, err := decodeFp(in, modulusLen, field)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -278,26 +271,20 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, froben
 		return nil, nil, err
 	}
 	if frobenius {
-		fq2.calculateFrobeniusCoeffs()
+		if ok := fq2.calculateFrobeniusCoeffs(); !ok {
+			return nil, nil, errors.New("Can not calculate Frobenius coefficients for Fp2")
+		}
 	}
 	return fq2, rest, nil
 }
 
 func createExtension3FieldParams(in []byte, modulusLen int, field *field, frobenius bool) (*fq3, []byte, error) {
-	degreeBuf, rest, err := split(in, EXTENSION_DEGREE_LENGTH_ENCODING)
-	if err != nil {
-		return nil, nil, errors.New("cant decode extension degree length")
-	}
-	degree := int(degreeBuf[0])
-	if degree != EXTENSION_THREE_DEGREE {
-		return nil, nil, errors.New("Extension degree expected to be 2")
-	}
-	nonResidue, rest, err := decodeFp(rest, modulusLen, field)
+	nonResidue, rest, err := decodeFp(in, modulusLen, field)
 	if err != nil {
 		return nil, nil, err
 	}
 	if !isNonNThRoot(field, nonResidue, 3) {
-		return nil, nil, errors.New("Non-residue for Fp2 is actually a residue")
+		return nil, nil, errors.New("Non-residue for Fp3 is actually a residue")
 	}
 
 	fq3, err := newFq3(field, nil)
@@ -306,7 +293,9 @@ func createExtension3FieldParams(in []byte, modulusLen int, field *field, froben
 		return nil, nil, err
 	}
 	if frobenius {
-		fq3.calculateFrobeniusCoeffs()
+		if ok := fq3.calculateFrobeniusCoeffs(); !ok {
+			return nil, nil, errors.New("Can not calculate Frobenius coefficients for Fp3")
+		}
 	}
 	return fq3, rest, nil
 }

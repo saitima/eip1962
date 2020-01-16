@@ -28,12 +28,16 @@ type TestVectorG2ScalarMultPair struct {
 	A      string `json:"a"`
 	Gx0    string `json:"g_x_0"`
 	Gx1    string `json:"g_x_1"`
+	Gx2    string `json:"g_x_2"`
 	Gy0    string `json:"g_y_0"`
 	Gy1    string `json:"g_y_1"`
+	Gy2    string `json:"g_y_2"`
 	Hx0    string `json:"h_x_0"`
 	Hx1    string `json:"h_x_1"`
+	Hx2    string `json:"h_x_2"`
 	Hy0    string `json:"h_y_0"`
 	Hy1    string `json:"h_y_1"`
+	Hy2    string `json:"h_y_2"`
 	Binary string `json:"scalar_mult_binary"`
 }
 
@@ -47,6 +51,7 @@ type TestVectorJSON struct {
 	NonResidue        string                       `json:"non_residue"`
 	NonResidue2_0     string                       `json:"quadratic_non_residue_0"`
 	NonResidue2_1     string                       `json:"quadratic_non_residue_1"`
+	NonResidue2_2     string                       `json:"quadratic_non_residue_2"`
 	A                 string                       `json:"A"`
 	B                 string                       `json:"B"`
 	G1x               string                       `json:"g1_x"`
@@ -57,12 +62,16 @@ type TestVectorJSON struct {
 	IsDType           string                       `json:"is_D_type"`
 	A_twist_0         string                       `json:"A_twist_0"`
 	A_twist_1         string                       `json:"A_twist_1"`
+	A_twist_2         string                       `json:"A_twist_2"`
 	B_twist_0         string                       `json:"B_twist_0"`
 	B_twist_1         string                       `json:"B_twist_1"`
+	B_twist_2         string                       `json:"B_twist_2"`
 	G2x0              string                       `json:"g2_x_0"`
 	G2x1              string                       `json:"g2_x_1"`
+	G2x2              string                       `json:"g2_x_2"`
 	G2y0              string                       `json:"g2_y_0"`
 	G2y1              string                       `json:"g2_y_1"`
+	G2y2              string                       `json:"g2_y_2"`
 	CofactorG2        string                       `json:"cofactor_g2"`
 	G2ScalarMultPairs []TestVectorG2ScalarMultPair `json:"g2_scalar_mult_test_vectors"`
 	R                 string                       `json:"r"`
@@ -86,6 +95,10 @@ func newTestVectorJSONFromFile(file string) (*TestVectorJSON, error) {
 	if err := json.Unmarshal(data, v); err != nil {
 		return nil, err
 	}
+	if len(v.N)%2 != 0 {
+		v.N = "0x0" + v.N[2:]
+	}
+
 	v.fieldByteLen = (len(v.N) - 2) / 2
 	v.groupByteLen = (len(v.Q) - 2) / 2
 
@@ -101,6 +114,7 @@ func newTestVectorJSONFromFile(file string) (*TestVectorJSON, error) {
 		}
 		v.NonResidue = new(big.Int).Sub(v.modulusBig, nonResidue).Text(16)
 	}
+
 	return v, nil
 }
 
@@ -111,6 +125,7 @@ func (v *TestVectorJSON) encode(str string) []byte {
 func (v *TestVectorJSON) makeBaseFieldBinary() {
 	v.buf.WriteByte(byte(v.fieldByteLen))
 	// - Field modulus
+
 	v.buf.Write(v.encode(v.N))
 }
 
@@ -170,8 +185,22 @@ func (v *TestVectorJSON) makeExtension2Field() {
 	v.buf.Write(v.encode(v.R))
 
 }
+func (v *TestVectorJSON) makeExtension3Field() {
+	v.buf.WriteByte(byte(EXTENSION_THREE_DEGREE))
+	v.buf.Write(v.encode(v.NonResidue))
+	v.buf.Write(v.encode(v.A_twist_0))
+	v.buf.Write(v.encode(v.A_twist_1))
+	v.buf.Write(v.encode(v.A_twist_2))
+	v.buf.Write(v.encode(v.B_twist_0))
+	v.buf.Write(v.encode(v.B_twist_1))
+	v.buf.Write(v.encode(v.B_twist_2))
+	g2GroupOrderLen := (len(v.N) - 2) / 2
+	v.buf.WriteByte(byte(g2GroupOrderLen))
+	v.buf.Write(v.encode(v.R))
 
-func (v *TestVectorJSON) makeG2PointBinary() {
+}
+
+func (v *TestVectorJSON) makeG22PointBinary() {
 	// - Point
 	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Gx0))
 	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Gx1))
@@ -179,15 +208,26 @@ func (v *TestVectorJSON) makeG2PointBinary() {
 	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Gy1))
 }
 
+func (v *TestVectorJSON) makeG23PointBinary() {
+	// - Point
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Gx0))
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Gx1))
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Gx2))
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Gy0))
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Gy1))
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Gy2))
+}
+
 func (v *TestVectorJSON) makeG2ScalarBinary() {
 	// - Scalar
 	v.buf.Write(bytes_(v.groupByteLen, v.G2ScalarMultPairs[0].A))
 }
 
-func (v *TestVectorJSON) makeG2MulBinary() ([]byte, []byte, error) {
+func (v *TestVectorJSON) makeG22MulBinary() ([]byte, []byte, error) {
+	v.buf.WriteByte(0x05) // op type
 	v.makeBaseFieldBinary()
 	v.makeExtension2Field()
-	v.makeG2PointBinary()
+	v.makeG22PointBinary()
 	v.makeG2ScalarBinary()
 	input := make([]byte, len(v.buf.Bytes()))
 	copy(input, v.buf.Bytes())
@@ -203,6 +243,33 @@ func (v *TestVectorJSON) makeG2MulBinary() ([]byte, []byte, error) {
 	output := make([]byte, len(v.buf.Bytes()))
 	copy(output, v.buf.Bytes())
 	if len(output) < (4 * 32) {
+		return nil, nil, fmt.Errorf("cant assemble output data for g2 scalar mul")
+	}
+	return input, output, nil
+}
+
+func (v *TestVectorJSON) makeG23MulBinary() ([]byte, []byte, error) {
+	v.buf.WriteByte(0x05)   // op type
+	v.makeBaseFieldBinary() // 1 fe
+	v.makeExtension3Field() // 7 fe
+	v.makeG23PointBinary()  // 6 fe
+	v.makeG2ScalarBinary()  // 1 ge
+	input := make([]byte, len(v.buf.Bytes()))
+	copy(input, v.buf.Bytes())
+	if len(input) < (14*v.fieldByteLen)+(2*v.groupByteLen)+4 {
+		return nil, nil, fmt.Errorf("cant assemble input data for g23 scalar mul")
+	}
+	v.buf.Reset()
+	// - Output
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Hx0))
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Hx1))
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Hx2))
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Hy0))
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Hy1))
+	v.buf.Write(v.encode(v.G2ScalarMultPairs[0].Hy2))
+	output := make([]byte, len(v.buf.Bytes()))
+	copy(output, v.buf.Bytes())
+	if len(output) < (6 * 32) {
 		return nil, nil, fmt.Errorf("cant assemble output data for g2 scalar mul")
 	}
 	return input, output, nil
@@ -328,29 +395,40 @@ func (v *TestVectorJSON) makeMNT4PairingBinary() ([]byte, []byte, error) {
 	v.buf.Write(v.encode(v.NonResidue2_0)) // quadratic non residue
 	v.buf.Write(v.encode(v.NonResidue2_1))
 
-	writeExp := func(in string) {
+	writeExp := func(in string, sign bool) {
 		if in[:1] == "-" {
-			length := len(in[3:]) / 2
+			length := len(in[3:])
 			if length%2 != 0 {
 				length++
 			}
-			v.buf.WriteByte(byte(length))       // x length
-			v.buf.Write(bytes_(length, in[1:])) // x encoded
-			v.buf.WriteByte(0x01)               // sign of x
+			byteLen := length / 2
+			v.buf.WriteByte(byte(byteLen))       // x length
+			v.buf.Write(bytes_(byteLen, in[1:])) // x encoded
+			if sign {
+				v.buf.WriteByte(0x01) // sign of x
+			}
 		} else {
-			length := len(in[2:]) / 2
+			length := len(in[2:])
 			if length%2 != 0 {
 				length++
 			}
-			v.buf.WriteByte(byte(length))   // x length
-			v.buf.Write(bytes_(length, in)) // x encoded
-			v.buf.WriteByte(0x00)
+			byteLen := length / 2
+			v.buf.WriteByte(byte(byteLen))   // x length
+			v.buf.Write(bytes_(byteLen, in)) // x encoded
+			if sign {
+				v.buf.WriteByte(0x00)
+			}
 		}
 	}
 
-	writeExp(v.X)
-	writeExp(v.ExpW0)
-	writeExp(v.ExpW1)
+	writeExp(v.X, true)
+	writeExp(v.ExpW0, false)
+	writeExp(v.ExpW1, false)
+	if v.ExpW0[:1] == "-" {
+		v.buf.WriteByte(0x01) // sign of x
+	} else {
+		v.buf.WriteByte(0x00)
+	}
 	v.buf.WriteByte(byte(0x02)) // num pairs
 	// e(P, Q)*e(-P, Q)=1
 	// first pair
@@ -387,30 +465,42 @@ func (v *TestVectorJSON) makeMNT6PairingBinary() ([]byte, []byte, error) {
 	v.buf.Write(v.encode(v.NonResidue))    // non residue
 	v.buf.Write(v.encode(v.NonResidue2_0)) // quadratic non residue
 	v.buf.Write(v.encode(v.NonResidue2_1))
+	v.buf.Write(v.encode(v.NonResidue2_2))
 
-	writeExp := func(in string) {
+	writeExp := func(in string, sign bool) {
 		if in[:1] == "-" {
-			length := len(in[3:]) / 2
+			length := len(in[3:])
 			if length%2 != 0 {
 				length++
 			}
-			v.buf.WriteByte(byte(length))       // x length
-			v.buf.Write(bytes_(length, in[1:])) // x encoded
-			v.buf.WriteByte(0x01)               // sign of x
+			byteLen := length / 2
+			v.buf.WriteByte(byte(byteLen))       // x length
+			v.buf.Write(bytes_(byteLen, in[1:])) // x encoded
+			if sign {
+				v.buf.WriteByte(0x01) // sign of x
+			}
 		} else {
-			length := len(in[2:]) / 2
+			length := len(in[2:])
 			if length%2 != 0 {
 				length++
 			}
-			v.buf.WriteByte(byte(length))   // x length
-			v.buf.Write(bytes_(length, in)) // x encoded
-			v.buf.WriteByte(0x00)
+			byteLen := length / 2
+			v.buf.WriteByte(byte(byteLen))   // x length
+			v.buf.Write(bytes_(byteLen, in)) // x encoded
+			if sign {
+				v.buf.WriteByte(0x00)
+			}
 		}
 	}
 
-	writeExp(v.X)
-	writeExp(v.ExpW0)
-	writeExp(v.ExpW1)
+	writeExp(v.X, true)
+	writeExp(v.ExpW0, false)
+	writeExp(v.ExpW1, false)
+	if v.ExpW0[:1] == "-" {
+		v.buf.WriteByte(0x01) // sign of x
+	} else {
+		v.buf.WriteByte(0x00)
+	}
 	v.buf.WriteByte(byte(0x02)) // num pairs
 	// e(P, Q)*e(-P, Q)=1
 	// first pair
@@ -418,8 +508,10 @@ func (v *TestVectorJSON) makeMNT6PairingBinary() ([]byte, []byte, error) {
 	v.buf.Write(v.encode(v.G1y))
 	v.buf.Write(v.encode(v.G2x0))
 	v.buf.Write(v.encode(v.G2x1))
+	v.buf.Write(v.encode(v.G2x2))
 	v.buf.Write(v.encode(v.G2y0))
 	v.buf.Write(v.encode(v.G2y1))
+	v.buf.Write(v.encode(v.G2y2))
 
 	// second pair
 	pYBuf := v.encode(v.G1y)
@@ -429,8 +521,10 @@ func (v *TestVectorJSON) makeMNT6PairingBinary() ([]byte, []byte, error) {
 	v.buf.Write(v.encode(pYStr))
 	v.buf.Write(v.encode(v.G2x0))
 	v.buf.Write(v.encode(v.G2x1))
+	v.buf.Write(v.encode(v.G2x2))
 	v.buf.Write(v.encode(v.G2y0))
 	v.buf.Write(v.encode(v.G2y1))
+	v.buf.Write(v.encode(v.G2y2))
 
 	if len(v.buf.Bytes()) < (16*32)+(6*1)+(len(v.X)-2)/2 {
 		return nil, nil, errors.New("can't assemble pairing binary data")
