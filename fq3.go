@@ -67,9 +67,10 @@ func (fq *fq3) toBytes(a *fe3) []byte {
 
 func (fq *fq3) toString(a *fe3) string {
 	return fmt.Sprintf(
-		"c0: %s c1: %s\n",
+		"c0: %s c1: %s c2: %s \n",
 		fq.f.toString(a[0]),
 		fq.f.toString(a[1]),
+		fq.f.toString(a[2]),
 	)
 }
 
