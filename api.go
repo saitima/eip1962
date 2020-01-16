@@ -1040,9 +1040,8 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-
 	// ext3
-	fq3, rest, err := createExtension3FieldParams(rest, modulusLen, field, true)
+	fq3, rest, err := createExtension3FieldParams(rest, modulusLen, field, false)
 	if err != nil {
 		return pairingError, err
 	}
@@ -1054,15 +1053,22 @@ func pairMNT6(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
 	}
 
+	f1, err := constructBaseForFq3AndFq6(field, fq3.nonResidue)
+	if err != nil {
+		return pairingError, err
+	}
+	if ok := fq3.calculateFrobeniusCoeffsWithPrecomputation(f1); !ok {
+		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp3")
+	}
+
 	fq6, err := newFq6Quadratic(fq3, nil)
 	fq6.f.copy(fq6.nonResidue, fq3NonResidue)
 	if err != nil {
 		return pairingError, err
 	}
-	if ok := fq6.calculateFrobeniusCoeffs(); !ok {
+	if ok := fq6.calculateFrobeniusCoeffsWithPrecomputation(f1); !ok {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp6")
 	}
-
 	// g2
 	g2, err := newG23(fq3, nil, nil, order.Bytes())
 	if err != nil {
