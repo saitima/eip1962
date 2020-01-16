@@ -205,9 +205,9 @@ func TestFq6Cubic(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	fq6.calculateFrobeniusCoeffs()
 	f.copy(fq6.nonResidue[0], f.one)
 	f.copy(fq6.nonResidue[1], f.one)
+	fq6.calculateFrobeniusCoeffs()
 
 	zero := fq6.zero()
 	one := fq6.one()
@@ -847,15 +847,14 @@ func TestFq12(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	fq6.calculateFrobeniusCoeffs()
 	f.copy(fq6.nonResidue[0], f.one)
 	f.copy(fq6.nonResidue[1], f.one)
+	fq6.calculateFrobeniusCoeffs()
 
 	fq12, err := newFq12(fq6, nil)
 	if err != nil {
 		panic(err)
 	}
-	// f.neg(fq12.nonResidue, f.one)
 	fq12.calculateFrobeniusCoeffs()
 
 	zero := fq12.zero()
@@ -1000,23 +999,19 @@ func TestFq12(t *testing.T) {
 
 func TestG1(t *testing.T) {
 	// base field
-	modulus, ok := new(big.Int).SetString("1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab", 16)
-	if !ok {
-		panic("invalid modulus") // @TODO
-	}
-	q, ok := new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
-	if !ok {
-		panic("invalid g1 order")
-	}
-	f := newField(modulus.Bytes())
-	a := bytes_(48, "0x00")
-	b := bytes_(48, "0x04")
-	g, err := newG1(f, a, b, q.Bytes())
+	byteLen := 48
+	modulusBytes := bytes_(byteLen, "1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
+	groupBytes := bytes_(byteLen, "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")
+
+	f := newField(modulusBytes)
+	a := bytes_(byteLen, "0x00")
+	b := bytes_(byteLen, "0x04")
+	g, err := newG1(f, a, b, groupBytes)
 	if err != nil {
 		panic(err)
 	}
 	zero := g.zero()
-	oneBytes := bytes_(48,
+	oneBytes := bytes_(byteLen,
 		"0x17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb",
 		"0x08b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1",
 	)
@@ -1060,7 +1055,7 @@ func TestG1(t *testing.T) {
 			t.Fatal("bad equality 2")
 		}
 		if g.equal(one, zero) {
-			// t.Fatal("bad equality 3") // TODO: affine equality
+			t.Fatal("bad equality 3")
 		}
 	})
 
@@ -1173,16 +1168,11 @@ func TestG1(t *testing.T) {
 }
 
 func TestG22(t *testing.T) {
-	// base field
-	modulus, ok := new(big.Int).SetString("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787", 10)
-	if !ok {
-		panic("invalid modulus") // @TODO
-	}
-	q, ok := new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
-	if !ok {
-		panic("invalid g1 order")
-	}
-	f := newField(modulus.Bytes())
+	byteLen := 48
+	modulusBytes := bytes_(byteLen, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
+	groupBytes := bytes_(byteLen, "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")
+
+	f := newField(modulusBytes)
 	fq2, err := newFq2(f, nil)
 	if err != nil {
 		panic(err)
@@ -1190,12 +1180,12 @@ func TestG22(t *testing.T) {
 	f.neg(fq2.nonResidue, f.one)
 	fq2.calculateFrobeniusCoeffs()
 
-	g, err := newG22(fq2, nil, nil, q.Bytes())
+	g, err := newG22(fq2, nil, nil, groupBytes)
 	if err != nil {
 		panic(err)
 	}
 	zero := g.zero()
-	oneBytes := bytes_(48,
+	oneBytes := bytes_(byteLen,
 		"0x024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8",
 		"0x13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e",
 		"0x0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801",
@@ -1250,7 +1240,7 @@ func TestG22(t *testing.T) {
 			t.Fatal("bad equality 2")
 		}
 		if g.equal(one, zero) {
-			// t.Fatal("bad equality 3") // TODO: affine equality
+			t.Fatal("bad equality 3")
 		}
 	})
 
@@ -1450,7 +1440,7 @@ func TestG23(t *testing.T) {
 			t.Fatal("bad equality 2")
 		}
 		if g.equal(one, zero) {
-			// t.Fatal("bad equality 3") // TODO: affine equality
+			t.Fatal("bad equality 3")
 		}
 	})
 
@@ -1516,7 +1506,7 @@ func TestG23(t *testing.T) {
 		}
 	})
 
-	t.Run("Scalar Multiplication", func(t *testing.T) {
+	t.Run("Multiplication", func(t *testing.T) {
 		g.mulScalar(actual, zero, bigZero)
 		if !g.equal(actual, zero) {
 			t.Fatal("bad scalar multiplication 1")
@@ -1841,6 +1831,7 @@ func TestMNT4320Pairing(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+
 	nonResidue, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x011")) // decimal 17
 	if err != nil {
 		panic(err)
@@ -1887,7 +1878,6 @@ func TestMNT4320Pairing(t *testing.T) {
 	expW1 := big.NewInt(1)
 
 	mnt4 := newMnt4Instance(z, false, expW0, expW1, false, fq4, g1, g2, twist)
-
 	generatorBytes := bytes_(byteLen,
 		"0x7a2caf82a1ba85213fe6ca3875aee86aba8f73d69060c4079492b948dea216b5b9c8d2af46",
 		"0x2db619461cc82672f7f159fec2e89d0148dcc9862d36778c1afd96a71e29cba48e710a48ab2",
@@ -1981,175 +1971,175 @@ func TestMNT4320Pairing(t *testing.T) {
 
 }
 
-// func TestBN254Pairing(t *testing.T) {
-// 	byteLen := 32
-// 	modulusBytes := bytes_(byteLen, "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47")
-// 	groupBytes := bytes_(byteLen, "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001")
-// 	f := newField(modulusBytes)
+func TestBN254Pairing(t *testing.T) {
+	byteLen := 32
+	modulusBytes := bytes_(byteLen, "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47")
+	groupBytes := bytes_(byteLen, "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001")
+	f := newField(modulusBytes)
 
-// 	// G1
-// 	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x00"))
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	// G1
+	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x00"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x03"))
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x03"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	g1, err := newG1(f, nil, nil, groupBytes)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	f.copy(g1.a, a)
-// 	f.copy(g1.b, b)
+	g1, err := newG1(f, nil, nil, groupBytes)
+	if err != nil {
+		panic(err)
+	}
+	f.copy(g1.a, a)
+	f.copy(g1.b, b)
 
-// 	fq2, err := newFq2(f, nil)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	f.neg(fq2.nonResidue, f.one)
-// 	fq2.calculateFrobeniusCoeffs()
+	fq2, err := newFq2(f, nil)
+	if err != nil {
+		panic(err)
+	}
+	f.neg(fq2.nonResidue, f.one)
+	fq2.calculateFrobeniusCoeffs()
 
-// 	fq6, err := newFq6(fq2, nil)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	nine, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x09"))
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	f.copy(fq6.nonResidue[0], nine)
-// 	f.copy(fq6.nonResidue[1], f.one)
-// 	fq6.calculateFrobeniusCoeffs()
+	fq6, err := newFq6(fq2, nil)
+	if err != nil {
+		panic(err)
+	}
+	nine, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x09"))
+	if err != nil {
+		panic(err)
+	}
+	f.copy(fq6.nonResidue[0], nine)
+	f.copy(fq6.nonResidue[1], f.one)
+	fq6.calculateFrobeniusCoeffs()
 
-// 	fq12, err := newFq12(fq6, nil)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	fq12.calculateFrobeniusCoeffs()
+	fq12, err := newFq12(fq6, nil)
+	if err != nil {
+		panic(err)
+	}
+	fq12.calculateFrobeniusCoeffs()
 
-// 	// G2
-// 	g2, err := newG22(fq2, nil, nil, groupBytes)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	// y^2 = x^3 + b/(9+u)
-// 	a2, b2 := fq2.zero(), fq2.newElement()
-// 	fq2.inverse(b2, fq6.nonResidue)
-// 	fq2.mulByFq(b2, b2, b)
-// 	fq2.copy(g2.a, a2)
-// 	fq2.copy(g2.b, b2)
+	// G2
+	g2, err := newG22(fq2, nil, nil, groupBytes)
+	if err != nil {
+		panic(err)
+	}
+	// y^2 = x^3 + b/(9+u)
+	a2, b2 := fq2.zero(), fq2.newElement()
+	fq2.inverse(b2, fq6.nonResidue)
+	fq2.mulByFq(b2, b2, b)
+	fq2.copy(g2.a, a2)
+	fq2.copy(g2.b, b2)
 
-// 	minus2Inv := new(big.Int).ModInverse(big.NewInt(-2), f.pbig)
-// 	nonResidueInPMinus1Over2 := fq2.newElement()
-// 	fq2.exp(nonResidueInPMinus1Over2, fq6.nonResidue, minus2Inv)
-// 	u := new(big.Int).SetUint64(4965661367192848881)
-// 	sixUPlus2 := new(big.Int).Mul(u, big.NewInt(6))
-// 	sixUPlus2 = new(big.Int).Add(sixUPlus2, big.NewInt(2))
+	minus2Inv := new(big.Int).ModInverse(big.NewInt(-2), f.pbig)
+	nonResidueInPMinus1Over2 := fq2.newElement()
+	fq2.exp(nonResidueInPMinus1Over2, fq6.nonResidue, minus2Inv)
+	u := new(big.Int).SetUint64(4965661367192848881)
+	sixUPlus2 := new(big.Int).Mul(u, big.NewInt(6))
+	sixUPlus2 = new(big.Int).Add(sixUPlus2, big.NewInt(2))
 
-// 	bn := newBNInstance(u, sixUPlus2, false, 2, g1, g2, fq12, nonResidueInPMinus1Over2)
+	bn := newBNInstance(u, sixUPlus2, false, 2, g1, g2, fq12, nonResidueInPMinus1Over2)
 
-// 	generatorBytes := bytes_(byteLen,
-// 		"0x01",
-// 		"0x02",
-// 	)
-// 	g1One, err := bn.g1.fromBytes(generatorBytes)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	if !bn.g1.isOnCurve(g1One) {
-// 		panic("p is not on curve\n")
-// 	}
-// 	generatorBytes = bytes_(byteLen,
-// 		"0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed",
-// 		"0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2",
-// 		"0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa",
-// 		"0x90689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b",
-// 	)
-// 	g2One, err := bn.g2.fromBytes(generatorBytes)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	if !bn.g2.isOnCurve(g2One) {
-// 		panic("q is not on curve\n")
-// 	}
-// 	expectedBytes := bytes_(byteLen,
-// 		"0x12c70e90e12b7874510cd1707e8856f71bf7f61d72631e268fca81000db9a1f5",
-// 		"0x084f330485b09e866bc2f2ea2b897394deaf3f12aa31f28cb0552990967d4704",
-// 		"0x0e841c2ac18a4003ac9326b9558380e0bc27fdd375e3605f96b819a358d34bde",
-// 		"0x2067586885c3318eeffa1938c754fe3c60224ee5ae15e66af6b5104c47c8c5d8",
-// 		"0x01676555de427abc409c4a394bc5426886302996919d4bf4bdd02236e14b3636",
-// 		"0x2b03614464f04dd772d86df88674c270ffc8747ea13e72da95e3594468f222c4",
-// 		"0x2c53748bcd21a7c038fb30ddc8ac3bf0af25d7859cfbc12c30c866276c565909",
-// 		"0x27ed208e7a0b55ae6e710bbfbd2fd922669c026360e37cc5b2ab862411536104",
-// 		"0x1ad9db1937fd72f4ac462173d31d3d6117411fa48dba8d499d762b47edb3b54a",
-// 		"0x279db296f9d479292532c7c493d8e0722b6efae42158387564889c79fc038ee3",
-// 		"0x0dc26f240656bbe2029bd441d77c221f0ba4c70c94b29b5f17f0f6d08745a069",
-// 		"0x108c19d15f9446f744d0f110405d3856d6cc3bda6c4d537663729f5257628417",
-// 	)
-// 	expected, err := bn.fq12.fromBytes(expectedBytes)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	generatorBytes := bytes_(byteLen,
+		"0x01",
+		"0x02",
+	)
+	g1One, err := bn.g1.fromBytes(generatorBytes)
+	if err != nil {
+		panic(err)
+	}
+	if !bn.g1.isOnCurve(g1One) {
+		panic("p is not on curve\n")
+	}
+	generatorBytes = bytes_(byteLen,
+		"0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed",
+		"0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2",
+		"0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa",
+		"0x90689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b",
+	)
+	g2One, err := bn.g2.fromBytes(generatorBytes)
+	if err != nil {
+		panic(err)
+	}
+	if !bn.g2.isOnCurve(g2One) {
+		panic("q is not on curve\n")
+	}
+	expectedBytes := bytes_(byteLen,
+		"0x12c70e90e12b7874510cd1707e8856f71bf7f61d72631e268fca81000db9a1f5",
+		"0x084f330485b09e866bc2f2ea2b897394deaf3f12aa31f28cb0552990967d4704",
+		"0x0e841c2ac18a4003ac9326b9558380e0bc27fdd375e3605f96b819a358d34bde",
+		"0x2067586885c3318eeffa1938c754fe3c60224ee5ae15e66af6b5104c47c8c5d8",
+		"0x01676555de427abc409c4a394bc5426886302996919d4bf4bdd02236e14b3636",
+		"0x2b03614464f04dd772d86df88674c270ffc8747ea13e72da95e3594468f222c4",
+		"0x2c53748bcd21a7c038fb30ddc8ac3bf0af25d7859cfbc12c30c866276c565909",
+		"0x27ed208e7a0b55ae6e710bbfbd2fd922669c026360e37cc5b2ab862411536104",
+		"0x1ad9db1937fd72f4ac462173d31d3d6117411fa48dba8d499d762b47edb3b54a",
+		"0x279db296f9d479292532c7c493d8e0722b6efae42158387564889c79fc038ee3",
+		"0x0dc26f240656bbe2029bd441d77c221f0ba4c70c94b29b5f17f0f6d08745a069",
+		"0x108c19d15f9446f744d0f110405d3856d6cc3bda6c4d537663729f5257628417",
+	)
+	expected, err := bn.fq12.fromBytes(expectedBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	t.Run("Expected", func(t *testing.T) {
-// 		actual := bn.pair(g1One, g2One)
-// 		if !bn.fq12.equal(expected, actual) {
-// 			t.Logf("\nexpected: %s\b", bn.fq12.toString(expected))
-// 			t.Logf("\actual: %s\b", bn.fq12.toString(actual))
-// 			t.Fatalf("bad pairing-1")
-// 		}
-// 	})
+	t.Run("Expected", func(t *testing.T) {
+		actual := bn.pair(g1One, g2One)
+		if !bn.fq12.equal(expected, actual) {
+			t.Logf("\nexpected: %s\b", bn.fq12.toString(expected))
+			t.Logf("\actual: %s\b", bn.fq12.toString(actual))
+			t.Fatalf("bad pairing-1")
+		}
+	})
 
-// 	t.Run("Bilinearity", func(t *testing.T) {
-// 		a, _ := rand.Int(rand.Reader, big.NewInt(100))
-// 		b, _ := rand.Int(rand.Reader, big.NewInt(100))
-// 		c := new(big.Int).Mul(a, b)
-// 		G, H := bn.g1.newPoint(), bn.g2.newPoint()
-// 		bn.g1.mulScalar(G, g1One, a)
-// 		bn.g2.mulScalar(H, g2One, b)
-// 		if !bn.g1.isOnCurve(G) {
-// 			t.Fatal("G isnt on the curve")
-// 		}
-// 		if !bn.g2.isOnCurve(H) {
-// 			t.Fatal("H isnt on the curve")
-// 		}
+	t.Run("Bilinearity", func(t *testing.T) {
+		a, _ := rand.Int(rand.Reader, big.NewInt(100))
+		b, _ := rand.Int(rand.Reader, big.NewInt(100))
+		c := new(big.Int).Mul(a, b)
+		G, H := bn.g1.newPoint(), bn.g2.newPoint()
+		bn.g1.mulScalar(G, g1One, a)
+		bn.g2.mulScalar(H, g2One, b)
+		if !bn.g1.isOnCurve(G) {
+			t.Fatal("G isnt on the curve")
+		}
+		if !bn.g2.isOnCurve(H) {
+			t.Fatal("H isnt on the curve")
+		}
 
-// 		var f1, f2 *fe12
-// 		// e(a*G1, b*G2) = e(G1, G2)^c
-// 		t.Run("First", func(t *testing.T) {
-// 			bn.g1.affine(G, G)
-// 			bn.g2.affine(H, H)
-// 			f1 = bn.pair(G, H)
-// 			f2 = bn.pair(g1One, g2One)
-// 			bn.fq12.exp(f2, f2, c)
-// 			if !bn.fq12.equal(f1, f2) {
-// 				t.Errorf("bad pairing")
-// 			}
-// 		})
-// 		// e(a*G1, b*G2) = e(c*G1, G2)
-// 		t.Run("Second", func(t *testing.T) {
-// 			G = bn.g1.mulScalar(G, g1One, c)
-// 			bn.g1.affine(G, G)
-// 			f2 = bn.pair(G, g2One)
-// 			if !bn.fq12.equal(f1, f2) {
-// 				t.Errorf("bad pairing")
-// 			}
-// 		})
-// 		// e(a*G1, b*G2) = e(G1, c*G2)
-// 		t.Run("Third", func(t *testing.T) {
-// 			H = bn.g2.mulScalar(H, g2One, c)
-// 			bn.g2.affine(H, H)
-// 			f2 = bn.pair(g1One, H)
-// 			if !bn.fq12.equal(f1, f2) {
-// 				t.Errorf("bad pairing")
-// 			}
-// 		})
-// 	})
+		var f1, f2 *fe12
+		// e(a*G1, b*G2) = e(G1, G2)^c
+		t.Run("First", func(t *testing.T) {
+			bn.g1.affine(G, G)
+			bn.g2.affine(H, H)
+			f1 = bn.pair(G, H)
+			f2 = bn.pair(g1One, g2One)
+			bn.fq12.exp(f2, f2, c)
+			if !bn.fq12.equal(f1, f2) {
+				t.Errorf("bad pairing")
+			}
+		})
+		// e(a*G1, b*G2) = e(c*G1, G2)
+		t.Run("Second", func(t *testing.T) {
+			G = bn.g1.mulScalar(G, g1One, c)
+			bn.g1.affine(G, G)
+			f2 = bn.pair(G, g2One)
+			if !bn.fq12.equal(f1, f2) {
+				t.Errorf("bad pairing")
+			}
+		})
+		// e(a*G1, b*G2) = e(G1, c*G2)
+		t.Run("Third", func(t *testing.T) {
+			H = bn.g2.mulScalar(H, g2One, c)
+			bn.g2.affine(H, H)
+			f2 = bn.pair(g1One, H)
+			if !bn.fq12.equal(f1, f2) {
+				t.Errorf("bad pairing")
+			}
+		})
+	})
 
-// }
+}
 
 func TestMNT6320Pairing(t *testing.T) {
 	byteLen := 40
@@ -2209,12 +2199,12 @@ func TestMNT6320Pairing(t *testing.T) {
 	fq3.mulByFq(g2.b, twist3, b)
 
 	// mnt6 instance)
-	z, ok := new(big.Int).SetString("689871209842287392837045615510547309923794944", 10)
+	z, ok := new(big.Int).SetString("1eef5546609756bec2a33f0dc9a1b671660000", 16)
 	if !ok {
 		panic("invalid value")
 	}
 
-	expW0, ok := new(big.Int).SetString("689871209842287392837045615510547309923794944", 10)
+	expW0, ok := new(big.Int).SetString("1eef5546609756bec2a33f0dc9a1b671660000", 16)
 	if !ok {
 		panic("invalid expW0")
 	}
