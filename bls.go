@@ -216,7 +216,6 @@ func (bls *BLSInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*poi
 	coeffs := make([][]fe6, len(g1Points))
 	// prepare and collect miller lines for each pair (Pi,Qi)
 	// TODO: check points that are normalized/affine form?
-	// fmt.Printf("length: %d\n", bls.calculateCoeffLength())
 	for i := 0; i < len(g1Points); i++ {
 		coeffs[i] = make([]fe6, bls.calculateCoeffLength())
 		bls.prepare(&coeffs[i], g2Points[i])

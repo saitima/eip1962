@@ -141,7 +141,7 @@ func TestMNT4Pairing(t *testing.T) {
 }
 
 func TestMNT6Pairing(t *testing.T) {
-	file := "test_vectors/custom/320.json"
+	file := "test_vectors/custom/320_mnt6.json"
 	v, err := newTestVectorJSONFromFile(file)
 	if err != nil {
 		t.Fatal(err)

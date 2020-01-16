@@ -27,12 +27,10 @@ func (api *API) run(in []byte) ([]byte, error) {
 		return new(g1Api).multiExp(rest)
 	case 0x04, 0x05, 0x06:
 		return new(g2Api).run(opType, rest)
-		// return new(g2Api).mulPoint(rest)
-		// return new(g2Api).multiExp(rest)
 	case 0x07:
 		return pairBLS(rest)
 	case 0x08:
-		return pairBN(rest) // todo
+		return pairBN(rest)
 	case 0x09:
 		return pairMNT4(rest)
 	case 0x0a:
@@ -194,7 +192,7 @@ func (api *g2Api) run(opType byte, in []byte) ([]byte, error) {
 	case EXTENSION_THREE_DEGREE:
 		return new(g23Api).run(opType, field, modulusLen, rest)
 	default:
-		return nil, errors.New("Extension degree expected to be 2 or 3 but %d provided\n", degree)
+		return nil, errors.New("Extension degree expected to be 2 or 3")
 	}
 }
 
@@ -513,20 +511,9 @@ func pairBN(in []byte) ([]byte, error) {
 		return pairingError, err
 	}
 	// ext2
-	nonResidue, rest, err := decodeFp(rest, modulusLen, field)
+	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, true)
 	if err != nil {
 		return pairingError, err
-	}
-	if !isNonNThRoot(field, nonResidue, 2) {
-		return pairingError, errors.New("Non-residue for Fp2 is actually a residue")
-	}
-	fq2, err := newFq2(field, nil)
-	fq2.f.copy(fq2.nonResidue, nonResidue)
-	if err != nil {
-		return pairingError, err
-	}
-	if ok := fq2.calculateFrobeniusCoeffs(); !ok {
-		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp2")
 	}
 	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
 	if err != nil {
@@ -699,22 +686,11 @@ func pairBLS(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	// ext2
-	nonResidue, rest, err := decodeFp(rest, modulusLen, field)
+	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, true)
 	if err != nil {
 		return pairingError, err
 	}
-	if !isNonNThRoot(field, nonResidue, 2) {
-		return pairingError, errors.New("Non-residue for Fp2 is actually a residue")
-	}
-	fq2, err := newFq2(field, nil)
-	fq2.f.copy(fq2.nonResidue, nonResidue)
-	if err != nil {
-		return pairingError, err
-	}
-	if ok := fq2.calculateFrobeniusCoeffs(); !ok {
-		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp2")
-	}
+
 	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
 	if err != nil {
 		return pairingError, err
@@ -875,26 +851,15 @@ func pairMNT4(in []byte) ([]byte, error) {
 		return pairingError, err
 	}
 	g1, err := newG1(field, nil, nil, order.Bytes())
+	if err != nil {
+		return pairingError, err
+	}
 	g1.f.copy(g1.a, a)
 	g1.f.copy(g1.b, b)
-	if err != nil {
-		return pairingError, err
-	}
 	// ext2
-	nonResidue, rest, err := decodeFp(rest, modulusLen, field)
+	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, true)
 	if err != nil {
 		return pairingError, err
-	}
-	if !isNonNThRoot(field, nonResidue, 2) {
-		return pairingError, errors.New("Non-residue for Fp2 is actually a residue")
-	}
-	fq2, err := newFq2(field, nil)
-	if err != nil {
-		return pairingError, err
-	}
-	fq2.f.copy(fq2.nonResidue, nonResidue)
-	if ok := fq2.calculateFrobeniusCoeffs(); !ok {
-		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp2")
 	}
 	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
 	if err != nil {
@@ -904,19 +869,20 @@ func pairMNT4(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
 	}
 	fq4, err := newFq4(fq2, nil)
-	fq2.f.copy(fq2.nonResidue, nonResidue)
+	fq2.f.copy(fq2.nonResidue, fq2.nonResidue)
 	if err != nil {
 		return pairingError, err
 	}
 	if ok := fq4.calculateFrobeniusCoeffs(); !ok {
-		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp2")
+		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp4")
 	}
 	// g2
 	g2, err := newG22(fq2, nil, nil, order.Bytes())
 	if err != nil {
 		return pairingError, err
 	}
-	twist, twist2, twist3 := fq2.one(), fq2.newElement(), fq2.newElement()
+	twist, twist2, twist3 := fq2.zero(), fq2.newElement(), fq2.newElement()
+	fq2.f.copy(twist[1], fq2.f.one)
 	fq2.square(twist2, twist)
 	fq2.mul(twist3, twist2, twist)
 	fq2.mulByFq(g2.a, twist2, g1.a)
@@ -927,7 +893,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if x.Cmp(big.NewInt(0)) != 0 {
+	if x.Uint64() == 0 {
 		return pairingError, errors.New("Ate pairing loop count parameters can not be zero")
 	}
 
@@ -954,22 +920,22 @@ func pairMNT4(in []byte) ([]byte, error) {
 	}
 
 	// expW0
-	expW0, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
+	expW0, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_FINAL_EXP_W0_BIT_LENGTH)
 	if err != nil {
 		return pairingError, err
 	}
-	if expW0.Cmp(big.NewInt(0)) != 0 {
+	if expW0.Uint64() == 0 {
 		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
 	}
+
 	// expW1
-	expW1, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
+	expW1, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_FINAL_EXP_W1_BIT_LENGTH)
 	if err != nil {
 		return pairingError, err
 	}
-	if expW1.Cmp(big.NewInt(0)) != 0 {
+	if expW1.Uint64() == 0 {
 		return pairingError, errors.New("Final exp w1 loop count parameters can not be zero")
 	}
-
 	expW0IsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
 	if err != nil {
 		return pairingError, errors.New("Exp_w0 sign is not encoded properly")
@@ -1068,21 +1034,11 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
+
 	// ext3
-	nonResidue, rest, err := decodeFp(rest, modulusLen, field)
+	fq3, rest, err := createExtension3FieldParams(rest, modulusLen, field, true)
 	if err != nil {
 		return pairingError, err
-	}
-	if !isNonNThRoot(field, nonResidue, 3) {
-		return pairingError, errors.New("Non-residue for Fp2 is actually a residue")
-	}
-	fq3, err := newFq3(field, nil)
-	if err != nil {
-		return pairingError, err
-	}
-	fq3.f.copy(fq3.nonResidue, nonResidue)
-	if ok := fq3.calculateFrobeniusCoeffs(); !ok {
-		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp2")
 	}
 	fq3NonResidue, rest, err := decodeFp3(rest, modulusLen, fq3)
 	if err != nil {
@@ -1091,20 +1047,23 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if !isNonNThRootFp3(fq3, fq3NonResidue, 3) {
 		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
 	}
+
 	fq6, err := newFq6Quadratic(fq3, nil)
-	fq3.f.copy(fq3.nonResidue, nonResidue)
+	fq6.f.copy(fq6.nonResidue, fq3NonResidue)
 	if err != nil {
 		return pairingError, err
 	}
 	if ok := fq6.calculateFrobeniusCoeffs(); !ok {
-		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp2")
+		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp6")
 	}
+
 	// g2
 	g2, err := newG23(fq3, nil, nil, order.Bytes())
 	if err != nil {
 		return pairingError, err
 	}
-	twist, twist2, twist3 := fq3.one(), fq3.newElement(), fq3.newElement()
+	twist, twist2, twist3 := fq3.zero(), fq3.newElement(), fq3.newElement()
+	fq3.f.copy(twist[1], fq3.f.one)
 	fq3.square(twist2, twist)
 	fq3.mul(twist3, twist2, twist)
 	fq3.mulByFq(g2.a, twist2, g1.a)
@@ -1115,7 +1074,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if x.Cmp(big.NewInt(0)) != 0 {
+	if x.Uint64() == 0 {
 		return pairingError, errors.New("Ate pairing loop count parameters can not be zero")
 	}
 
@@ -1146,7 +1105,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if expW0.Cmp(big.NewInt(0)) != 0 {
+	if expW0.Uint64() == 0 {
 		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
 	}
 	// expW1
@@ -1154,7 +1113,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if expW1.Cmp(big.NewInt(0)) != 0 {
+	if expW1.Uint64() == 0 {
 		return pairingError, errors.New("Final exp w1 loop count parameters can not be zero")
 	}
 
