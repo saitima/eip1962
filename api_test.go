@@ -27,19 +27,19 @@ func TestG1MulPoint(t *testing.T) {
 		t.Logf("expected %x\n", expected)
 	}
 }
-func TestG2MulPoint(t *testing.T) {
+func TestG22MulPoint(t *testing.T) {
 	file := "test_vectors/custom/256.json"
 	v, err := newTestVectorJSONFromFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
-	in, expected, err := v.makeG2MulBinary()
+	in, expected, err := v.makeG22MulBinary()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	api := new(g2Api)
-	actual, err := api.mulPoint(in)
+	api := new(API)
+	actual, err := api.run(in)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,6 +50,30 @@ func TestG2MulPoint(t *testing.T) {
 		t.Fatalf("not equal")
 	}
 }
+func TestG23MulPoint(t *testing.T) {
+	file := "test_vectors/custom/320_cubic.json"
+	v, err := newTestVectorJSONFromFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in, expected, err := v.makeG23MulBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	api := new(API)
+	actual, err := api.run(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(actual, expected) {
+		t.Logf("actual %x\n", actual)
+		t.Logf("expected %x\n", expected)
+		t.Fatalf("not equal")
+	}
+}
+
 func TestBNPairing(t *testing.T) {
 	file := "test_vectors/custom/256.json"
 	v, err := newTestVectorJSONFromFile(file)
