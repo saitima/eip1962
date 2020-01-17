@@ -633,11 +633,11 @@ func pairBN(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
-		g1.mulScalar(g1Tmp, g1Point, order)
+		g1.checkCorrectSubGroup(g1Tmp, g1Point, order)
 		if !g1.equal(g1Tmp, g1zero) {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.mulScalar(g2Tmp, g2Point, order)
+		g2.checkCorrectSubGroup(g2Tmp, g2Point, order)
 		if !g2.equal(g2Tmp, g2zero) {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
@@ -802,11 +802,11 @@ func pairBLS(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
-		g1.mulScalar(g1Tmp, g1Point, order)
+		g1.checkCorrectSubGroup(g1Tmp, g1Point, order)
 		if !g1.equal(g1Tmp, g1zero) {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.mulScalar(g2Tmp, g2Point, order)
+		g2.checkCorrectSubGroup(g2Tmp, g2Point, order)
 		if !g2.equal(g2Tmp, g2zero) {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
@@ -822,8 +822,6 @@ func pairBLS(in []byte) ([]byte, error) {
 	if len(g1Points) == 0 {
 		return pairingSuccess, nil // success
 	}
-
-	// return pairingSuccess, nil // TODO: for benchmarking purpose
 
 	// pairs
 	engine := newBLSInstance(
@@ -982,11 +980,11 @@ func pairMNT4(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
-		g1.mulScalar(g1Tmp, g1Point, order)
+		g1.checkCorrectSubGroup(g1Tmp, g1Point, order)
 		if !g1.equal(g1Tmp, g1zero) {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.mulScalar(g2Tmp, g2Point, order)
+		g2.checkCorrectSubGroup(g2Tmp, g2Point, order)
 		if !g2.equal(g2Tmp, g2zero) {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
@@ -1166,11 +1164,11 @@ func pairMNT6(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
-		g1.mulScalar(g1Tmp, g1Point, order)
+		g1.checkCorrectSubGroup(g1Tmp, g1Point, order)
 		if !g1.equal(g1Tmp, g1zero) {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.mulScalar(g2Tmp, g2Point, order)
+		g2.checkCorrectSubGroup(g2Tmp, g2Point, order)
 		if !g2.equal(g2Tmp, g2zero) {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}

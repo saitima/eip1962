@@ -1138,6 +1138,24 @@ func TestG1(t *testing.T) {
 			t.Fatal("bad scalar multiplication 4")
 		}
 	})
+	t.Run("Wnaf Multiplication", func(t *testing.T) {
+		g.wnafMul(actual, zero, bigZero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 1")
+		}
+		g.wnafMul(actual, zero, bigOne)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 2")
+		}
+		g.wnafMul(actual, one, bigZero)
+		if !g.equal(actual, zero) {
+			t.Fatal("bad scalar multiplication 3")
+		}
+		g.wnafMul(actual, one, bigOne)
+		if !g.equal(actual, one) {
+			t.Fatal("bad scalar multiplication 4")
+		}
+	})
 
 	t.Run("Multi Exponentiation", func(t *testing.T) {
 		count := 1000

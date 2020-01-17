@@ -274,7 +274,7 @@ func (g *g1) doubleNonZeroA(r, p *pointG1) *pointG1 {
 	g.f.square(t[3], t[0])    // m^2
 	g.f.double(t[4], t[2])    // 2s
 	g.f.sub(t[3], t[3], t[4]) // t = m^2 - 2s
-	g.f.copy(r[0], t[3])       // x3 = t
+	g.f.copy(r[0], t[3])      // x3 = t
 	g.f.sub(t[2], t[2], t[3]) // s - t
 	g.f.mul(t[0], t[0], t[2]) // m * (s - t)
 	g.f.double(t[1], t[1])    //
@@ -312,7 +312,7 @@ func (g *g1) doubleZeroA(r, p *pointG1) *pointG1 {
 	g.f.mul(t[0], t[0], t[1]) // e * (d - x3)
 	g.f.sub(t[1], t[0], t[2]) // x3 = e * (d - x3) - 8c
 	g.f.mul(t[0], p[1], p[2]) // y1 * z1
-	g.f.copy(r[1], t[1])       //
+	g.f.copy(r[1], t[1])      //
 	g.f.double(r[2], t[0])    // z3 = 2(y1 * z1)
 	return r
 }
@@ -340,6 +340,52 @@ func (g *g1) mulScalar(c, p *pointG1, e *big.Int) *pointG1 {
 			g.add(q, q, n)
 		}
 		g.double(n, n)
+	}
+	g.copy(c, q)
+	return c
+}
+
+func (g *g1) checkCorrectSubGroup(c, p *pointG1, e *big.Int) *pointG1 {
+	return g.wnafMul(c, p, e)
+}
+
+func (g *g1) wnafMul(c, p *pointG1, e *big.Int) *pointG1 {
+	windowSize := uint(3)
+	precompTable := make([]*pointG1, (1 << (windowSize - 1)))
+	for i := 0; i < len(precompTable); i++ {
+		precompTable[i] = g.newPoint()
+	}
+	var indexForPositive uint64
+	indexForPositive = (1 << (windowSize - 2))
+	g.copy(precompTable[indexForPositive], p)
+	g.neg(precompTable[indexForPositive-1], p)
+	doubled, precomp := g.newPoint(), g.newPoint()
+	g.double(doubled, p)
+	g.copy(precomp, p)
+	for i := uint64(1); i < indexForPositive; i++ {
+		g.add(precomp, precomp, doubled)
+		g.copy(precompTable[indexForPositive+i], precomp)
+		g.neg(precompTable[indexForPositive-1-i], precomp)
+	}
+	wnaf := wnaf(e, windowSize)
+	q := g.zero()
+	l := len(wnaf)
+	found := false
+	var idx uint64
+	for i := l - 1; i >= 0; i-- {
+		if found {
+			g.double(q, q)
+		}
+		if wnaf[i] != 0 {
+			found = true
+			if wnaf[i] > 0 {
+				idx = uint64(wnaf[i] >> 1)
+				g.add(q, q, precompTable[indexForPositive+idx])
+			} else {
+				idx = uint64(((0 - wnaf[i]) >> 1))
+				g.add(q, q, precompTable[indexForPositive-1-idx])
+			}
+		}
 	}
 	g.copy(c, q)
 	return c

@@ -340,6 +340,52 @@ func (g *g23) mulScalar(c, p *pointG23, e *big.Int) *pointG23 {
 	return c
 }
 
+func (g *g23) checkCorrectSubGroup(c, p *pointG23, e *big.Int) *pointG23 {
+	return g.wnafMul(c, p, e)
+}
+
+func (g *g23) wnafMul(c, p *pointG23, e *big.Int) *pointG23 {
+	windowSize := uint(3)
+	precompTable := make([]*pointG23, (1 << (windowSize - 1)))
+	for i := 0; i < len(precompTable); i++ {
+		precompTable[i] = g.newPoint()
+	}
+	var indexForPositive uint64
+	indexForPositive = (1 << (windowSize - 2))
+	g.copy(precompTable[indexForPositive], p)
+	g.neg(precompTable[indexForPositive-1], p)
+	doubled, precomp := g.newPoint(), g.newPoint()
+	g.double(doubled, p)
+	g.copy(precomp, p)
+	for i := uint64(1); i < indexForPositive; i++ {
+		g.add(precomp, precomp, doubled)
+		g.copy(precompTable[indexForPositive+i], precomp)
+		g.neg(precompTable[indexForPositive-1-i], precomp)
+	}
+	wnaf := wnaf(e, windowSize)
+	q := g.zero()
+	l := len(wnaf)
+	found := false
+	var idx uint64
+	for i := l - 1; i >= 0; i-- {
+		if found {
+			g.double(q, q)
+		}
+		if wnaf[i] != 0 {
+			found = true
+			if wnaf[i] > 0 {
+				idx = uint64(wnaf[i] >> 1)
+				g.add(q, q, precompTable[indexForPositive+idx])
+			} else {
+				idx = uint64(((0 - wnaf[i]) >> 1))
+				g.add(q, q, precompTable[indexForPositive-1-idx])
+			}
+		}
+	}
+	g.copy(c, q)
+	return c
+}
+
 func (g *g23) multiExp(r *pointG23, points []*pointG23, powers []*big.Int) (*pointG23, error) {
 	if len(points) != len(powers) {
 		return nil, fmt.Errorf("point and scalar vectors should be in same length")
