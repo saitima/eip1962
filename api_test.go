@@ -74,7 +74,7 @@ func TestG23MulPoint(t *testing.T) {
 	}
 }
 
-func TestBNPairing(t *testing.T) {
+func TestBNPairingApi(t *testing.T) {
 	file := "test_vectors/custom/256.json"
 	v, err := newTestVectorJSONFromFile(file)
 	if err != nil {
@@ -94,7 +94,7 @@ func TestBNPairing(t *testing.T) {
 		t.Fatalf("not equal")
 	}
 }
-func TestBLSPairing(t *testing.T) {
+func TestBLSPairingApi(t *testing.T) {
 	file := "test_vectors/custom/384.json"
 	v, err := newTestVectorJSONFromFile(file)
 	if err != nil {

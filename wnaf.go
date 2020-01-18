@@ -58,7 +58,7 @@ func (repr scalar) div2() {
 func (repr scalar) String() string {
 	var str string
 	for i := len(repr) - 1; i >= 0; i-- {
-		str += fmt.Sprintf("%x", repr[i])
+		str += fmt.Sprintf("%d", repr[i])
 	}
 	return str
 }
@@ -76,16 +76,50 @@ func (repr scalar) adc(b scalar) {
 	}
 }
 
-func wnaf(s *big.Int, window uint) []int64 {
+func (repr scalar) onesCount() int {
+	count := 0
+	for i := 0; i < len(repr); i++ {
+		count += bits.OnesCount64(repr[i])
+	}
+	return count
+}
+
+func onesCount(s *big.Int) int {
+	repr := newRepr(s)
+	count := 0
+	for i := 0; i < len(repr); i++ {
+		count += bits.OnesCount64(repr[i])
+	}
+	return count
+}
+
+func calculateHammingWeight(s *big.Int) int {
 	if s.Uint64() == 0 {
-		return []int64{0}
+		return 0
+	}
+	return newRepr(s).onesCount()
+}
+
+func calculateNafHammingWeight(naf []int8) int {
+	weight := 0
+	for _, i := range naf {
+		if i != 0 {
+			weight++
+		}
+	}
+	return weight
+}
+
+func wnaf(s *big.Int, window uint) []int64 {
+	e := newRepr(s)
+	if e.isZero() {
+		return []int64{}
 	}
 	max := int64(1 << window)
 	midpoint := int64(1 << (window - 1))
 	modulusMask := uint64(1<<window) - 1
 
 	var b scalar
-	e := newRepr(s)
 	var out []int64
 	for !e.isZero() {
 		var z int64
@@ -99,6 +133,38 @@ func wnaf(s *big.Int, window uint) []int64 {
 				z = maskedBits
 				b := e.new(uint64(z))
 				e.sbb(b)
+			}
+		} else {
+			z = 0
+		}
+		out = append(out, z)
+		e.div2()
+	}
+	return out
+
+}
+
+func ternaryWnaf(s *big.Int) []int8 {
+	e := newRepr(s)
+	if e.isZero() {
+		return []int8{}
+	}
+	window := uint64(1)
+	midpoint := int8(1 << window)
+	mask := uint64(1 << (window + 1))
+
+	var b scalar
+	var out []int8
+	for !e.isZero() {
+		var z int8
+		if e.isOdd() {
+			z = midpoint - int8(e[0]%mask)
+			if z >= 0 {
+				b = e.new(uint64(z))
+				e.sbb(b)
+			} else {
+				b := e.new(uint64(0 - z))
+				e.adc(b)
 			}
 		} else {
 			z = 0

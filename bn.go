@@ -4,7 +4,6 @@ import (
 	"math/big"
 )
 
-// bnInstance ..
 type bnInstance struct {
 	u                        *big.Int
 	sixUPlus2                *big.Int
@@ -16,10 +15,24 @@ type bnInstance struct {
 	nonResidueInPMinus1Over2 *fe2
 	t2                       [16]*fe2
 	t12                      [16]*fe12
+	preferNaf                bool
+	sixUPlus2Naf             []int8
 }
 
-// NewBNInstance ..
-func newBNInstance(u, sixUplus2 *big.Int, uIsnegative bool, twistType uint8, g1 *g1, g2 *g22, fq12 *fq12, nonResidue *fe2) bnInstance {
+func newBNInstance(u, sixUplus2 *big.Int, uIsnegative bool, twistType uint8, g1 *g1, g2 *g22, fq12 *fq12, nonResidue *fe2, forceNoNaf bool) bnInstance {
+	naf := ternaryWnaf(sixUplus2)
+	originalBits := sixUplus2.BitLen()
+	originalHamming := calculateHammingWeight(sixUplus2)
+	nafHamming := calculateNafHammingWeight(naf)
+	var preferNaf bool
+	if len(naf)+nafHamming < originalBits+originalHamming {
+		preferNaf = true
+		if forceNoNaf {
+			preferNaf = false
+		}
+	} else {
+		preferNaf = false
+	}
 	bn := bnInstance{
 		u:                        u,
 		sixUPlus2:                sixUplus2,
@@ -29,6 +42,8 @@ func newBNInstance(u, sixUplus2 *big.Int, uIsnegative bool, twistType uint8, g1 
 		g2:                       g2,
 		fq12:                     fq12,
 		nonResidueInPMinus1Over2: nonResidue,
+		preferNaf:                preferNaf,
+		sixUPlus2Naf:             naf,
 	}
 	for i := 0; i < 16; i++ {
 		bn.t2[i] = bn.fq12.f.f.newElement()
@@ -166,7 +181,6 @@ func (bn *bnInstance) additionStep(coeff *fe6, r *pointG22, q *pointG22) {
 }
 
 func (bn *bnInstance) ell(f *fe12, coeffs *fe6, p *pointG1) {
-	// TODO: p needs to be affine/normalized
 	fq2 := bn.fq12.f.f
 	switch bn.twistType {
 	case 1: // M
@@ -180,12 +194,11 @@ func (bn *bnInstance) ell(f *fe12, coeffs *fe6, p *pointG1) {
 	}
 }
 
-// TODO: twistPoint should be a affine point
 func (bn *bnInstance) prepare(coeffs *[]fe6, Q *pointG22) {
 	f := bn.fq12.f.f.f
-	twoInw := f.newFieldElement()
-	f.double(twoInw, f.one)
-	f.inverse(twoInw, twoInw)
+	twoInv := f.newFieldElement()
+	f.double(twoInv, f.one)
+	f.inverse(twoInv, twoInv)
 	if bn.g2.isZero(Q) {
 		// TODO: mark this point as infinity
 		return
@@ -194,20 +207,17 @@ func (bn *bnInstance) prepare(coeffs *[]fe6, Q *pointG22) {
 	T := bn.g2.newPoint()
 	bn.g2.copy(T, Q)
 
-	j := 0
-	//  skip first msb bit
-	for i := bn.sixUPlus2.BitLen() - 2; i >= 0; i-- {
-		bn.doublingStep(&(*coeffs)[j], T, twoInw)
-		j++
-		if bn.sixUPlus2.Bit(int(i)) != 0 {
-			bn.additionStep(&(*coeffs)[j], T, Q)
-			j++
-		}
+	if bn.preferNaf {
+		bn.prepareWithNaf(coeffs, T, Q, twoInv)
+	} else {
+		bn.prepareWithoutNaf(coeffs, T, Q, twoInv)
 	}
+
 	if bn.uIsnegative {
 		bn.g2.neg(T, T)
 	}
 
+	j := len(*coeffs) - 2
 	// Q1 = π(Q)
 	Q1 := bn.g2.newPoint()
 	bn.fq12.f.f.conjugate(Q1[0], Q[0])
@@ -224,16 +234,79 @@ func (bn *bnInstance) prepare(coeffs *[]fe6, Q *pointG22) {
 	bn.additionStep(&(*coeffs)[j], T, Q2)
 }
 
+func (bn *bnInstance) prepareWithNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fieldElement) {
+	j := 0
+	for i := len(bn.sixUPlus2Naf) - 1; i >= 0; i-- {
+		bn.doublingStep(&(*coeffs)[j], T, twoInv)
+		j++
+		if bn.sixUPlus2.Bit(int(i)) != 0 {
+			bn.additionStep(&(*coeffs)[j], T, Q)
+			j++
+		}
+	}
+}
+func (bn *bnInstance) prepareWithoutNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fieldElement) {
+	j := 0
+	//  skip first msb bit
+	for i := bn.sixUPlus2.BitLen() - 2; i >= 0; i-- {
+		bn.doublingStep(&(*coeffs)[j], T, twoInv)
+		j++
+		if bn.sixUPlus2.Bit(int(i)) != 0 {
+			bn.additionStep(&(*coeffs)[j], T, Q)
+			j++
+		}
+	}
+}
+
 func (bn *bnInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*pointG22) {
 	coeffs := make([][]fe6, len(g1Points))
-
-	// prepare and collect miller lines for each pair (Pi,Qi)
-	// TODO: check points that are normalized/affine form?
-	// for i := 0; i < len(g1Points); i++ {
+	coeffLength := bn.calculateCoeffLength()
 	for i, _ := range g1Points {
-		coeffs[i] = make([]fe6, bn.calculateCoeffLength())
+		coeffs[i] = make([]fe6, coeffLength)
 		bn.prepare(&coeffs[i], g2Points[i])
 	}
+
+	if bn.preferNaf {
+		bn.millerLoopWithNaf(f, coeffs, g1Points)
+	} else {
+		bn.millerLoopWithoutNaf(f, coeffs, g1Points)
+	}
+
+	if bn.uIsnegative {
+		bn.fq12.conjugate(f, f)
+	}
+	// Q1 = π(Q)
+	j := coeffLength - 2
+	for k, point := range g1Points {
+		bn.ell(f, &(coeffs)[k][j], point)
+	}
+	j++
+	// -Q2 = -π(π(Q))
+	for k, point := range g1Points {
+		bn.ell(f, &(coeffs)[k][j], point)
+	}
+}
+
+func (bn *bnInstance) millerLoopWithNaf(f *fe12, coeffs [][]fe6, g1Points []*pointG1) {
+	j := 0
+	for i := len(bn.sixUPlus2Naf) - 1; i >= 0; i-- {
+		bn.fq12.square(f, f)
+		// doubling coeffs
+		for k, point := range g1Points {
+			bn.ell(f, &(coeffs)[k][j], point)
+		}
+		j++
+		// addition coeffs
+		if bn.sixUPlus2Naf[i] != 0 {
+			for k, point := range g1Points {
+				bn.ell(f, &(coeffs)[k][j], point)
+			}
+			j++
+		}
+	}
+}
+
+func (bn *bnInstance) millerLoopWithoutNaf(f *fe12, coeffs [][]fe6, g1Points []*pointG1) {
 	j := 0
 	for i := bn.sixUPlus2.BitLen() - 2; i >= 0; i-- {
 		if j > 0 {
@@ -253,20 +326,6 @@ func (bn *bnInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*point
 		}
 
 	}
-
-	if bn.uIsnegative {
-		bn.fq12.conjugate(f, f)
-	}
-	// Q1 = π(Q)
-	for k, point := range g1Points {
-		bn.ell(f, &(coeffs)[k][j], point)
-	}
-	j++
-
-	// -Q2 = -π(π(Q))
-	for k, point := range g1Points {
-		bn.ell(f, &(coeffs)[k][j], point)
-	}
 }
 
 func (bn *bnInstance) expByU(c, a *fe12) {
@@ -276,12 +335,6 @@ func (bn *bnInstance) expByU(c, a *fe12) {
 	}
 }
 
-// p(x) = 36x^4 +36x^3 +24x^2 +6x+1 ⌘ 1 mod 6
-// so degree 12 extension is squaring friendly
-// x^q =x^((q-1))·x= x^(3(q-1)/3)·x = i^((q-1)/6) ·x
-// w = i^(q-1)/6 is a primitive sixth root of unity in Fq
-// x^q = w·x
-// x^(q^2) = (x^q)^2 = (wx)^2=  w^2·x
 func (bn *bnInstance) finalExp(f *fe12) {
 	fq12 := bn.fq12
 
@@ -374,7 +427,6 @@ func (bn *bnInstance) finalExp(f *fe12) {
 	fq12.copy(f, t0)
 }
 
-// Pair ..
 func (bn *bnInstance) pair(point *pointG1, twistPoint *pointG22) *fe12 {
 	f := bn.fq12.one()
 	bn.millerLoop(f, []*pointG1{point}, []*pointG22{twistPoint})
@@ -391,12 +443,23 @@ func (bn *bnInstance) multiPair(points []*pointG1, twistPoints []*pointG22) *fe1
 
 func (bn *bnInstance) calculateCoeffLength() int {
 	j := 0
-	for i := bn.sixUPlus2.BitLen() - 2; i >= 0; i-- {
-		if bn.sixUPlus2.Bit(i) != 0 {
+	if bn.preferNaf {
+		for i := len(bn.sixUPlus2Naf) - 1; i >= 0; i-- {
+			if bn.sixUPlus2.Bit(i) != 0 {
+				j++
+			}
 			j++
 		}
-		j++
+		j = j + 2
+	} else {
+		for i := bn.sixUPlus2.BitLen() - 2; i >= 0; i-- {
+			if bn.sixUPlus2.Bit(i) != 0 {
+				j++
+			}
+			j++
+		}
+		j = j + 2
 	}
-	j = j + 2
+
 	return j
 }

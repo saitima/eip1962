@@ -663,6 +663,7 @@ func pairBN(in []byte) ([]byte, error) {
 		g2,
 		fq12,
 		nonResidueInPMinus1Over2,
+		false,
 	)
 	result := engine.multiPair(g1Points, g2Points)
 	if !fq12.equal(result, fq12.one()) {
@@ -831,6 +832,7 @@ func pairBLS(in []byte) ([]byte, error) {
 		g1,
 		g2,
 		fq12,
+		false,
 	)
 	result := engine.multiPair(g1Points, g2Points)
 	if !fq12.equal(result, fq12.one()) {

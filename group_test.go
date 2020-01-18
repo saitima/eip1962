@@ -1632,7 +1632,7 @@ func TestBLS12384Pairing(t *testing.T) {
 		panic("invalid exponent")
 	}
 
-	bls := newBLSInstance(z, true, 1, g1, g2, fq12)
+	bls := newBLSInstance(z, true, 1, g1, g2, fq12, true)
 
 	generatorBytes := bytes_(byteLen,
 		"0x17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb",
@@ -1788,7 +1788,7 @@ func BenchmarkBLS(t *testing.B) {
 		panic("invalid exponent")
 	}
 
-	bls := newBLSInstance(z, true, 1, g1, g2, fq12)
+	bls := newBLSInstance(z, true, 1, g1, g2, fq12, true)
 
 	bytesLen := 48
 	generatorBytes := bytes_(bytesLen,
@@ -2057,7 +2057,7 @@ func TestBN254Pairing(t *testing.T) {
 	sixUPlus2 := new(big.Int).Mul(u, big.NewInt(6))
 	sixUPlus2 = new(big.Int).Add(sixUPlus2, big.NewInt(2))
 
-	bn := newBNInstance(u, sixUPlus2, false, 2, g1, g2, fq12, nonResidueInPMinus1Over2)
+	bn := newBNInstance(u, sixUPlus2, false, 2, g1, g2, fq12, nonResidueInPMinus1Over2, true)
 
 	generatorBytes := bytes_(byteLen,
 		"0x01",

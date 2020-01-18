@@ -351,12 +351,3 @@ func decodeLoopParameters(in []byte, limit int) (*big.Int, []byte, error) {
 	return param, rest, nil
 }
 
-func calculateHammingWeight(s *big.Int) int {
-	weight := 0
-	for i := range s.Bits() {
-		if i == 1 {
-			weight++
-		}
-	}
-	return weight
-}
