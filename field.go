@@ -124,6 +124,110 @@ func newField(p []byte) *field {
 		f._neg = _neg8
 		f.div_two = div_two_8
 		f.mul_two = mul_two_8
+	case 9:
+		f.equal = eq9
+		f.copy = cpy9
+		f.cmp = cmp9
+		f.addn = addn9
+		f.subn = subn9
+		f._mul = mul9
+		f._add = add9
+		f._sub = sub9
+		f._double = double9
+		f._neg = _neg9
+		f.div_two = div_two_9
+		f.mul_two = mul_two_9
+	case 10:
+		f.equal = eq10
+		f.copy = cpy10
+		f.cmp = cmp10
+		f.addn = addn10
+		f.subn = subn10
+		f._mul = mul10
+		f._add = add10
+		f._sub = sub10
+		f._double = double10
+		f._neg = _neg10
+		f.div_two = div_two_10
+		f.mul_two = mul_two_10
+	case 11:
+		f.equal = eq11
+		f.copy = cpy11
+		f.cmp = cmp11
+		f.addn = addn11
+		f.subn = subn11
+		f._mul = mul11
+		f._add = add11
+		f._sub = sub11
+		f._double = double11
+		f._neg = _neg11
+		f.div_two = div_two_11
+		f.mul_two = mul_two_11
+	case 12:
+		f.equal = eq12
+		f.copy = cpy12
+		f.cmp = cmp12
+		f.addn = addn12
+		f.subn = subn12
+		f._mul = mul12
+		f._add = add12
+		f._sub = sub12
+		f._double = double12
+		f._neg = _neg12
+		f.div_two = div_two_12
+		f.mul_two = mul_two_12
+	case 13:
+		f.equal = eq13
+		f.copy = cpy13
+		f.cmp = cmp13
+		f.addn = addn13
+		f.subn = subn13
+		f._mul = mul13
+		f._add = add13
+		f._sub = sub13
+		f._double = double13
+		f._neg = _neg13
+		f.div_two = div_two_13
+		f.mul_two = mul_two_13
+	case 14:
+		f.equal = eq14
+		f.copy = cpy14
+		f.cmp = cmp14
+		f.addn = addn14
+		f.subn = subn14
+		f._mul = mul14
+		f._add = add14
+		f._sub = sub14
+		f._double = double14
+		f._neg = _neg14
+		f.div_two = div_two_14
+		f.mul_two = mul_two_14
+	case 15:
+		f.equal = eq15
+		f.copy = cpy15
+		f.cmp = cmp15
+		f.addn = addn15
+		f.subn = subn15
+		f._mul = mul15
+		f._add = add15
+		f._sub = sub15
+		f._double = double15
+		f._neg = _neg15
+		f.div_two = div_two_15
+		f.mul_two = mul_two_15
+	case 16:
+		f.equal = eq16
+		f.copy = cpy16
+		f.cmp = cmp16
+		f.addn = addn16
+		f.subn = subn16
+		f._mul = mul16
+		f._add = add16
+		f._sub = sub16
+		f._double = double16
+		f._neg = _neg16
+		f.div_two = div_two_16
+		f.mul_two = mul_two_16
 	default:
 		panic("not implemented")
 	}
@@ -204,7 +308,8 @@ func (f *field) newFieldElementFromBytesNoTransform(in []byte) (fieldElement, er
 
 func (f *field) newFieldElementFromBytes(in []byte) (fieldElement, error) {
 	if len(in) != f.byteSize() {
-		return nil, fmt.Errorf("bad input size")
+		// fmt.Printf("bad input size expected %d given %d\n", f.byteSize(), len(in))
+		// return nil, fmt.Errorf("bad i/nput size expected %d given %d", f.byteSize(), len(in))
 	}
 	if !f.isValid(in) {
 		return nil, fmt.Errorf("input is a larger number than modulus")
@@ -266,6 +371,22 @@ func (f *field) toBytesNoTransform(in fieldElement) []byte {
 		return toBytes((*[7]uint64)(in)[:])
 	case 8:
 		return toBytes((*[8]uint64)(in)[:])
+	case 9:
+		return toBytes((*[9]uint64)(in)[:])
+	case 10:
+		return toBytes((*[10]uint64)(in)[:])
+	case 11:
+		return toBytes((*[11]uint64)(in)[:])
+	case 12:
+		return toBytes((*[12]uint64)(in)[:])
+	case 13:
+		return toBytes((*[13]uint64)(in)[:])
+	case 14:
+		return toBytes((*[14]uint64)(in)[:])
+	case 15:
+		return toBytes((*[15]uint64)(in)[:])
+	case 16:
+		return toBytes((*[16]uint64)(in)[:])
 	default:
 		panic("not implemented")
 	}
@@ -314,10 +435,18 @@ func toBytes(fe []uint64) []byte {
 // limbSize is calculated according to size of input slice
 func newFieldElementFromBytes(in []byte) (fieldElement, int) {
 	byteSize := len(in)
-	limbSize := byteSize / 8
+	// requiredPad := byteSize % 8
+	// if requiredPad != 1 {
+	// 	requiredPad = 8 - requiredPad
+	// 	add := make([]byte, requiredPad)
+	// 	in = append(add, in...)
+	// 	byteSize += requiredPad
+	// }
 	if byteSize%8 != 0 {
 		panic("bad input byte size")
 	}
+
+	limbSize := byteSize / 8
 	a := newFieldElement(limbSize)
 	var data []uint64
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&data))
@@ -339,6 +468,22 @@ func newFieldElement(limbSize int) fieldElement {
 		return unsafe.Pointer(&[7]uint64{})
 	case 8:
 		return unsafe.Pointer(&[8]uint64{})
+	case 9:
+		return unsafe.Pointer(&[9]uint64{})
+	case 10:
+		return unsafe.Pointer(&[10]uint64{})
+	case 11:
+		return unsafe.Pointer(&[11]uint64{})
+	case 12:
+		return unsafe.Pointer(&[12]uint64{})
+	case 13:
+		return unsafe.Pointer(&[13]uint64{})
+	case 14:
+		return unsafe.Pointer(&[14]uint64{})
+	case 15:
+		return unsafe.Pointer(&[15]uint64{})
+	case 16:
+		return unsafe.Pointer(&[16]uint64{})
 	default:
 		panic("not implemented")
 	}
