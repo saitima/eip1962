@@ -59,7 +59,7 @@ func (g *g22) newPoint() *pointG22 {
 func (g *g22) fromBytes(in []byte) (*pointG22, error) {
 	byteLen := g.f.f.limbSize * 8 * 2
 	if len(in) < 2*byteLen {
-		return nil, fmt.Errorf("input string should be equal or larger than 96")
+		return nil, fmt.Errorf("input string should be equal or larger than %d given %d", 2*byteLen, len(in))
 	}
 	x, err := g.f.fromBytes(in[:byteLen])
 	if err != nil {
@@ -340,8 +340,8 @@ func (g *g22) mulScalar(c, p *pointG22, e *big.Int) *pointG22 {
 	return c
 }
 
-func (g *g22) checkCorrectSubGroup(c, p *pointG22, e *big.Int) *pointG22 {
-	return g.wnafMul(c, p, e)
+func (g *g22) checkCorrectSubGroup(c, p *pointG22) *pointG22 {
+	return g.wnafMul(c, p, g.q)
 }
 
 func (g *g22) wnafMul(c, p *pointG22, e *big.Int) *pointG22 {

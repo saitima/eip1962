@@ -175,13 +175,12 @@ func decodeG1CurveParams(in []byte) ([]byte, int, []byte, error) {
 
 }
 
-func parseGroupOrder(in []byte, modulsuLen int) (int, *big.Int, []byte, error) {
+func parseGroupOrder(in []byte) (int, *big.Int, []byte, error) {
 	orderBuf, orderLen, rest, err := decodeG1CurveParams(in)
 	if err != nil {
 		return 0, nil, nil, err
 	}
 	order := new(big.Int).SetBytes(orderBuf)
-
 	return orderLen, order, rest, nil
 }
 
@@ -350,4 +349,3 @@ func decodeLoopParameters(in []byte, limit int) (*big.Int, []byte, error) {
 	}
 	return param, rest, nil
 }
-

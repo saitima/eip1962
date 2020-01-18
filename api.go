@@ -51,7 +51,7 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, order, rest, err := parseGroupOrder(rest, modulusLen)
+	_, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest, modulusLen)
+	orderLen, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest, modulusLen)
+	orderLen, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	_, order, rest, err := parseGroupOrder(rest, modulusLen)
+	_, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest, modulusLen)
+	orderLen, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +296,7 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest, modulusLen)
+	orderLen, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +366,7 @@ func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	_, order, rest, err := parseGroupOrder(rest, modulusLen)
+	_, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +407,7 @@ func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest, modulusLen)
+	orderLen, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +442,7 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest, modulusLen)
+	orderLen, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +500,7 @@ func pairBN(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	_, order, rest, err := parseGroupOrder(rest, modulusLen)
+	_, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return pairingError, err
 	}
@@ -633,11 +633,11 @@ func pairBN(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
-		g1.checkCorrectSubGroup(g1Tmp, g1Point, order)
+		g1.checkCorrectSubGroup(g1Tmp, g1Point)
 		if !g1.equal(g1Tmp, g1zero) {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.checkCorrectSubGroup(g2Tmp, g2Point, order)
+		g2.checkCorrectSubGroup(g2Tmp, g2Point)
 		if !g2.equal(g2Tmp, g2zero) {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
@@ -663,7 +663,7 @@ func pairBN(in []byte) ([]byte, error) {
 		g2,
 		fq12,
 		nonResidueInPMinus1Over2,
-		false,
+		true,
 	)
 	result := engine.multiPair(g1Points, g2Points)
 	if !fq12.equal(result, fq12.one()) {
@@ -683,7 +683,7 @@ func pairBLS(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	_, order, rest, err := parseGroupOrder(rest, modulusLen)
+	_, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return pairingError, err
 	}
@@ -803,11 +803,11 @@ func pairBLS(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
-		g1.checkCorrectSubGroup(g1Tmp, g1Point, order)
+		g1.checkCorrectSubGroup(g1Tmp, g1Point)
 		if !g1.equal(g1Tmp, g1zero) {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.checkCorrectSubGroup(g2Tmp, g2Point, order)
+		g2.checkCorrectSubGroup(g2Tmp, g2Point)
 		if !g2.equal(g2Tmp, g2zero) {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
@@ -852,7 +852,8 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	_, order, rest, err := parseGroupOrder(rest, modulusLen)
+
+	_, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return pairingError, err
 	}
@@ -867,19 +868,11 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
-	if err != nil {
-		return pairingError, err
-	}
-	if !isNonNThRootFp2(fq2, fq2NonResidue, 6) {
-		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
-	}
 
 	f1 := constructBaseForFq2AndFq4(field, fq2.nonResidue)
 	fq2.calculateFrobeniusCoeffsWithPrecomputation(f1)
 
 	fq4, err := newFq4(fq2, nil)
-	fq2.f.copy(fq2.nonResidue, fq2.nonResidue)
 	if err != nil {
 		return pairingError, err
 	}
@@ -982,11 +975,11 @@ func pairMNT4(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
-		g1.checkCorrectSubGroup(g1Tmp, g1Point, order)
+		g1.checkCorrectSubGroup(g1Tmp, g1Point)
 		if !g1.equal(g1Tmp, g1zero) {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.checkCorrectSubGroup(g2Tmp, g2Point, order)
+		g2.checkCorrectSubGroup(g2Tmp, g2Point)
 		if !g2.equal(g2Tmp, g2zero) {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
@@ -1032,7 +1025,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	_, order, rest, err := parseGroupOrder(rest, modulusLen)
+	_, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return pairingError, err
 	}
@@ -1166,11 +1159,11 @@ func pairMNT6(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
-		g1.checkCorrectSubGroup(g1Tmp, g1Point, order)
+		g1.checkCorrectSubGroup(g1Tmp, g1Point)
 		if !g1.equal(g1Tmp, g1zero) {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.checkCorrectSubGroup(g2Tmp, g2Point, order)
+		g2.checkCorrectSubGroup(g2Tmp, g2Point)
 		if !g2.equal(g2Tmp, g2zero) {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}

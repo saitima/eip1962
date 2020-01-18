@@ -345,8 +345,8 @@ func (g *g1) mulScalar(c, p *pointG1, e *big.Int) *pointG1 {
 	return c
 }
 
-func (g *g1) checkCorrectSubGroup(c, p *pointG1, e *big.Int) *pointG1 {
-	return g.wnafMul(c, p, e)
+func (g *g1) checkCorrectSubGroup(c, p *pointG1) *pointG1 {
+	return g.wnafMul(c, p, g.q)
 }
 
 func (g *g1) wnafMul(c, p *pointG1, e *big.Int) *pointG1 {
