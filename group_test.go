@@ -42,7 +42,10 @@ var (
 
 func TestFq2(t *testing.T) {
 	modulusBytes := bytes_(48, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 	fq2, err := newFq2(f, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -192,7 +195,10 @@ func TestFq2(t *testing.T) {
 
 func TestFq6Cubic(t *testing.T) {
 	modulusBytes := bytes_(48, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	fq2, err := newFq2(f, nil)
 	if err != nil {
@@ -351,7 +357,10 @@ func TestFq6Cubic(t *testing.T) {
 
 func TestFq3(t *testing.T) {
 	modulusBytes := bytes_(40, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 	fq3, err := newFq3(f, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -508,7 +517,10 @@ func TestFq3(t *testing.T) {
 func TestFq4(t *testing.T) {
 	byteLen := 40
 	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	fq2, err := newFq2(f, nil)
 	if err != nil {
@@ -672,7 +684,10 @@ func TestFq4(t *testing.T) {
 func TestFq6Quadratic(t *testing.T) {
 	byteLen := 40
 	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	fq3, err := newFq3(f, nil)
 	if err != nil {
@@ -835,7 +850,10 @@ func TestFq6Quadratic(t *testing.T) {
 
 func TestFq12(t *testing.T) {
 	modulusBytes := bytes_(48, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 	fq2, err := newFq2(f, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -1003,7 +1021,11 @@ func TestG1(t *testing.T) {
 	modulusBytes := bytes_(byteLen, "1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
 	groupBytes := bytes_(byteLen, "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")
 
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	a := bytes_(byteLen, "0x00")
 	b := bytes_(byteLen, "0x04")
 	g, err := newG1(f, a, b, groupBytes)
@@ -1190,7 +1212,10 @@ func TestG22(t *testing.T) {
 	modulusBytes := bytes_(byteLen, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
 	groupBytes := bytes_(byteLen, "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")
 
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 	fq2, err := newFq2(f, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -1376,7 +1401,10 @@ func TestG23(t *testing.T) {
 	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
 	groupBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
 
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	fq3, err := newFq3(f, nil)
 	if err != nil {
@@ -1575,7 +1603,10 @@ func TestBLS12384Pairing(t *testing.T) {
 	byteLen := 48
 	modulusBytes := bytes_(byteLen, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
 	groupBytes := bytes_(byteLen, "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// G1
 	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x00"))
@@ -1735,7 +1766,10 @@ func TestBLS12384Pairing(t *testing.T) {
 func BenchmarkBLS(t *testing.B) {
 	modulusBytes := bytes_(48, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
 	groupBytes := bytes_(48, "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// G1
 	a, err := f.newFieldElementFromBytes(bytes_(48, "0x00"))
 	if err != nil {
@@ -1825,7 +1859,10 @@ func TestMNT4320Pairing(t *testing.T) {
 	byteLen := 40
 	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
 	groupBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// G1
 	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x02"))
@@ -1993,7 +2030,10 @@ func TestMNT4753Pairing(t *testing.T) {
 	byteLen := 96
 	modulusBytes := bytes_(byteLen, "0x1c4c62d92c41110229022eee2cdadb7f997505b8fafed5eb7e8f96c97d87307fdb925e8a0ed8d99d124d9a15af79db117e776f218059db80f0da5cb537e38685acce9767254a4638810719ac425f0e39d54522cdd119f5e9063de245e8001")
 	groupBytes := bytes_(byteLen, "0x1c4c62d92c41110229022eee2cdadb7f997505b8fafed5eb7e8f96c97d87307fdb925e8a0ed8d99d124d9a15af79db26c5c28c859a99b3eebca9429212636b9dff97634993aa4d6c381bc3f0057974ea099170fa13a4fd90776e240000001")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// G1
 	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x02"))
@@ -2156,7 +2196,10 @@ func TestBN254Pairing(t *testing.T) {
 	byteLen := 32
 	modulusBytes := bytes_(byteLen, "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47")
 	groupBytes := bytes_(byteLen, "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// G1
 	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x00"))
@@ -2326,7 +2369,10 @@ func TestMNT6320Pairing(t *testing.T) {
 	byteLen := 40
 	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
 	groupBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
-	f := newField(modulusBytes)
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// G1
 	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xb"))

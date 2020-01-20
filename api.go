@@ -14,11 +14,10 @@ var (
 	OPERATION_G2_ADD             = 0x04
 	OPERATION_G2_MUL             = 0x05
 	OPERATION_G2_MULTIEXP        = 0x06
-	OPERATION_PAIRING            = 0x07
-	BLS12PAIR                    = 0x01
-	BNPAIR                       = 0x02
-	MNT4PAIR                     = 0x03
-	MNT6PAIR                     = 0x04
+	OPERATION_BLS12PAIR          = 0x07
+	OPERATION_BNPAIR             = 0x08
+	OPERATION_MNT4PAIR           = 0x09
+	OPERATION_MNT6PAIR           = 0x0a
 )
 
 type API struct{}
@@ -33,8 +32,14 @@ func (api *API) Run(opType int, in []byte) ([]byte, error) {
 		return new(g1Api).multiExp(in)
 	case OPERATION_G2_ADD, OPERATION_G2_MUL, OPERATION_G2_MULTIEXP:
 		return new(g2Api).run(opType, in)
-	case OPERATION_PAIRING:
-		return new(pairingAPI).run(in)
+	case OPERATION_BLS12PAIR:
+		return pairBLS(in)
+	case OPERATION_BNPAIR:
+		return pairBN(in)
+	case OPERATION_MNT4PAIR:
+		return pairMNT4(in)
+	case OPERATION_MNT6PAIR:
+		return pairMNT6(in)
 	default:
 		return zero, errors.New("Unknown operation type")
 	}
@@ -488,29 +493,6 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	return out, nil
 }
 
-type pairingAPI struct{}
-
-func (api *pairingAPI) run(in []byte) ([]byte, error) {
-	curveTypeBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
-	if err != nil {
-		return zero, errors.New("Input should be longer than operation type encoding")
-	}
-	curveType := int(curveTypeBuf[0])
-	switch curveType {
-	case BLS12PAIR:
-		return pairBLS(rest)
-	case BNPAIR:
-		return pairBN(rest)
-	case MNT4PAIR:
-		return pairMNT4(rest)
-	case MNT6PAIR:
-		return pairMNT6(rest)
-	default:
-		return zero, errors.New("unknown curve type for pairing")
-	}
-	return zero, nil
-}
-
 func pairBN(in []byte) ([]byte, error) {
 	// base field
 
@@ -627,7 +609,7 @@ func pairBN(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Unknown parameter u sign")
 	}
 
-	if weight := calculateHammingWeight(u); weight > MAX_BN_SIX_U_PLUS_TWO_HAMMING {
+	if weight := calculateHammingWeight(sixUPlus2); weight > MAX_BN_SIX_U_PLUS_TWO_HAMMING {
 		return pairingError, errors.New("|6*U + 2| has too large hamming weight")
 	}
 	minus2Inv := new(big.Int).ModInverse(big.NewInt(-2), field.pbig)
