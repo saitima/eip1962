@@ -39,24 +39,45 @@ type field struct {
 	mul_two  func(a fieldElement)
 }
 
-func newField(p []byte) *field {
+func newField(p []byte) (*field, error) {
 	f := new(field)
 	f.pbig = new(big.Int).SetBytes(p)
-	f.p, f.limbSize = newFieldElementFromBytes(p)
+	var err error
+	f.p, f.limbSize, err = newFieldElementFromBytes(p)
+	if err != nil {
+		return nil, err
+	}
 	R := new(big.Int)
 	R.SetBit(R, f.byteSize()*8, 1).Mod(R, f.pbig)
 	R2 := new(big.Int)
 	R2.Mul(R, R).Mod(R2, f.pbig)
 	inpT := new(big.Int).ModInverse(new(big.Int).Neg(f.pbig), new(big.Int).SetBit(new(big.Int), 64, 1))
-	f.r = newFieldElementFromBigUnchecked(f.limbSize, R)
-	f.rbig = R
-	f.one = newFieldElementFromBigUnchecked(f.limbSize, R)
-	f.r2 = newFieldElementFromBigUnchecked(f.limbSize, R2)
-	f._one = newFieldElementFromBigUnchecked(f.limbSize, big.NewInt(1))
-	f.zero = newFieldElementFromBigUnchecked(f.limbSize, new(big.Int))
 	if inpT == nil {
-		return nil
+		return nil, fmt.Errorf("invalid inverse of prime %x", f.pbig)
 	}
+
+	f.r, err = newFieldElementFromBigUnchecked(f.limbSize, R)
+	if err != nil {
+		return nil, err
+	}
+	f.rbig = R
+	f.one, err = newFieldElementFromBigUnchecked(f.limbSize, R)
+	if err != nil {
+		return nil, err
+	}
+	f.r2, err = newFieldElementFromBigUnchecked(f.limbSize, R2)
+	if err != nil {
+		return nil, err
+	}
+	f._one, err = newFieldElementFromBigUnchecked(f.limbSize, big.NewInt(1))
+	if err != nil {
+		return nil, err
+	}
+	f.zero, err = newFieldElementFromBigUnchecked(f.limbSize, new(big.Int))
+	if err != nil {
+		return nil, err
+	}
+
 	f.inp = inpT.Uint64()
 	switch f.limbSize {
 	case 4:
@@ -229,9 +250,9 @@ func newField(p []byte) *field {
 		f.div_two = div_two_16
 		f.mul_two = mul_two_16
 	default:
-		panic("not implemented")
+		return nil, fmt.Errorf("given limb size %d not implemented", f.limbSize)
 	}
-	return f
+	return f, nil
 }
 
 func (f *field) toMont(c, a fieldElement) {
@@ -290,10 +311,10 @@ func (f *field) newFieldElement() fieldElement {
 	return newFieldElement(f.limbSize)
 }
 
-func (f *field) randFieldElement(r io.Reader) fieldElement {
+func (f *field) randFieldElement(r io.Reader) (fieldElement, error) {
 	bi, err := rand.Int(r, f.pbig)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return newFieldElementFromBigUnchecked(f.limbSize, bi)
 }
@@ -302,19 +323,24 @@ func (f *field) newFieldElementFromBytesNoTransform(in []byte) (fieldElement, er
 	if len(in) != f.byteSize() {
 		return nil, fmt.Errorf("bad input size")
 	}
-	fe, _ := newFieldElementFromBytes(in)
+	fe, _, err := newFieldElementFromBytes(in)
+	if err != nil {
+		return nil, err
+	}
 	return fe, nil
 }
 
 func (f *field) newFieldElementFromBytes(in []byte) (fieldElement, error) {
 	if len(in) != f.byteSize() {
-		// fmt.Printf("bad input size expected %d given %d\n", f.byteSize(), len(in))
-		// return nil, fmt.Errorf("bad i/nput size expected %d given %d", f.byteSize(), len(in))
+		return nil, fmt.Errorf("bad input size expected %d given %d", f.byteSize(), len(in))
 	}
 	if !f.isValid(in) {
 		return nil, fmt.Errorf("input is a larger number than modulus")
 	}
-	fe, _ := newFieldElementFromBytes(in)
+	fe, _, err := newFieldElementFromBytes(in)
+	if err != nil {
+		return nil, err
+	}
 	// if limbSize != _limbSize { // panic("") // is not expected // }
 	f.toMont(fe, fe)
 	return fe, nil
@@ -335,7 +361,10 @@ func (f *field) newFieldElementFromString(hexStr string) (fieldElement, error) {
 	if len(in) > f.byteSize() {
 		return nil, fmt.Errorf("bad input size")
 	}
-	fe, _ := newFieldElementFromBytes(padBytes(in, f.byteSize()))
+	fe, _, err := newFieldElementFromBytes(padBytes(in, f.byteSize()))
+	if err != nil {
+		return nil, err
+	}
 	f.toMont(fe, fe)
 	return fe, nil
 }
@@ -348,7 +377,10 @@ func (f *field) newFieldElementFromBig(a *big.Int) (fieldElement, error) {
 	if len(in) > f.byteSize() {
 		return nil, fmt.Errorf("bad input size")
 	}
-	fe, _ := newFieldElementFromBytes(padBytes(in, f.byteSize()))
+	fe, _, err := newFieldElementFromBytes(padBytes(in, f.byteSize()))
+	if err != nil {
+		return nil, err
+	}
 	f.toMont(fe, fe)
 	return fe, nil
 }
@@ -388,7 +420,7 @@ func (f *field) toBytesNoTransform(in fieldElement) []byte {
 	case 16:
 		return toBytes((*[16]uint64)(in)[:])
 	default:
-		panic("not implemented")
+		panic("given limb size %d not implemented")
 	}
 }
 
@@ -433,27 +465,22 @@ func toBytes(fe []uint64) []byte {
 
 // newFieldElement returns pointer of an uint64 array.
 // limbSize is calculated according to size of input slice
-func newFieldElementFromBytes(in []byte) (fieldElement, int) {
+func newFieldElementFromBytes(in []byte) (fieldElement, int, error) {
 	byteSize := len(in)
-	// requiredPad := byteSize % 8
-	// if requiredPad != 1 {
-	// 	requiredPad = 8 - requiredPad
-	// 	add := make([]byte, requiredPad)
-	// 	in = append(add, in...)
-	// 	byteSize += requiredPad
-	// }
 	if byteSize%8 != 0 {
-		panic("bad input byte size")
+		return nil, 0, fmt.Errorf("invalid input byte size %d for new field element", byteSize)
 	}
-
 	limbSize := byteSize / 8
+	if limbSize < 4 || limbSize > 16 {
+		return nil, 0, fmt.Errorf("given limb size %d not implemented", limbSize)
+	}
 	a := newFieldElement(limbSize)
 	var data []uint64
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&data))
 	sh.Data = uintptr(a)
 	sh.Len, sh.Cap = limbSize, limbSize
 	limbSliceFromBytes(data[:], in)
-	return a, limbSize
+	return a, limbSize, nil
 }
 
 func newFieldElement(limbSize int) fieldElement {
@@ -485,15 +512,18 @@ func newFieldElement(limbSize int) fieldElement {
 	case 16:
 		return unsafe.Pointer(&[16]uint64{})
 	default:
-		panic("not implemented")
+		panic("unsupported limbsize")
 	}
 }
 
-func newFieldElementFromBigUnchecked(limbSize int, bi *big.Int) fieldElement {
+func newFieldElementFromBigUnchecked(limbSize int, bi *big.Int) (fieldElement, error) {
 	in := bi.Bytes()
 	byteSize := limbSize * 8
-	fe, _ := newFieldElementFromBytes(padBytes(in, byteSize))
-	return fe
+	fe, _, err := newFieldElementFromBytes(padBytes(in, byteSize))
+	if err != nil {
+		return nil, err
+	}
+	return fe, nil
 }
 
 func limbSliceFromBytes(out []uint64, in []byte) {

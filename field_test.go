@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func randField(limbSize int) *field {
+func randField(limbSize int) (*field, error) {
 	byteSize := limbSize * 8
 	pbig, err := rand.Prime(rand.Reader, 8*byteSize-1)
 	if err != nil {
@@ -80,13 +80,16 @@ func BenchmarkField(t *testing.B) {
 	} else {
 		return
 	}
-	field := randField(limbSize)
+	field, err := randField(limbSize)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if field.limbSize != limbSize {
 		t.Fatalf("bad field construction")
 	}
 	bitSize := limbSize * 64
-	a := field.randFieldElement(rand.Reader)
-	b := field.randFieldElement(rand.Reader)
+	a, _ := field.randFieldElement(rand.Reader)
+	b, _ := field.randFieldElement(rand.Reader)
 	c := field.newFieldElement()
 	t.Run(fmt.Sprintf("%d_add", bitSize), func(t *testing.B) {
 		for i := 0; i < t.N; i++ {
@@ -119,8 +122,14 @@ func TestShift(t *testing.T) {
 	two := big.NewInt(2)
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_shift", limbSize*64), func(t *testing.T) {
-			field := randField(limbSize)
-			a := field.randFieldElement(rand.Reader)
+			field, err := randField(limbSize)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a, err := field.randFieldElement(rand.Reader)
+			if err != nil {
+				t.Fatal(err)
+			}
 			bi := field.toBigNoTransform(a)
 			da := field.newFieldElement()
 			field.copy(da, a)
@@ -145,7 +154,10 @@ func TestShift(t *testing.T) {
 func TestCompare(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_compare", limbSize*64), func(t *testing.T) {
-			field := randField(limbSize)
+			field, err := randField(limbSize)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if field.cmp(field.r, field.r) != 0 {
 				t.Fatalf("r == r (cmp)")
 			}
@@ -177,8 +189,14 @@ func TestCompare(t *testing.T) {
 func TestCopy(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_copy", limbSize*64), func(t *testing.T) {
-			field := randField(limbSize)
-			a := field.randFieldElement(rand.Reader)
+			field, err := randField(limbSize)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a, err := field.randFieldElement(rand.Reader)
+			if err != nil {
+				t.Fatal(err)
+			}
 			b := field.newFieldElement()
 			field.copy(b, a)
 			if !field.equal(a, b) {
@@ -191,7 +209,10 @@ func TestCopy(t *testing.T) {
 func TestSerialization(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_serialization", limbSize*64), func(t *testing.T) {
-			field := randField(limbSize)
+			field, err := randField(limbSize)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if field.limbSize != limbSize {
 				t.Fatalf("bad field construction\n")
 			}
@@ -203,12 +224,15 @@ func TestSerialization(t *testing.T) {
 				t.Fatalf("demont(r) must be equal to 1\n")
 			}
 			// is a => modulus should not be valid
-			_, err := field.newFieldElementFromBytes(field.pbig.Bytes())
+			_, err = field.newFieldElementFromBytes(field.pbig.Bytes())
 			if err == nil {
 				t.Fatalf("a number eq or larger than modulus must not be valid")
 			}
 			for i := 0; i < fuz; i++ {
-				field := randField(limbSize)
+				field, err := randField(limbSize)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
@@ -253,12 +277,21 @@ func TestAdditionCrossAgainstBigInt(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_addition_cross", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
-				field := randField(limbSize)
+				field, err := randField(limbSize)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if field.limbSize != limbSize {
 					t.Fatalf("Bad field construction")
 				}
-				a := field.randFieldElement(rand.Reader)
-				b := field.randFieldElement(rand.Reader)
+				a, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
+				b, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
 				c := field.newFieldElement()
 				big_a := field.toBig(a)
 				big_b := field.toBig(b)
@@ -296,12 +329,21 @@ func TestAdditionProperties(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_addition_properties", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
-				field := randField(limbSize)
+				field, err := randField(limbSize)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
-				a := field.randFieldElement(rand.Reader)
-				b := field.randFieldElement(rand.Reader)
+				a, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
+				b, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
 				c_1 := field.newFieldElement()
 				c_2 := field.newFieldElement()
 				field.add(c_1, a, field.zero)
@@ -341,7 +383,10 @@ func TestAdditionProperties(t *testing.T) {
 				if !field.equal(c_1, c_2) {
 					t.Fatalf("a - b = - ( b - a )")
 				}
-				c_x := field.randFieldElement(rand.Reader)
+				c_x, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
 				field.add(c_1, a, b)
 				field.add(c_1, c_1, c_x)
 				field.add(c_2, a, c_x)
@@ -365,12 +410,21 @@ func TestMultiplicationCrossAgainstBigInt(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_multiplication_cross", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
-				field := randField(limbSize)
+				field, err := randField(limbSize)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
-				a := field.randFieldElement(rand.Reader)
-				b := field.randFieldElement(rand.Reader)
+				a, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
+				b, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
 				c := field.newFieldElement()
 				big_a := field.toBig(a)
 				big_b := field.toBig(b)
@@ -390,12 +444,21 @@ func TestMultiplicationProperties(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_multiplication_properties", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
-				field := randField(limbSize)
+				field, err := randField(limbSize)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
-				a := field.randFieldElement(rand.Reader)
-				b := field.randFieldElement(rand.Reader)
+				a, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
+				b, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
 				c_1 := field.newFieldElement()
 				c_2 := field.newFieldElement()
 				field.mul(c_1, a, field.zero)
@@ -411,7 +474,10 @@ func TestMultiplicationProperties(t *testing.T) {
 				if !field.equal(c_1, c_2) {
 					t.Fatalf("a * b == b * a")
 				}
-				c_x := field.randFieldElement(rand.Reader)
+				c_x, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
 				field.mul(c_1, a, b)
 				field.mul(c_1, c_1, c_x)
 				field.mul(c_2, c_x, b)
@@ -428,11 +494,17 @@ func TestExponentiation(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_exponention", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
-				field := randField(limbSize)
+				field, err := randField(limbSize)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
-				a := field.randFieldElement(rand.Reader)
+				a, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
 				u := field.newFieldElement()
 				field.exp(u, a, big.NewInt(0))
 				if !field.equal(u, field.one) {
@@ -468,7 +540,10 @@ func TestInversion(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_inversion", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
-				field := randField(limbSize)
+				field, err := randField(limbSize)
+				if err != nil {
+					t.Fatal(err)
+				}
 				u := field.newFieldElement()
 				field.inverse(u, field.zero)
 				if !field.equal(u, field.zero) {
@@ -478,7 +553,10 @@ func TestInversion(t *testing.T) {
 				if !field.equal(u, field.one) {
 					t.Fatalf("(1^-1) == 1)")
 				}
-				a := field.randFieldElement(rand.Reader)
+				a, err := field.randFieldElement(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
 				field.inverse(u, a)
 				field.mul(u, u, a)
 				if !field.equal(u, field.r) {
