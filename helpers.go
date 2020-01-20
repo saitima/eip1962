@@ -34,3 +34,15 @@ func bytes_(size int, hexStrs ...string) []byte {
 	}
 	return out
 }
+
+func padHex(value []byte) []byte {
+	requiredPad := len(value) % 8
+	if requiredPad != 0 {
+		padLen := (8 - requiredPad)
+		value = append(make([]byte, padLen), value...)
+		for i := 0; i < padLen; i++ {
+			value[i] = 0x00
+		}
+	}
+	return value
+}

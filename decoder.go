@@ -30,7 +30,7 @@ func split(in []byte, offset int) ([]byte, []byte, error) {
 	return in[0:offset], in[offset:], nil
 }
 
-func decodeBaseFieldParams(in []byte) (*big.Int, int, []byte, error) {
+func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 	modulusLenBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return nil, 0, nil, errors.New("cant decode modulus length")
@@ -40,21 +40,24 @@ func decodeBaseFieldParams(in []byte) (*big.Int, int, []byte, error) {
 	if err != nil {
 		return nil, 0, nil, errors.New("cant decode modulus")
 	}
-	modulus := new(big.Int).SetBytes(modulusBuf)
-	return modulus, modulusLen, rest, nil
+	modulusBuf = padHex(modulusBuf)
+	return modulusBuf, modulusLen, rest, nil
 }
 
 // G1
 func parseBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, error) {
-	modulus, modulusLen, rest, err := decodeBaseFieldParams(in)
+	modulusBuf, modulusLen, rest, err := decodeBaseFieldParams(in)
 	if err != nil {
 		return nil, nil, 0, nil, err
 	}
 	if len(rest) < modulusLen {
 		return nil, nil, 0, nil, errors.New("Input is not long enough")
 	}
-	modulusBytes := bytes_(modulusLen, modulus.Text(16))
-	field := newField(modulusBytes)
+	field, err := newField(modulusBuf)
+	if err != nil {
+		return nil, nil, 0, nil, err
+	}
+	modulus := new(big.Int).SetBytes(modulusBuf)
 	return field, modulus, modulusLen, rest, nil
 }
 
@@ -63,7 +66,8 @@ func decodeFp(in []byte, modulusLen int, field *field) (fieldElement, []byte, er
 	if err != nil {
 		return nil, nil, err
 	}
-	x, err := field.newFieldElementFromBytes(xBuf)
+	padHex(xBuf)
+	x, err := field.newFieldElementFromBytes(padHex(xBuf))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -75,7 +79,7 @@ func decodeFp2(in []byte, modulusLen int, field *fq2) (*fe2, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	c0, err := field.f.newFieldElementFromBytes(c0Buf)
+	c0, err := field.f.newFieldElementFromBytes(padHex(c0Buf))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -83,7 +87,7 @@ func decodeFp2(in []byte, modulusLen int, field *fq2) (*fe2, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	c1, err := field.f.newFieldElementFromBytes(c1Buf)
+	c1, err := field.f.newFieldElementFromBytes(padHex(c1Buf))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -98,7 +102,7 @@ func decodeFp3(in []byte, modulusLen int, field *fq3) (*fe3, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	c0, err := field.f.newFieldElementFromBytes(c0Buf)
+	c0, err := field.f.newFieldElementFromBytes(padHex(c0Buf))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -106,7 +110,7 @@ func decodeFp3(in []byte, modulusLen int, field *fq3) (*fe3, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	c1, err := field.f.newFieldElementFromBytes(c1Buf)
+	c1, err := field.f.newFieldElementFromBytes(padHex(c1Buf))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -114,7 +118,7 @@ func decodeFp3(in []byte, modulusLen int, field *fq3) (*fe3, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	c2, err := field.f.newFieldElementFromBytes(c2Buf)
+	c2, err := field.f.newFieldElementFromBytes(padHex(c2Buf))
 	if err != nil {
 		return nil, nil, err
 	}

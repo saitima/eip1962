@@ -274,7 +274,6 @@ func (v *TestVectorJSON) makeG23MulBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeBNPairingBinary() ([]byte, []byte, error) {
-	v.buf.WriteByte(byte(BNPAIR))          // curve type
 	v.makeBaseFieldBinary()                // base field
 	v.makeG1GroupBinary()                  // g1
 	v.buf.Write(v.encode(v.NonResidue))    // non residue
@@ -327,7 +326,6 @@ func (v *TestVectorJSON) makeBNPairingBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeBLSPairingBinary() ([]byte, []byte, error) {
-	v.buf.WriteByte(byte(BLS12PAIR))       // curve type
 	v.makeBaseFieldBinary()                // base field
 	v.makeG1GroupBinary()                  // g1
 	v.buf.Write(v.encode(v.NonResidue))    // non residue
@@ -386,7 +384,6 @@ func (v *TestVectorJSON) makeBLSPairingBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeMNT4PairingBinary() ([]byte, []byte, error) {
-	v.buf.WriteByte(byte(MNT4PAIR))     // curve type
 	v.makeBaseFieldBinary()             // base field
 	v.makeG1GroupBinary()               // g1
 	v.buf.Write(v.encode(v.NonResidue)) // non residue
@@ -430,7 +427,6 @@ func (v *TestVectorJSON) makeMNT4PairingBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeMNT6PairingBinary() ([]byte, []byte, error) {
-	v.buf.WriteByte(byte(MNT6PAIR))     // curve type
 	v.makeBaseFieldBinary()             // base field
 	v.makeG1GroupBinary()               // g1
 	v.buf.Write(v.encode(v.NonResidue)) // non residue
