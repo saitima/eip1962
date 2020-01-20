@@ -1,4 +1,4 @@
-package fp
+package eip
 
 import (
 	"errors"
@@ -8,33 +8,33 @@ import (
 var (
 	zero                         = []byte{0x00}
 	pairingError, pairingSuccess = []byte{0x00}, []byte{0x01}
+	OPERATION_G1_ADD             = 0x01
+	OPERATION_G1_MUL             = 0x02
+	OPERATION_G1_MULTIEXP        = 0x03
+	OPERATION_G2_ADD             = 0x04
+	OPERATION_G2_MUL             = 0x05
+	OPERATION_G2_MULTIEXP        = 0x06
+	OPERATION_PAIRING            = 0x07
+	BLS12PAIR                    = 0x01
+	BNPAIR                       = 0x02
+	MNT4PAIR                     = 0x03
+	MNT6PAIR                     = 0x04
 )
 
 type API struct{}
 
-func (api *API) run(in []byte) ([]byte, error) {
-	opTypeBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
-	if err != nil {
-		return zero, errors.New("Input should be longer than operation type encoding")
-	}
-	opType := opTypeBuf[0]
+func (api *API) Run(opType int, in []byte) ([]byte, error) {
 	switch opType {
-	case 0x01:
-		return new(g1Api).addPoints(rest)
-	case 0x02:
-		return new(g1Api).mulPoint(rest)
-	case 0x03:
-		return new(g1Api).multiExp(rest)
-	case 0x04, 0x05, 0x06:
-		return new(g2Api).run(opType, rest)
-	case 0x07:
-		return pairBLS(rest)
-	case 0x08:
-		return pairBN(rest)
-	case 0x09:
-		return pairMNT4(rest)
-	case 0x0a:
-		return pairMNT6(rest)
+	case OPERATION_G1_ADD:
+		return new(g1Api).addPoints(in)
+	case OPERATION_G1_MUL:
+		return new(g1Api).mulPoint(in)
+	case OPERATION_G1_MULTIEXP:
+		return new(g1Api).multiExp(in)
+	case OPERATION_G2_ADD, OPERATION_G2_MUL, OPERATION_G2_MULTIEXP:
+		return new(g2Api).run(opType, in)
+	case OPERATION_PAIRING:
+		return new(pairingAPI).run(in)
 	default:
 		return zero, errors.New("Unknown operation type")
 	}
@@ -176,7 +176,7 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 
 type g2Api struct{}
 
-func (api *g2Api) run(opType byte, in []byte) ([]byte, error) {
+func (api *g2Api) run(opType int, in []byte) ([]byte, error) {
 	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
 	if err != nil {
 		return nil, err
@@ -198,7 +198,7 @@ func (api *g2Api) run(opType byte, in []byte) ([]byte, error) {
 
 type g22Api struct{}
 
-func (api *g22Api) run(opType byte, field *field, modulusLen int, in []byte) ([]byte, error) {
+func (api *g22Api) run(opType int, field *field, modulusLen int, in []byte) ([]byte, error) {
 	switch opType {
 	case 0x04:
 		return api.addPoints(field, modulusLen, in)
@@ -344,7 +344,7 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 
 type g23Api struct{}
 
-func (api *g23Api) run(opType byte, field *field, modulusLen int, in []byte) ([]byte, error) {
+func (api *g23Api) run(opType int, field *field, modulusLen int, in []byte) ([]byte, error) {
 	switch opType {
 	case 0x04:
 		return api.addPoints(field, modulusLen, in)
@@ -486,6 +486,29 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	g2.multiExp(p, bases, scalars)
 	out := g2.toBytes(p)
 	return out, nil
+}
+
+type pairingAPI struct{}
+
+func (api *pairingAPI) run(in []byte) ([]byte, error) {
+	curveTypeBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
+	if err != nil {
+		return zero, errors.New("Input should be longer than operation type encoding")
+	}
+	curveType := int(curveTypeBuf[0])
+	switch curveType {
+	case BLS12PAIR:
+		return pairBLS(rest)
+	case BNPAIR:
+		return pairBN(rest)
+	case MNT4PAIR:
+		return pairMNT4(rest)
+	case MNT6PAIR:
+		return pairMNT6(rest)
+	default:
+		return zero, errors.New("unknown curve type for pairing")
+	}
+	return zero, nil
 }
 
 func pairBN(in []byte) ([]byte, error) {
@@ -678,6 +701,7 @@ func pairBLS(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
+
 	// g1
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
@@ -777,7 +801,6 @@ func pairBLS(in []byte) ([]byte, error) {
 	default:
 		return pairingError, errors.New("Unknown parameter z sign")
 	}
-
 	if weight := calculateHammingWeight(z); weight > MAX_BLS12_X_HAMMING {
 		return pairingError, errors.New("z has too large hamming weight")
 	}
@@ -852,7 +875,6 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-
 	_, order, rest, err := parseGroupOrder(rest)
 	if err != nil {
 		return pairingError, err
@@ -872,6 +894,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 	f1 := constructBaseForFq2AndFq4(field, fq2.nonResidue)
 	fq2.calculateFrobeniusCoeffsWithPrecomputation(f1)
 
+	// ext4
 	fq4, err := newFq4(fq2, nil)
 	if err != nil {
 		return pairingError, err
@@ -902,7 +925,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 		return pairingError, errors.New("x has too large hamming weight")
 	}
 
-	// u is negative
+	// x is negative
 	xIsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
 	if err != nil {
 		return pairingError, errors.New("x is not encoded properly")
@@ -928,7 +951,6 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if expW0.Uint64() == 0 {
 		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
 	}
-
 	// expW1
 	expW1, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_FINAL_EXP_W1_BIT_LENGTH)
 	if err != nil {
@@ -1011,6 +1033,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if !fq4.equal(result, fq4.one()) {
 		return pairingError, nil
 	}
+
 	return pairingSuccess, nil
 }
 
@@ -1020,6 +1043,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
+
 	// g1
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
@@ -1035,27 +1059,20 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
+
 	// ext3
 	fq3, rest, err := createExtension3FieldParams(rest, modulusLen, field, false)
 	if err != nil {
 		return pairingError, err
 	}
-	fq3NonResidue, rest, err := decodeFp3(rest, modulusLen, fq3)
-	if err != nil {
-		return pairingError, err
-	}
-	if !isNonNThRootFp3(fq3, fq3NonResidue, 3) {
-		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
-	}
-
 	f1, err := constructBaseForFq3AndFq6(field, fq3.nonResidue)
 	if err != nil {
 		return pairingError, err
 	}
 	fq3.calculateFrobeniusCoeffsWithPrecomputation(f1)
 
+	// ext6 quadratic
 	fq6, err := newFq6Quadratic(fq3, nil)
-	fq6.f.copy(fq6.nonResidue, fq3NonResidue)
 	if err != nil {
 		return pairingError, err
 	}
