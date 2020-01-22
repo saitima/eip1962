@@ -79,6 +79,16 @@ func (g *g1) fromBytes(in []byte) (*pointG1, error) {
 	return p, nil
 }
 
+func (g *g1) fromXY(x, y fieldElement) *pointG1 {
+	if g.f.isZero(x) && g.f.isZero(y) {
+		return g.zero()
+	}
+	p := g.zero()
+	g.f.copy(p[0], x)
+	g.f.copy(p[1], y)
+	return p
+}
+
 func (g *g1) toBytes(p *pointG1) []byte {
 	byteLen := g.f.limbSize * 8
 	out := make([]byte, 2*byteLen)

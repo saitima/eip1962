@@ -80,7 +80,7 @@ func newField(p []byte) (*field, error) {
 
 	f.inp = inpT.Uint64()
 	switch f.limbSize {
-	case 4:
+	case 1, 2, 3, 4:
 		f.equal = eq4
 		f.copy = cpy4
 		f.cmp = cmp4
@@ -393,7 +393,7 @@ func (f *field) toBytes(in fieldElement) []byte {
 
 func (f *field) toBytesNoTransform(in fieldElement) []byte {
 	switch f.limbSize {
-	case 4:
+	case 1, 2, 3, 4:
 		return toBytes((*[4]uint64)(in)[:])
 	case 5:
 		return toBytes((*[5]uint64)(in)[:])
@@ -471,7 +471,7 @@ func newFieldElementFromBytes(in []byte) (fieldElement, int, error) {
 		return nil, 0, fmt.Errorf("invalid input byte size %d for new field element", byteSize)
 	}
 	limbSize := byteSize / 8
-	if limbSize < 4 || limbSize > 16 {
+	if limbSize < 1 || limbSize > 16 {
 		return nil, 0, fmt.Errorf("given limb size %d not implemented", limbSize)
 	}
 	a := newFieldElement(limbSize)
@@ -485,7 +485,7 @@ func newFieldElementFromBytes(in []byte) (fieldElement, int, error) {
 
 func newFieldElement(limbSize int) fieldElement {
 	switch limbSize {
-	case 4:
+	case 1, 2, 3, 4:
 		return unsafe.Pointer(&[4]uint64{})
 	case 5:
 		return unsafe.Pointer(&[5]uint64{})

@@ -76,6 +76,16 @@ func (g *g22) fromBytes(in []byte) (*pointG22, error) {
 	return p, nil
 }
 
+func (g *g22) fromXY(x, y *fe2) *pointG22 {
+	if g.f.isZero(x) && g.f.isZero(y) {
+		return g.zero()
+	}
+	p := g.zero()
+	g.f.copy(p[0], x)
+	g.f.copy(p[1], y)
+	return p
+}
+
 func (g *g22) toBytes(p *pointG22) []byte {
 	l := g.f.f.limbSize * 8 * 2
 	out := make([]byte, 2*l)

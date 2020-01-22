@@ -1,2 +1,3 @@
 generated
 playground*.go
+fuzz_test.go

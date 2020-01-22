@@ -64,8 +64,8 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	g1.a = a
-	g1.b = b
+	g1.f.copy(g1.a, a)
+	g1.f.copy(g1.b, b)
 	p0, rest, err := decodeG1Point(rest, modulusLen, g1)
 	if err != nil {
 		return nil, err
@@ -78,10 +78,10 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 		return nil, errors.New("Input contains garbage at the end")
 	}
 	if !g1.isOnCurve(p0) {
-		return nil, errors.New("p0 isn't on the curve")
+		return nil, errors.New("point 0 isn't on the curve")
 	}
 	if !g1.isOnCurve(p1) {
-		return nil, errors.New("p1 isn't on the curve")
+		return nil, errors.New("point 1 isn't on the curve")
 	}
 	g1.add(p1, p1, p0)
 	out := g1.toBytes(p1)
@@ -112,6 +112,9 @@ func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
 	p, rest, err := decodeG1Point(rest, modulusLen, g1)
 	if err != nil {
 		return nil, err
+	}
+	if !g1.isOnCurve(p) {
+		return nil, errors.New("point isn't on the curve")
 	}
 	s, rest, err := decodeScalar(rest, orderLen, order)
 	if err != nil {
@@ -158,12 +161,15 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 	bases := make([]*pointG1, numPairs)
 	scalars := make([]*big.Int, numPairs)
 	for i := 0; i < numPairs; i++ {
-		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		p, localRest, err := decodeG1Point(rest, modulusLen, g1)
 		if err != nil {
 			return pairingError, err
 		}
+		if !g1.isOnCurve(p) {
+			return nil, errors.New("point isn't on the curve")
+		}
 		scalar, localRest, err := decodeScalar(localRest, orderLen, order)
-		g1.copy(bases[i], g1Point)
+		g1.copy(bases[i], p)
 		scalars[i] = new(big.Int).Set(scalar)
 		rest = localRest
 	}
@@ -243,14 +249,15 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
+
 	if len(rest) != 0 {
 		return nil, errors.New("Input contains garbage at the end")
 	}
 	if !g2.isOnCurve(q0) {
-		return nil, errors.New("p0 isn't on the curve")
+		return nil, errors.New("point 0 isn't on the curve")
 	}
 	if !g2.isOnCurve(q1) {
-		return nil, errors.New("p1 isn't on the curve")
+		return nil, errors.New("point 1 isn't on the curve")
 	}
 	g2.add(q1, q1, q0)
 	out := g2.toBytes(q1)
@@ -286,6 +293,9 @@ func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 	}
 	if len(rest) != 0 {
 		return nil, errors.New("Input contains garbage at the end")
+	}
+	if !g2.isOnCurve(q) {
+		return nil, errors.New("q1 isn't on the curve")
 	}
 	g2.mulScalar(q, q, s)
 	out := g2.toBytes(q)
@@ -326,12 +336,15 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	bases := make([]*pointG22, numPairs)
 	scalars := make([]*big.Int, numPairs)
 	for i := 0; i < numPairs; i++ {
-		g2Point, localRest, err := decodeG22Point(rest, modulusLen, g2)
+		q, localRest, err := decodeG22Point(rest, modulusLen, g2)
 		if err != nil {
 			return pairingError, err
 		}
+		if !g2.isOnCurve(q) {
+			return nil, errors.New("point isn't on the curve")
+		}
+		g2.copy(bases[i], q)
 		scalar, localRest, err := decodeScalar(localRest, orderLen, order)
-		g2.copy(bases[i], g2Point)
 		scalars[i] = new(big.Int).Set(scalar)
 		rest = localRest
 	}
@@ -339,11 +352,11 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(bases) != len(scalars) || len(bases) == 0 {
-		return pairingSuccess, nil // success
+		return pairingSuccess, nil
 	}
-	p := g2.newPoint()
-	g2.multiExp(p, bases, scalars)
-	out := g2.toBytes(p)
+	q := g2.newPoint()
+	g2.multiExp(q, bases, scalars)
+	out := g2.toBytes(q)
 	return out, nil
 }
 
@@ -393,10 +406,10 @@ func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 		return nil, errors.New("Input contains garbage at the end")
 	}
 	if !g2.isOnCurve(q0) {
-		return nil, errors.New("p0 isn't on the curve")
+		return nil, errors.New("point 0 isn't on the curve")
 	}
 	if !g2.isOnCurve(q1) {
-		return nil, errors.New("p1 isn't on the curve")
+		return nil, errors.New("point 1 isn't on the curve")
 	}
 	g2.add(q1, q1, q0)
 	out := g2.toBytes(q1)
@@ -432,6 +445,9 @@ func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 	}
 	if len(rest) != 0 {
 		return nil, errors.New("Input contains garbage at the end")
+	}
+	if !g2.isOnCurve(q) {
+		return nil, errors.New("point isn't on the curve")
 	}
 	g2.mulScalar(q, q, s)
 	out := g2.toBytes(q)
@@ -472,12 +488,15 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	bases := make([]*pointG23, numPairs)
 	scalars := make([]*big.Int, numPairs)
 	for i := 0; i < numPairs; i++ {
-		g2Point, localRest, err := decodeG23Point(rest, modulusLen, g2)
+		q, localRest, err := decodeG23Point(rest, modulusLen, g2)
 		if err != nil {
 			return pairingError, err
 		}
+		if !g2.isOnCurve(q) {
+			return nil, errors.New("point isn't on the curve")
+		}
+		g2.copy(bases[i], q)
 		scalar, localRest, err := decodeScalar(localRest, orderLen, order)
-		g2.copy(bases[i], g2Point)
 		scalars[i] = new(big.Int).Set(scalar)
 		rest = localRest
 	}
@@ -485,7 +504,7 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(bases) != len(scalars) || len(bases) == 0 {
-		return pairingSuccess, nil // success
+		return pairingSuccess, nil
 	}
 	p := g2.newPoint()
 	g2.multiExp(p, bases, scalars)
@@ -495,7 +514,6 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 
 func pairBN(in []byte) ([]byte, error) {
 	// base field
-
 	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
 	if err != nil {
 		return pairingError, err
@@ -637,6 +655,12 @@ func pairBN(in []byte) ([]byte, error) {
 		g2Point, localRest, err := decodeG22Point(localRest, modulusLen, g2)
 		if err != nil {
 			return pairingError, err
+		}
+		if !g1.isOnCurve(g1Point) {
+			return pairingError, errors.New("G1 point is not on curve")
+		}
+		if !g2.isOnCurve(g2Point) {
+			return pairingError, errors.New("G2 point is not on curve")
 		}
 		g1.checkCorrectSubGroup(g1Tmp, g1Point)
 		if !g1.equal(g1Tmp, g1zero) {
@@ -807,6 +831,12 @@ func pairBLS(in []byte) ([]byte, error) {
 		g2Point, localRest, err := decodeG22Point(localRest, modulusLen, g2)
 		if err != nil {
 			return pairingError, err
+		}
+		if !g1.isOnCurve(g1Point) {
+			return pairingError, errors.New("G1 point is not on curve")
+		}
+		if !g2.isOnCurve(g2Point) {
+			return pairingError, errors.New("G2 point is not on curve")
 		}
 		g1.checkCorrectSubGroup(g1Tmp, g1Point)
 		if !g1.equal(g1Tmp, g1zero) {
@@ -979,10 +1009,17 @@ func pairMNT4(in []byte) ([]byte, error) {
 		if err != nil {
 			return pairingError, err
 		}
+		if !g1.isOnCurve(g1Point) {
+			return pairingError, errors.New("G1 point is not on curve")
+		}
+		if !g2.isOnCurve(g2Point) {
+			return pairingError, errors.New("G2 point is not on curve")
+		}
 		g1.checkCorrectSubGroup(g1Tmp, g1Point)
 		if !g1.equal(g1Tmp, g1zero) {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
+
 		g2.checkCorrectSubGroup(g2Tmp, g2Point)
 		if !g2.equal(g2Tmp, g2zero) {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
@@ -1157,6 +1194,12 @@ func pairMNT6(in []byte) ([]byte, error) {
 		g2Point, localRest, err := decodeG23Point(localRest, modulusLen, g2)
 		if err != nil {
 			return pairingError, err
+		}
+		if !g1.isOnCurve(g1Point) {
+			return pairingError, errors.New("G1 point is not on curve")
+		}
+		if !g2.isOnCurve(g2Point) {
+			return pairingError, errors.New("G2 point is not on curve")
 		}
 		g1.checkCorrectSubGroup(g1Tmp, g1Point)
 		if !g1.equal(g1Tmp, g1zero) {

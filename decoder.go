@@ -25,9 +25,9 @@ const (
 
 func split(in []byte, offset int) ([]byte, []byte, error) {
 	if len(in) < offset {
-		return nil, nil, errors.New(fmt.Sprintf("cant split at given offset %d", offset))
+		return nil, nil, fmt.Errorf("cant split at given offset %d", offset)
 	}
-	return in[0:offset], in[offset:], nil
+	return in[:offset], in[offset:], nil
 }
 
 func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
@@ -41,6 +41,7 @@ func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 		return nil, 0, nil, errors.New("cant decode modulus")
 	}
 	modulusBuf = padHex(modulusBuf)
+
 	return modulusBuf, modulusLen, rest, nil
 }
 
@@ -66,7 +67,6 @@ func decodeFp(in []byte, modulusLen int, field *field) (fieldElement, []byte, er
 	if err != nil {
 		return nil, nil, err
 	}
-	padHex(xBuf)
 	x, err := field.newFieldElementFromBytes(padHex(xBuf))
 	if err != nil {
 		return nil, nil, err
@@ -197,13 +197,7 @@ func decodeG1Point(in []byte, modulusLen int, g1 *g1) (*pointG1, []byte, error) 
 	if err != nil {
 		return nil, nil, err
 	}
-	p := g1.newPoint()
-	g1.f.copy(p[0], x)
-	g1.f.copy(p[1], y)
-	g1.f.copy(p[2], g1.f.one)
-	if !g1.isOnCurve(p) {
-		return nil, nil, errors.New("g1 point isn't on the curve")
-	}
+	p := g1.fromXY(x, y)
 	return p, rest, nil
 }
 
@@ -216,13 +210,7 @@ func decodeG22Point(in []byte, modulusLen int, g2 *g22) (*pointG22, []byte, erro
 	if err != nil {
 		return nil, nil, err
 	}
-	q := g2.newPoint()
-	g2.f.copy(q[0], x)
-	g2.f.copy(q[1], y)
-	g2.f.copy(q[2], g2.f.one())
-	if !g2.isOnCurve(q) {
-		return nil, nil, errors.New("g2 point isn't on the curve")
-	}
+	q := g2.fromXY(x, y)
 	return q, rest, nil
 }
 
@@ -235,14 +223,7 @@ func decodeG23Point(in []byte, modulusLen int, g2 *g23) (*pointG23, []byte, erro
 	if err != nil {
 		return nil, nil, err
 	}
-	// TODO: use gg2.fromBytes() instead
-	q := g2.newPoint()
-	g2.f.copy(q[0], x)
-	g2.f.copy(q[1], y)
-	g2.f.copy(q[2], g2.f.one())
-	if !g2.isOnCurve(q) {
-		return nil, nil, errors.New("g2 point isn't on the curve")
-	}
+	q := g2.fromXY(x, y)
 	return q, rest, nil
 }
 
