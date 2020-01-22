@@ -86,6 +86,7 @@ func (g *g1) fromXY(x, y fieldElement) *pointG1 {
 	p := g.zero()
 	g.f.copy(p[0], x)
 	g.f.copy(p[1], y)
+	g.f.copy(p[2], g.f.one)
 	return p
 }
 

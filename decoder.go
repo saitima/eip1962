@@ -12,6 +12,8 @@ const (
 	EXTENSION_TWO_DEGREE                    = 2
 	EXTENSION_THREE_DEGREE                  = 3
 	TWIST_TYPE_LENGTH                       = 1
+	MAX_MODULUS_BYTE_LEN                    = 128
+	MAX_GROUP_BYTE_LEN                      = 128
 	MAX_BN_U_BIT_LENGTH                     = 128
 	MAX_BLS12_X_BIT_LENGTH                  = 128
 	MAX_ATE_PAIRING_ATE_LOOP_COUNT          = 2032
@@ -35,13 +37,18 @@ func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 	if err != nil {
 		return nil, 0, nil, errors.New("cant decode modulus length")
 	}
+	if len(modulusLenBuf) == 0 {
+		return nil, 0, nil, errors.New("Encoded modulus length is too large")
+	}
+	if len(modulusLenBuf) > MAX_MODULUS_BYTE_LEN {
+		return nil, 0, nil, errors.New("Modulus is length is zero")
+	}
+
 	modulusLen := int(modulusLenBuf[0])
 	modulusBuf, rest, err := split(rest, modulusLen)
 	if err != nil {
 		return nil, 0, nil, errors.New("cant decode modulus")
 	}
-	modulusBuf = padHex(modulusBuf)
-
 	return modulusBuf, modulusLen, rest, nil
 }
 
@@ -54,11 +61,22 @@ func parseBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, error
 	if len(rest) < modulusLen {
 		return nil, nil, 0, nil, errors.New("Input is not long enough")
 	}
+	modulusBuf = padHex(modulusBuf)
+	modulus := new(big.Int).SetBytes(modulusBuf)
+	if modulus.Uint64() == 0 {
+		return nil, nil, 0, nil, errors.New("Modulus can not be zero")
+	}
+	if modulus.Uint64()&1 == 0 {
+		return nil, nil, 0, nil, errors.New("Modulus is even")
+	}
+	if modulus.Uint64() < 3 {
+		return nil, nil, 0, nil, errors.New("Modulus is less than 3")
+	}
+
 	field, err := newField(modulusBuf)
 	if err != nil {
 		return nil, nil, 0, nil, err
 	}
-	modulus := new(big.Int).SetBytes(modulusBuf)
 	return field, modulus, modulusLen, rest, nil
 }
 
@@ -138,6 +156,10 @@ func decodeBAInBaseFieldFromEncoding(in []byte, modulusLen int, field *field) (f
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	// TODO move this control into g1 constructor
+	if field.isZero(b) || (field.isZero(a) && field.isZero(b)) {
+		return nil, nil, nil, errors.New("Curve shape is not supported")
+	}
 	return a, b, rest, nil
 }
 
@@ -149,6 +171,10 @@ func decodeBAInExtField2FromEncoding(in []byte, modulusLen int, field *fq2) (*fe
 	b2, rest, err := decodeFp2(rest, modulusLen, field)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	// TODO move this control into g1 constructor
+	if field.isZero(b2) || (field.isZero(a2) && field.isZero(b2)) {
+		return nil, nil, nil, errors.New("Curve shape is not supported")
 	}
 	return a2, b2, rest, nil
 }
@@ -185,6 +211,9 @@ func parseGroupOrder(in []byte) (int, *big.Int, []byte, error) {
 		return 0, nil, nil, err
 	}
 	order := new(big.Int).SetBytes(orderBuf)
+	if order.Uint64() == 0 {
+		return 0, nil, nil, errors.New("Group order is zero")
+	}
 	return orderLen, order, rest, nil
 }
 
