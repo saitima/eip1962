@@ -99,6 +99,13 @@ func (g *g1) toBytes(p *pointG1) []byte {
 	copy(out[byteLen:], g.f.toBytes(a[1]))
 	return out
 }
+func (g *g1) toBytesAllocated(out []byte, p *pointG1) []byte {
+	a := g.newPoint()
+	g.affine(a, p)
+	copy(out[:len(out)/2], g.f.toBytes(a[0]))
+	copy(out[len(out)/2:], g.f.toBytes(a[1]))
+	return out
+}
 
 func (g *g1) copy(q, p *pointG1) *pointG1 {
 	g.f.copy(q[0], p[0])
