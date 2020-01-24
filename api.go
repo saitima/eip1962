@@ -171,6 +171,7 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 			return nil, errors.New("point isn't on the curve")
 		}
 		scalar, localRest, err := decodeScalar(localRest, orderLen, order)
+		bases[i] = g1.newPoint()
 		g1.copy(bases[i], p)
 		scalars[i] = new(big.Int).Set(scalar)
 		rest = localRest
@@ -348,6 +349,7 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 		if !g2.isOnCurve(q) {
 			return nil, errors.New("point isn't on the curve")
 		}
+		bases[i] = g2.newPoint()
 		g2.copy(bases[i], q)
 		scalar, localRest, err := decodeScalar(localRest, orderLen, order)
 		scalars[i] = new(big.Int).Set(scalar)
@@ -503,6 +505,7 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 		if !g2.isOnCurve(q) {
 			return nil, errors.New("point isn't on the curve")
 		}
+		bases[i] = g2.newPoint()
 		g2.copy(bases[i], q)
 		scalar, localRest, err := decodeScalar(localRest, orderLen, order)
 		scalars[i] = new(big.Int).Set(scalar)
