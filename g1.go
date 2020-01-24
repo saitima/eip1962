@@ -115,13 +115,24 @@ func (g *g1) copy(q, p *pointG1) *pointG1 {
 }
 
 func (g *g1) affine(r, p *pointG1) *pointG1 {
-	q := g.newPoint()
 	if g.isZero(p) {
-		g.copy(q, g.inf)
-		return q
+		g.f.copy(r[0], g.f.zero)
+		g.f.copy(r[1], g.f.zero)
+		g.f.copy(r[2], g.f.zero)
+		return r
+	}
+	if g.f.equal(p[2], g.f.one) {
+		g.copy(r, p)
+		return r
 	}
 	t := g.t
 	g.f.inverse(t[0], p[2])
+	if g.f.equal(t[0], g.f.zero) {
+		g.copy(r, p)
+		g.f.copy(r[2], g.f.zero)
+		return r
+	}
+	q := g.newPoint()
 	g.f.square(t[1], t[0])
 	g.f.mul(q[0], p[0], t[1])
 	g.f.mul(t[0], t[0], t[1])

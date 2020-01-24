@@ -46,3 +46,14 @@ func padHex(value []byte) []byte {
 	}
 	return value
 }
+
+func reverse(in []byte) []byte {
+	l := len(in)
+	out := make([]byte, l)
+	for i := l - 1; i >= 0; i-- {
+		a := in[i]
+		b := ((a & 0xf0) >> 4) | ((a & 0x0f) << 4)
+		out[l-1-i] = b
+	}
+	return out
+}
