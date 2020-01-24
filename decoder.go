@@ -321,15 +321,26 @@ func createExtension3FieldParams(in []byte, modulusLen int, field *field, froben
 
 func isNonNThRoot(field *field, nonResidue fieldElement, power int) bool {
 	result := field.newFieldElement()
-	field.exp(result, nonResidue, field.pbig)
+	exp := new(big.Int).Sub(field.pbig, big.NewInt(1))
+	exp, rem := new(big.Int).DivMod(exp, big.NewInt(int64(power)), big.NewInt(0))
+	if rem.Uint64() != 0 {
+		return false
+	}
+	field.exp(result, nonResidue, exp)
 	if field.equal(result, field.one) {
 		return false
 	}
 	return true
 }
+
 func isNonNThRootFp2(fq2 *fq2, nonResidue *fe2, power int) bool {
+	exp := new(big.Int).Sub(fq2.f.pbig, big.NewInt(1))
+	exp, rem := new(big.Int).DivMod(exp, big.NewInt(int64(power)), big.NewInt(0))
+	if rem.Uint64() != 0 {
+		return false
+	}
 	result := fq2.newElement()
-	fq2.exp(result, nonResidue, fq2.f.pbig)
+	fq2.exp(result, nonResidue, exp)
 	if fq2.equal(result, fq2.one()) {
 		return false
 	}
@@ -337,8 +348,13 @@ func isNonNThRootFp2(fq2 *fq2, nonResidue *fe2, power int) bool {
 }
 
 func isNonNThRootFp3(fq3 *fq3, nonResidue *fe3, power int) bool {
+	exp := new(big.Int).Sub(fq3.f.pbig, big.NewInt(1))
+	exp, rem := new(big.Int).DivMod(exp, big.NewInt(int64(power)), big.NewInt(0))
+	if rem.Uint64() != 0 {
+		return false
+	}
 	result := fq3.newElement()
-	fq3.exp(result, nonResidue, fq3.f.pbig)
+	fq3.exp(result, nonResidue, exp)
 	if fq3.equal(result, fq3.one()) {
 		return false
 	}
