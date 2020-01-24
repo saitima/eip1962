@@ -195,6 +195,14 @@ func (fq *fq3) square(c, a *fe3) {
 	fq.f.sub(c[2], t[1], t[0])
 }
 
+func (fq *fq3) hasInverse(inv, e *fe3) bool {
+	fq.inverse(inv, e)
+	if fq.equal(inv, fq.zero()) {
+		return false
+	}
+	return true
+}
+
 func (fq *fq3) inverse(c, a *fe3) {
 	t := fq.t
 	fq.f.square(t[0], a[0])        // v0 = a0^2

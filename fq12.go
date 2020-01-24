@@ -177,6 +177,14 @@ func (fq *fq12) square(c, a *fe12) {
 	fq.f.double(&c[1], t[1])        // c1 = 2*v2
 }
 
+func (fq *fq12) hasInverse(inv, e *fe12) bool {
+	fq.inverse(inv, e)
+	if fq.equal(inv, fq.zero()) {
+		return false
+	}
+	return true
+}
+
 func (fq *fq12) inverse(c, a *fe12) {
 	t := fq.t
 	// c0 = a0 * (a0^2 - β * a1^2)^-1

@@ -601,6 +601,14 @@ func padBytes(in []byte, size int) []byte {
 	return out
 }
 
+func (f *field) hasInverse(inv, e fieldElement) bool {
+	f.inverse(inv, e)
+	if f.equal(inv, f.zero) {
+		return false
+	}
+	return true
+}
+
 func (f *field) inverse(inv, e fieldElement) {
 	u, v, s, r := f.newFieldElement(),
 		f.newFieldElement(),

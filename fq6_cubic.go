@@ -192,6 +192,13 @@ func (fq *fq6) square(c, a *fe6) {
 	fq.f.add(t[0], t[0], t[4])
 	fq.f.sub(&c[2], t[1], t[0])
 }
+func (fq *fq6) hasInverse(inv, e *fe6) bool {
+	fq.inverse(inv, e)
+	if fq.equal(inv, fq.zero()) {
+		return false
+	}
+	return true
+}
 
 func (fq *fq6) inverse(c, a *fe6) {
 	t := fq.t
