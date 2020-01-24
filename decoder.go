@@ -283,6 +283,9 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, froben
 	if err != nil {
 		return nil, nil, err
 	}
+	if field.isZero(nonResidue) {
+		return nil, nil, errors.New("Fp2 non-residue can not be zero")
+	}
 	if !isNonNThRoot(field, nonResidue, 2) {
 		return nil, nil, errors.New("Non-residue for Fp2 is actually a residue")
 	}
@@ -304,6 +307,9 @@ func createExtension3FieldParams(in []byte, modulusLen int, field *field, froben
 	nonResidue, rest, err := decodeFp(in, modulusLen, field)
 	if err != nil {
 		return nil, nil, err
+	}
+	if field.isZero(nonResidue) {
+		return nil, nil, errors.New("Fp3 non-residue can not be zero")
 	}
 	if !isNonNThRoot(field, nonResidue, 3) {
 		return nil, nil, errors.New("Non-residue for Fp3 is actually a residue")
