@@ -63,13 +63,14 @@ func parseBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, error
 	}
 	modulusBuf = padHex(modulusBuf)
 	modulus := new(big.Int).SetBytes(modulusBuf)
-	if modulus.Uint64() == 0 {
+	if isBigZero(modulus) {
 		return nil, nil, 0, nil, errors.New("Modulus can not be zero")
 	}
-	if modulus.Uint64()&1 == 0 {
+	if isBigEven(modulus) {
 		return nil, nil, 0, nil, errors.New("Modulus is even")
 	}
-	if modulus.Uint64() < 3 {
+
+	if isBigLowerThan(modulus, 3) {
 		return nil, nil, 0, nil, errors.New("Modulus is less than 3")
 	}
 
@@ -214,8 +215,9 @@ func parseGroupOrder(in []byte) (int, *big.Int, []byte, error) {
 	if err != nil {
 		return 0, nil, nil, err
 	}
+
 	order := new(big.Int).SetBytes(orderBuf)
-	if order.Uint64() == 0 {
+	if isBigZero(order) {
 		return 0, nil, nil, errors.New("Group order is zero")
 	}
 	return orderLen, order, rest, nil

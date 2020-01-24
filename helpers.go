@@ -3,6 +3,7 @@ package eip
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 )
 
 func bytes_(size int, hexStrs ...string) []byte {
@@ -56,4 +57,29 @@ func reverse(in []byte) []byte {
 		out[l-1-i] = b
 	}
 	return out
+}
+
+func isBigZero(a *big.Int) bool {
+	if big.NewInt(0).Cmp(a) == 0 {
+		return true
+	}
+	return false
+}
+
+func isBigLowerThan(a *big.Int, b int) bool {
+	if a.Cmp(big.NewInt(int64(b))) == -1 {
+		return true
+	}
+	return false
+}
+
+func isBigEven(a *big.Int) bool {
+	if a.Bit(0) == 0 {
+		return true
+	}
+	return false
+}
+
+func isPrime(a *big.Int) bool {
+	return true
 }
