@@ -152,6 +152,7 @@ func decodeBAInBaseFieldFromEncoding(in []byte, modulusLen int, field *field) (f
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
 	b, rest, err := decodeFp(rest, modulusLen, field)
 	if err != nil {
 		return nil, nil, nil, err
@@ -197,6 +198,9 @@ func decodeG1CurveParams(in []byte) ([]byte, int, []byte, error) {
 		return nil, 0, nil, err
 	}
 	orderLen := int(orderLenBuf[0])
+	if orderLen > MAX_GROUP_BYTE_LEN {
+		return nil, 0, nil, errors.New("Encoded group length is too large")
+	}
 	orderBuf, rest, err := split(rest, orderLen)
 	if err != nil {
 		return nil, 0, nil, err
