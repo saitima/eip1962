@@ -55,7 +55,6 @@ func newField(p []byte) (*field, error) {
 	if inpT == nil {
 		return nil, fmt.Errorf("invalid inverse of prime %x", f.pbig)
 	}
-
 	f.r, err = newFieldElementFromBigUnchecked(f.limbSize, R)
 	if err != nil {
 		return nil, err
@@ -80,7 +79,46 @@ func newField(p []byte) (*field, error) {
 
 	f.inp = inpT.Uint64()
 	switch f.limbSize {
-	case 1, 2, 3, 4:
+	case 1:
+		f.equal = eq1
+		f.copy = cpy1
+		f.cmp = cmp1
+		f.addn = addn1
+		f.subn = subn1
+		f._mul = mul1
+		f._add = add1
+		f._sub = sub1
+		f._double = double1
+		f._neg = _neg1
+		f.div_two = div_two_1
+		f.mul_two = mul_two_1
+	case 2:
+		f.equal = eq2
+		f.copy = cpy2
+		f.cmp = cmp2
+		f.addn = addn2
+		f.subn = subn2
+		f._mul = mul2
+		f._add = add2
+		f._sub = sub2
+		f._double = double2
+		f._neg = _neg2
+		f.div_two = div_two_2
+		f.mul_two = mul_two_2
+	case 3:
+		f.equal = eq3
+		f.copy = cpy3
+		f.cmp = cmp3
+		f.addn = addn3
+		f.subn = subn3
+		f._mul = mul3
+		f._add = add3
+		f._sub = sub3
+		f._double = double3
+		f._neg = _neg3
+		f.div_two = div_two_3
+		f.mul_two = mul_two_3
+	case 4:
 		f.equal = eq4
 		f.copy = cpy4
 		f.cmp = cmp4
@@ -332,7 +370,7 @@ func (f *field) newFieldElementFromBytesNoTransform(in []byte) (fieldElement, er
 
 func (f *field) newFieldElementFromBytes(in []byte) (fieldElement, error) {
 	if len(in) != f.byteSize() {
-		return nil, fmt.Errorf("bad input size expected %d given %d", f.byteSize(), len(in))
+		return nil, fmt.Errorf("bad input size")
 	}
 	if !f.isValid(in) {
 		return nil, fmt.Errorf("input is a larger number than modulus")
@@ -393,7 +431,13 @@ func (f *field) toBytes(in fieldElement) []byte {
 
 func (f *field) toBytesNoTransform(in fieldElement) []byte {
 	switch f.limbSize {
-	case 1, 2, 3, 4:
+	case 1:
+		return toBytes((*[1]uint64)(in)[:])
+	case 2:
+		return toBytes((*[2]uint64)(in)[:])
+	case 3:
+		return toBytes((*[3]uint64)(in)[:])
+	case 4:
 		return toBytes((*[4]uint64)(in)[:])
 	case 5:
 		return toBytes((*[5]uint64)(in)[:])
@@ -420,7 +464,7 @@ func (f *field) toBytesNoTransform(in fieldElement) []byte {
 	case 16:
 		return toBytes((*[16]uint64)(in)[:])
 	default:
-		panic("given limb size %d not implemented")
+		panic("not implemented")
 	}
 }
 
@@ -485,7 +529,13 @@ func newFieldElementFromBytes(in []byte) (fieldElement, int, error) {
 
 func newFieldElement(limbSize int) fieldElement {
 	switch limbSize {
-	case 1, 2, 3, 4:
+	case 1:
+		return unsafe.Pointer(&[1]uint64{})
+	case 2:
+		return unsafe.Pointer(&[2]uint64{})
+	case 3:
+		return unsafe.Pointer(&[3]uint64{})
+	case 4:
 		return unsafe.Pointer(&[4]uint64{})
 	case 5:
 		return unsafe.Pointer(&[5]uint64{})
@@ -512,7 +562,7 @@ func newFieldElement(limbSize int) fieldElement {
 	case 16:
 		return unsafe.Pointer(&[16]uint64{})
 	default:
-		panic("unsupported limbsize")
+		panic("not implemented")
 	}
 }
 
