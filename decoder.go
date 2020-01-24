@@ -49,6 +49,9 @@ func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 	if err != nil {
 		return nil, 0, nil, errors.New("cant decode modulus")
 	}
+	if int(modulusBuf[0]) == 0 {
+		return nil, 0, nil, errors.New("In modulus encoding highest byte is zero")
+	}
 	return modulusBuf, modulusLen, rest, nil
 }
 
