@@ -124,9 +124,9 @@ func (g *g23) affine(r, p *pointG23) *pointG23 {
 		return r
 	}
 	t := g.t
-	g.f.inverse(t[0], p[2])
-	if g.f.equal(t[0], g.f.zero()) {
-		g.copy(r, p)
+	if !g.f.hasInverse(t[0], p[2]) {
+		g.f.copy(r[0], g.f.zero())
+		g.f.copy(r[1], g.f.zero())
 		g.f.copy(r[2], g.f.zero())
 		return r
 	}
