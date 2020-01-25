@@ -1,6 +1,7 @@
 package eip
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -17,33 +18,26 @@ type g1 struct {
 	inf *pointG1
 }
 
-func newG1(f *field, a, b, q []byte) (*g1, error) {
-	a_, b_ := f.newFieldElement(), f.newFieldElement()
-	var err error
-	if a != nil {
-		a_, err = f.newFieldElementFromBytes(a)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if b != nil {
-		b_, err = f.newFieldElementFromBytes(b)
-		if err != nil {
-			return nil, err
-		}
-	}
+func newG1(f *field, a, b fieldElement, q []byte) (*g1, error) {
 	t := [9]fieldElement{}
 	for i := 0; i < 9; i++ {
 		t[i] = f.newFieldElement()
 	}
 	g := &g1{
 		f: f,
-		a: a_,
-		b: b_,
+		a: f.newFieldElement(),
+		b: f.newFieldElement(),
 		q: new(big.Int).SetBytes(q),
 		t: t,
 	}
+	if a == nil || b == nil {
+		return nil, errors.New("a and b values should be provided")
+	}
+	if g.f.isZero(b) || (g.f.isZero(a) && g.f.isZero(b)) {
+		return nil, errors.New("Curve shape is not supported")
+	}
+	g.f.copy(g.a, a)
+	g.f.copy(g.b, b)
 	g.inf = g.newPoint()
 	g.f.copy(g.inf[0], f.zero)
 	g.f.copy(g.inf[1], f.one)

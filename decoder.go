@@ -35,22 +35,33 @@ func split(in []byte, offset int) ([]byte, []byte, error) {
 func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 	modulusLenBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return nil, 0, nil, errors.New("cant decode modulus length")
+		return nil, 0, nil, errors.New("Input is not long enough to get modulus length")
+	}
+	if len(modulusLenBuf) > MAX_MODULUS_BYTE_LEN {
+		return nil, 0, nil, errors.New("Modulus length is zero")
 	}
 	if len(modulusLenBuf) == 0 {
 		return nil, 0, nil, errors.New("Encoded modulus length is too large")
 	}
-	if len(modulusLenBuf) > MAX_MODULUS_BYTE_LEN {
-		return nil, 0, nil, errors.New("Modulus is length is zero")
-	}
-
 	modulusLen := int(modulusLenBuf[0])
 	modulusBuf, rest, err := split(rest, modulusLen)
 	if err != nil {
-		return nil, 0, nil, errors.New("cant decode modulus")
+		return nil, 0, nil, errors.New("Input is not long enough to get modulus")
 	}
 	if int(modulusBuf[0]) == 0 {
 		return nil, 0, nil, errors.New("In modulus encoding highest byte is zero")
+	}
+	modulusBuf = padHex(modulusBuf)
+	modulus := new(big.Int).SetBytes(modulusBuf)
+	if isBigZero(modulus) {
+		return nil, 0, nil, errors.New("Modulus can not be zero")
+	}
+	if isBigEven(modulus) {
+		return nil, 0, nil, errors.New("Modulus is even")
+	}
+
+	if isBigLowerThan(modulus, 3) {
+		return nil, 0, nil, errors.New("Modulus is less than 3")
 	}
 	return modulusBuf, modulusLen, rest, nil
 }
@@ -61,26 +72,11 @@ func parseBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, error
 	if err != nil {
 		return nil, nil, 0, nil, err
 	}
-	if len(rest) < modulusLen {
-		return nil, nil, 0, nil, errors.New("Input is not long enough")
-	}
-	modulusBuf = padHex(modulusBuf)
-	modulus := new(big.Int).SetBytes(modulusBuf)
-	if isBigZero(modulus) {
-		return nil, nil, 0, nil, errors.New("Modulus can not be zero")
-	}
-	if isBigEven(modulus) {
-		return nil, nil, 0, nil, errors.New("Modulus is even")
-	}
-
-	if isBigLowerThan(modulus, 3) {
-		return nil, nil, 0, nil, errors.New("Modulus is less than 3")
-	}
-
 	field, err := newField(modulusBuf)
 	if err != nil {
-		return nil, nil, 0, nil, err
+		return nil, nil, 0, nil, errors.New("Failed to create prime field from modulus")
 	}
+	modulus := field.pbig
 	return field, modulus, modulusLen, rest, nil
 }
 
@@ -161,10 +157,7 @@ func decodeBAInBaseFieldFromEncoding(in []byte, modulusLen int, field *field) (f
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	// TODO move this control into g1 constructor
-	if field.isZero(b) || (field.isZero(a) && field.isZero(b)) {
-		return nil, nil, nil, errors.New("Curve shape is not supported")
-	}
+
 	return a, b, rest, nil
 }
 
@@ -177,10 +170,7 @@ func decodeBAInExtField2FromEncoding(in []byte, modulusLen int, field *fq2) (*fe
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	// TODO move this control into g1 constructor
-	if field.isZero(b2) || (field.isZero(a2) && field.isZero(b2)) {
-		return nil, nil, nil, errors.New("Curve shape is not supported")
-	}
+
 	return a2, b2, rest, nil
 }
 

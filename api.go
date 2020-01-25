@@ -60,12 +60,10 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	g1, err := newG1(field, nil, nil, order.Bytes())
+	g1, err := newG1(field, a, b, order.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	g1.f.copy(g1.a, a)
-	g1.f.copy(g1.b, b)
 	p0, rest, err := decodeG1Point(rest, modulusLen, g1)
 	if err != nil {
 		return nil, err
@@ -104,9 +102,7 @@ func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	g1, err := newG1(field, nil, nil, order.Bytes())
-	g1.f.copy(g1.a, a)
-	g1.f.copy(g1.b, b)
+	g1, err := newG1(field, a, b, order.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -143,9 +139,7 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	g1, err := newG1(field, nil, nil, order.Bytes())
-	g1.f.copy(g1.a, a)
-	g1.f.copy(g1.b, b)
+	g1, err := newG1(field, a, b, order.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -242,12 +236,10 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	g2, err := newG22(fq2, nil, nil, order.Bytes())
+	g2, err := newG22(fq2, a2, b2, order.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	g2.a = a2
-	g2.b = b2
 	q0, rest, err := decodeG22Point(rest, modulusLen, g2)
 	if err != nil {
 		return nil, err
@@ -285,7 +277,7 @@ func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	g2, err := newG22(fq2, nil, nil, order.Bytes())
+	g2, err := newG22(fq2, a2, b2, order.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -324,12 +316,10 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	g2, err := newG22(fq2, nil, nil, order.Bytes())
+	g2, err := newG22(fq2, a2, b2, order.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	fq2.copy(g2.a, a2)
-	fq2.copy(g2.b, b2)
 
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
@@ -402,12 +392,10 @@ func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	g2, err := newG23(fq3, nil, nil, order.Bytes())
+	g2, err := newG23(fq3, a2, b2, order.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	g2.a = a2
-	g2.b = b2
 	q0, rest, err := decodeG23Point(rest, modulusLen, g2)
 	if err != nil {
 		return nil, err
@@ -444,12 +432,10 @@ func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	g2, err := newG23(fq3, nil, nil, order.Bytes())
+	g2, err := newG23(fq3, a3, b3, order.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	fq3.copy(g2.a, a3)
-	fq3.copy(g2.b, b3)
 	q, rest, err := decodeG23Point(rest, modulusLen, g2)
 	if err != nil {
 		return nil, err
@@ -483,12 +469,10 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	g2, err := newG23(fq3, nil, nil, order.Bytes())
+	g2, err := newG23(fq3, a2, b2, order.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	g2.a = a2
-	g2.b = b2
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return pairingError, errors.New("Input is not long enough to get number of pairs")
@@ -548,9 +532,7 @@ func pairBN(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	g1, err := newG1(field, nil, nil, order.Bytes())
-	g1.f.copy(g1.a, a)
-	g1.f.copy(g1.b, b)
+	g1, err := newG1(field, a, b, order.Bytes())
 	if err != nil {
 		return pairingError, err
 	}
@@ -598,21 +580,21 @@ func pairBN(in []byte) ([]byte, error) {
 	if ok := fq12.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp12")
 	}
-	// g2
-	g2, err := newG22(fq2, nil, nil, order.Bytes())
-	if err != nil {
-		return pairingError, err
-	}
-	// a2 is pairingError
-	fq2.copy(g2.a, fq2.zero())
+
+	b2 := fq2.newElement()
 	if twistType == 0x01 {
-		fq2.mulByFq(g2.b, fq6.nonResidue, b)
+		fq2.mulByFq(b2, fq6.nonResidue, b)
 	} else {
 		fq6NonResidueInv := fq2.newElement()
 		fq2.inverse(fq6NonResidueInv, fq6.nonResidue)
-		fq2.mulByFq(g2.b, fq6NonResidueInv, b)
+		fq2.mulByFq(b2, fq6NonResidueInv, b)
 	}
 
+	// g2
+	g2, err := newG22(fq2, fq2.zero(), b2, order.Bytes())
+	if err != nil {
+		return pairingError, err
+	}
 	// u
 	u, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
@@ -738,9 +720,7 @@ func pairBLS(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	g1, err := newG1(field, nil, nil, order.Bytes())
-	g1.f.copy(g1.a, a)
-	g1.f.copy(g1.b, b)
+	g1, err := newG1(field, a, b, order.Bytes())
 	if err != nil {
 		return pairingError, err
 	}
@@ -788,19 +768,19 @@ func pairBLS(in []byte) ([]byte, error) {
 	if ok := fq12.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp12")
 	}
-	// g2
-	g2, err := newG22(fq2, nil, nil, order.Bytes())
-	if err != nil {
-		return pairingError, err
-	}
-	// a2 is pairingError
-	fq2.copy(g2.a, fq2.zero())
+
+	b2 := fq2.newElement()
 	if twistType == 0x01 {
-		fq2.mulByFq(g2.b, fq6.nonResidue, b)
+		fq2.mulByFq(b2, fq6.nonResidue, b)
 	} else {
 		fq6NonResidueInv := fq2.newElement()
 		fq2.inverse(fq6NonResidueInv, fq6.nonResidue)
-		fq2.mulByFq(g2.b, fq6NonResidueInv, b)
+		fq2.mulByFq(b2, fq6NonResidueInv, b)
+	}
+	// g2
+	g2, err := newG22(fq2, fq2.zero(), b2, order.Bytes())
+	if err != nil {
+		return pairingError, err
 	}
 
 	// z
@@ -912,12 +892,10 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	g1, err := newG1(field, nil, nil, order.Bytes())
+	g1, err := newG1(field, a, b, order.Bytes())
 	if err != nil {
 		return pairingError, err
 	}
-	g1.f.copy(g1.a, a)
-	g1.f.copy(g1.b, b)
 	// ext2
 	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, false)
 	if err != nil {
@@ -933,18 +911,20 @@ func pairMNT4(in []byte) ([]byte, error) {
 		return pairingError, err
 	}
 	fq4.calculateFrobeniusCoeffsWithPrecomputation(f1)
-	// g2
-	g2, err := newG22(fq2, nil, nil, order.Bytes())
-	if err != nil {
-		return pairingError, err
-	}
+
+	a2, b2 := fq2.newElement(), fq2.newElement()
 	twist, twist2, twist3 := fq2.zero(), fq2.newElement(), fq2.newElement()
 	fq2.f.copy(twist[1], fq2.f.one)
 	fq2.square(twist2, twist)
 	fq2.mul(twist3, twist2, twist)
-	fq2.mulByFq(g2.a, twist2, g1.a)
-	fq2.mulByFq(g2.b, twist3, g1.b)
+	fq2.mulByFq(a2, twist2, g1.a)
+	fq2.mulByFq(b2, twist3, g1.b)
 
+	// g2
+	g2, err := newG22(fq2, a2, b2, order.Bytes())
+	if err != nil {
+		return pairingError, err
+	}
 	// x
 	x, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
@@ -1093,9 +1073,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	g1, err := newG1(field, nil, nil, order.Bytes())
-	g1.f.copy(g1.a, a)
-	g1.f.copy(g1.b, b)
+	g1, err := newG1(field, a, b, order.Bytes())
 	if err != nil {
 		return pairingError, err
 	}
@@ -1118,18 +1096,18 @@ func pairMNT6(in []byte) ([]byte, error) {
 	}
 	fq6.calculateFrobeniusCoeffsWithPrecomputation(f1)
 
-	// g2
-	g2, err := newG23(fq3, nil, nil, order.Bytes())
-	if err != nil {
-		return pairingError, err
-	}
+	a3, b3 := fq3.newElement(), fq3.newElement()
 	twist, twist2, twist3 := fq3.zero(), fq3.newElement(), fq3.newElement()
 	fq3.f.copy(twist[1], fq3.f.one)
 	fq3.square(twist2, twist)
 	fq3.mul(twist3, twist2, twist)
-	fq3.mulByFq(g2.a, twist2, g1.a)
-	fq3.mulByFq(g2.b, twist3, g1.b)
-
+	fq3.mulByFq(a3, twist2, g1.a)
+	fq3.mulByFq(b3, twist3, g1.b)
+	// g2
+	g2, err := newG23(fq3, a3, b3, order.Bytes())
+	if err != nil {
+		return pairingError, err
+	}
 	// x
 	x, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {

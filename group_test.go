@@ -1026,8 +1026,14 @@ func TestG1(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := bytes_(byteLen, "0x00")
-	b := bytes_(byteLen, "0x04")
+	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x04"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	g, err := newG1(f, a, b, groupBytes)
 	if err != nil {
 		t.Fatal(err)
@@ -1223,7 +1229,15 @@ func TestG22(t *testing.T) {
 	f.neg(fq2.nonResidue, f.one)
 	fq2.calculateFrobeniusCoeffs()
 
-	g, err := newG22(fq2, nil, nil, groupBytes)
+	b, err := f.newFieldElementFromBytes(bytes_(48, "0x04"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a2, b2 := fq2.zero(), fq2.newElement()
+	f.copy(b2[0], b)
+	f.copy(b2[1], b)
+
+	g, err := newG22(fq2, a2, b2, groupBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1251,15 +1265,6 @@ func TestG22(t *testing.T) {
 			t.Logf("invalid out ")
 		}
 	})
-	b, err := f.newFieldElementFromBytes(bytes_(48, "0x04"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	a2, b2 := fq2.zero(), fq2.newElement()
-	f.copy(b2[0], b)
-	f.copy(b2[1], b)
-	fq2.copy(g.a, a2)
-	fq2.copy(g.b, b2)
 
 	t.Run("Is on curve", func(t *testing.T) {
 		if !g.isOnCurve(one) {
@@ -1416,7 +1421,24 @@ func TestG23(t *testing.T) {
 	}
 	fq3.calculateFrobeniusCoeffs()
 
-	g, err := newG23(fq3, nil, nil, groupBytes)
+	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xd68c7b1dc5dd042e957b71c44d3d6c24e683fc09b420b1a2d263fde47ddba59463d0c65282"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a3, b3 := fq3.newElement(), fq3.newElement()
+	twist, twist2, twist3 := fq3.newElement(), fq3.newElement(), fq3.newElement()
+	f.copy(twist[0], f.zero)
+	f.copy(twist[1], f.one)
+	fq3.square(twist2, twist)
+	fq3.mul(twist3, twist2, twist)
+	fq3.mulByFq(a3, twist2, a)
+	fq3.mulByFq(b3, twist3, b)
+
+	g, err := newG23(fq3, a3, b3, groupBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1447,22 +1469,6 @@ func TestG23(t *testing.T) {
 			t.Logf("invalid out ")
 		}
 	})
-	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xb"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xd68c7b1dc5dd042e957b71c44d3d6c24e683fc09b420b1a2d263fde47ddba59463d0c65282"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	twist, twist2, twist3 := fq3.newElement(), fq3.newElement(), fq3.newElement()
-	f.copy(twist[0], f.zero)
-	f.copy(twist[1], f.one)
-	fq3.square(twist2, twist)
-	fq3.mul(twist3, twist2, twist)
-	fq3.mulByFq(g.a, twist2, a)
-	fq3.mulByFq(g.b, twist3, b)
 
 	t.Run("Is on curve", func(t *testing.T) {
 		if !g.isOnCurve(one) {
@@ -1619,12 +1625,10 @@ func TestBLS12384Pairing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g1, err := newG1(f, nil, nil, groupBytes)
+	g1, err := newG1(f, a, b, groupBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.copy(g1.a, a)
-	f.copy(g1.b, b)
 
 	fq2, err := newFq2(f, nil)
 	if err != nil {
@@ -1633,16 +1637,15 @@ func TestBLS12384Pairing(t *testing.T) {
 	f.neg(fq2.nonResidue, f.one)
 	fq2.calculateFrobeniusCoeffs()
 
-	// G2
-	g2, err := newG22(fq2, nil, nil, groupBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
 	a2, b2 := fq2.zero(), fq2.newElement()
 	f.copy(b2[0], b)
 	f.copy(b2[1], b)
-	fq2.copy(g2.a, a2)
-	fq2.copy(g2.b, b2)
+
+	// G2
+	g2, err := newG22(fq2, a2, b2, groupBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	fq6, err := newFq6(fq2, nil)
 	if err != nil {
@@ -1779,12 +1782,10 @@ func BenchmarkBLS(t *testing.B) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g1, err := newG1(f, nil, nil, groupBytes)
+	g1, err := newG1(f, a, b, groupBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.copy(g1.a, a)
-	f.copy(g1.b, b)
 
 	fq2, err := newFq2(f, nil)
 	if err != nil {
@@ -1792,16 +1793,14 @@ func BenchmarkBLS(t *testing.B) {
 	}
 	f.neg(fq2.nonResidue, f.one)
 	fq2.calculateFrobeniusCoeffs()
-	// G2
-	g2, err := newG22(fq2, nil, nil, groupBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
 	a2, b2 := fq2.zero(), fq2.newElement()
 	f.copy(b2[0], b)
 	f.copy(b2[1], b)
-	fq2.copy(g2.a, a2)
-	fq2.copy(g2.b, b2)
+	// G2
+	g2, err := newG22(fq2, a2, b2, groupBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	fq6, err := newFq6(fq2, nil)
 	if err != nil {
@@ -1875,12 +1874,10 @@ func TestMNT4320Pairing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g1, err := newG1(f, nil, nil, groupBytes)
+	g1, err := newG1(f, a, b, groupBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.copy(g1.a, a)
-	f.copy(g1.b, b)
 
 	fq2, err := newFq2(f, nil)
 	if err != nil {
@@ -1902,11 +1899,6 @@ func TestMNT4320Pairing(t *testing.T) {
 	fq4.f.f.copy(fq4.nonResidue[0], fq2.nonResidue)
 	fq4.calculateFrobeniusCoeffs()
 
-	// G2
-	g2, err := newG22(fq2, nil, nil, groupBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
 	// y^2 = x^3 + b/(9+u)
 	twist, twist2, twist3 := fq2.newElement(), fq2.newElement(), fq2.newElement()
 	f.copy(twist[0], f.zero)
@@ -1917,8 +1909,12 @@ func TestMNT4320Pairing(t *testing.T) {
 	a2, b2 := fq2.newElement(), fq2.newElement()
 	fq2.mulByFq(a2, twist2, a)
 	fq2.mulByFq(b2, twist3, b)
-	fq2.copy(g2.a, a2)
-	fq2.copy(g2.b, b2)
+
+	// G2
+	g2, err := newG22(fq2, a2, b2, groupBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// mnt4 instance)
 	z, ok := new(big.Int).SetString("689871209842287392837045615510547309923794944", 10)
@@ -2046,12 +2042,10 @@ func TestMNT4753Pairing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g1, err := newG1(f, nil, nil, groupBytes)
+	g1, err := newG1(f, a, b, groupBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.copy(g1.a, a)
-	f.copy(g1.b, b)
 
 	fq2, err := newFq2(f, nil)
 	if err != nil {
@@ -2073,19 +2067,21 @@ func TestMNT4753Pairing(t *testing.T) {
 	// fq4.f.f.copy(fq4.nonResidue[0], fq2.nonResidue)
 	fq4.calculateFrobeniusCoeffs()
 
-	// G2
-	g2, err := newG22(fq2, nil, nil, groupBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
 	// y^2 = x^3 + b/(9+u)
+	a2, b2 := fq2.newElement(), fq2.newElement()
 	twist, twist2, twist3 := fq2.newElement(), fq2.newElement(), fq2.newElement()
 	f.copy(twist[0], f.zero)
 	f.copy(twist[1], f.one)
 	fq2.square(twist2, twist)
 	fq2.mul(twist3, twist2, twist)
-	fq2.mulByFq(g2.a, twist2, a)
-	fq2.mulByFq(g2.b, twist3, b)
+	fq2.mulByFq(a2, twist2, a)
+	fq2.mulByFq(b2, twist3, b)
+
+	// G2
+	g2, err := newG22(fq2, a2, b2, groupBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// mnt4 instance)
 	z, ok := new(big.Int).SetString("15474b1d641a3fd86dcbcee5dcda7fe51852c8cbe26e600733b714aa43c31a66b0344c4e2c428b07a7713041ba18000", 16)
@@ -2212,12 +2208,10 @@ func TestBN254Pairing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g1, err := newG1(f, nil, nil, groupBytes)
+	g1, err := newG1(f, a, b, groupBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.copy(g1.a, a)
-	f.copy(g1.b, b)
 
 	fq2, err := newFq2(f, nil)
 	if err != nil {
@@ -2244,17 +2238,15 @@ func TestBN254Pairing(t *testing.T) {
 	}
 	fq12.calculateFrobeniusCoeffs()
 
-	// G2
-	g2, err := newG22(fq2, nil, nil, groupBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
 	// y^2 = x^3 + b/(9+u)
 	a2, b2 := fq2.zero(), fq2.newElement()
 	fq2.inverse(b2, fq6.nonResidue)
 	fq2.mulByFq(b2, b2, b)
-	fq2.copy(g2.a, a2)
-	fq2.copy(g2.b, b2)
+	// G2
+	g2, err := newG22(fq2, a2, b2, groupBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	minus2Inv := new(big.Int).ModInverse(big.NewInt(-2), f.pbig)
 	nonResidueInPMinus1Over2 := fq2.newElement()
@@ -2385,12 +2377,10 @@ func TestMNT6320Pairing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g1, err := newG1(f, nil, nil, groupBytes)
+	g1, err := newG1(f, a, b, groupBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.copy(g1.a, a)
-	f.copy(g1.b, b)
 
 	fq3, err := newFq3(f, nil)
 	if err != nil {
@@ -2411,19 +2401,20 @@ func TestMNT6320Pairing(t *testing.T) {
 	fq6.f.f.copy(fq6.nonResidue[0], fq3.nonResidue)
 	fq6.calculateFrobeniusCoeffs()
 
-	// G2
-	g2, err := newG23(fq3, nil, nil, groupBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	a3, b3 := fq3.newElement(), fq3.newElement()
 	twist, twist2, twist3 := fq3.newElement(), fq3.newElement(), fq3.newElement()
 	f.copy(twist[0], f.zero)
 	f.copy(twist[1], f.one)
 	fq3.square(twist2, twist)
 	fq3.mul(twist3, twist2, twist)
-	fq3.mulByFq(g2.a, twist2, a)
-	fq3.mulByFq(g2.b, twist3, b)
+	fq3.mulByFq(a3, twist2, a)
+	fq3.mulByFq(b3, twist3, b)
+
+	// G2
+	g2, err := newG23(fq3, a3, b3, groupBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// mnt6 instance)
 	z, ok := new(big.Int).SetString("1eef5546609756bec2a33f0dc9a1b671660000", 16)

@@ -1,6 +1,7 @@
 package eip
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -17,34 +18,27 @@ type g22 struct {
 	inf *pointG22
 }
 
-func newG22(f *fq2, a, b, q []byte) (*g22, error) {
-	var err error
-	a_, b_ := f.newElement(), f.newElement()
-	if a != nil {
-		a_, err = f.fromBytes(a)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if b != nil {
-		b_, err = f.fromBytes(b)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+func newG22(f *fq2, a, b *fe2, q []byte) (*g22, error) {
 	t := [9]*fe2{}
 	for i := 0; i < 9; i++ {
 		t[i] = f.zero()
 	}
 	g := &g22{
 		f:   f,
-		a:   a_,
-		b:   b_,
+		a:   f.newElement(),
+		b:   f.newElement(),
 		q:   new(big.Int).SetBytes(q),
 		t:   t,
 		inf: &pointG22{f.zero(), f.one(), f.zero()},
 	}
+	if a == nil || b == nil {
+		return nil, errors.New("a and b values should be provided")
+	}
+	if g.f.isZero(b) || (g.f.isZero(a) && g.f.isZero(b)) {
+		return nil, errors.New("Curve shape is not supported")
+	}
+	g.f.copy(g.a, a)
+	g.f.copy(g.b, b)
 	g.inf = g.newPoint()
 	g.f.copy(g.inf[0], g.f.zero())
 	g.f.copy(g.inf[1], g.f.one())

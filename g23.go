@@ -1,6 +1,7 @@
 package eip
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -17,34 +18,27 @@ type g23 struct {
 	inf *pointG23
 }
 
-func newG23(f *fq3, a, b, q []byte) (*g23, error) {
-	var err error
-	a_, b_ := f.newElement(), f.newElement()
-	if a != nil {
-		a_, err = f.fromBytes(a)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if b != nil {
-		b_, err = f.fromBytes(b)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+func newG23(f *fq3, a, b *fe3, q []byte) (*g23, error) {
 	t := [9]*fe3{}
 	for i := 0; i < 9; i++ {
 		t[i] = f.zero()
 	}
 	g := &g23{
 		f:   f,
-		a:   a_,
-		b:   b_,
+		a:   f.newElement(),
+		b:   f.newElement(),
 		q:   new(big.Int).SetBytes(q),
 		t:   t,
 		inf: &pointG23{f.zero(), f.one(), f.zero()},
 	}
+	if a == nil || b == nil {
+		return nil, errors.New("a and b values should be provided")
+	}
+	if g.f.isZero(b) || (g.f.isZero(a) && g.f.isZero(b)) {
+		return nil, errors.New("Curve shape is not supported")
+	}
+	g.f.copy(g.a, a)
+	g.f.copy(g.b, b)
 	g.inf = g.newPoint()
 	g.f.copy(g.inf[0], g.f.zero())
 	g.f.copy(g.inf[1], g.f.one())
