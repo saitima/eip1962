@@ -600,7 +600,7 @@ func pairBN(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if u.Uint64() == 0 {
+	if isBigZero(u) {
 		return pairingError, errors.New("Loop count parameters can not be zero")
 	}
 	// u is negative
@@ -683,7 +683,7 @@ func pairBN(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(g1Points) == 0 {
-		return pairingSuccess, nil // success
+		return pairingError, nil // success
 	}
 
 	engine := newBNInstance(
@@ -860,7 +860,7 @@ func pairBLS(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(g1Points) == 0 {
-		return pairingSuccess, nil // success
+		return pairingError, nil // success
 	}
 
 	// pairs
@@ -936,18 +936,18 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if x.Uint64() == 0 {
+	if isBigZero(x) {
 		return pairingError, errors.New("Ate pairing loop count parameters can not be zero")
 	}
 
 	if weight := calculateHammingWeight(x); weight > MAX_ATE_PAIRING_ATE_LOOP_COUNT_HAMMING {
-		return pairingError, errors.New("x has too large hamming weight")
+		return pairingError, errors.New("X has too large hamming weight")
 	}
 
 	// x is negative
 	xIsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
 	if err != nil {
-		return pairingError, errors.New("x is not encoded properly")
+		return pairingError, errors.New("Input is not long enough to get X sign encoding")
 	}
 	// maybe better? uIsNegativeBuf[0 : SIGN_ENCODING_LENGTH-1]
 	var xIsNegative bool
@@ -959,7 +959,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 		xIsNegative = false
 		break
 	default:
-		return pairingError, errors.New("Unknown parameter x sign")
+		return pairingError, errors.New("X sign is not encoded properly")
 	}
 
 	// expW0
@@ -967,7 +967,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if expW0.Uint64() == 0 {
+	if isBigZero(expW0) {
 		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
 	}
 	// expW1
@@ -975,7 +975,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if expW1.Uint64() == 0 {
+	if isBigZero(expW1) {
 		return pairingError, errors.New("Final exp w1 loop count parameters can not be zero")
 	}
 	expW0IsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
@@ -1000,7 +1000,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {
-		return pairingError, errors.New("zero pairs encoded")
+		return pairingError, errors.New("Zero pairs encoded")
 	}
 
 	var g1Points []*pointG1
@@ -1032,6 +1032,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
 		if !g1.equal(g1zero, g1Point) && !g2.equal(g2zero, g2Point) {
+
 			g1Points = append(g1Points, g1Point)
 			g2Points = append(g2Points, g2Point)
 		}
@@ -1041,7 +1042,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(g1Points) == 0 {
-		return pairingSuccess, nil // success
+		return pairingError, nil // success
 	}
 
 	engine := newMnt4Instance(
@@ -1122,7 +1123,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if x.Uint64() == 0 {
+	if isBigZero(x) {
 		return pairingError, errors.New("Ate pairing loop count parameters can not be zero")
 	}
 
@@ -1153,7 +1154,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if expW0.Uint64() == 0 {
+	if isBigZero(expW0) {
 		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
 	}
 	// expW1
@@ -1161,7 +1162,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	if expW1.Uint64() == 0 {
+	if isBigZero(expW1) {
 		return pairingError, errors.New("Final exp w1 loop count parameters can not be zero")
 	}
 
@@ -1227,7 +1228,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(g1Points) == 0 {
-		return pairingSuccess, nil // success
+		return pairingError, nil // success
 	}
 
 	engine := newMNT6Instance(
