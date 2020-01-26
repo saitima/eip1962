@@ -343,12 +343,15 @@ func (mnt6 *mnt6Instance) millerLoop(f *fe6q, g1Points []*pointG1, g2Points []*p
 	}
 }
 
-func (mnt6 *mnt6Instance) finalexp(f *fe6q) {
+func (mnt6 *mnt6Instance) finalexp(f *fe6q) error {
 	fInv, first, firstInv := mnt6.fq6.newElement(), mnt6.fq6.newElement(), mnt6.fq6.newElement()
-	mnt6.fq6.inverse(fInv, f)
+	if ok := mnt6.fq6.hasInverse(fInv, f); !ok {
+		return _error("element has no inverse")
+	}
 	mnt6.finalexpPart1(first, f, fInv)
 	mnt6.finalexpPart1(firstInv, fInv, f)
 	mnt6.finalexpPart2(f, first, firstInv)
+	return nil
 }
 
 func (mnt6 *mnt6Instance) finalexpPart1(f, elt, eltInv *fe6q) {
@@ -386,16 +389,20 @@ func (mnt6 *mnt6Instance) calculateCoeffSize() (int, int) {
 }
 
 // Pair ..
-func (mnt6 *mnt6Instance) pair(g1Point *pointG1, g2Point *pointG23) *fe6q {
+func (mnt6 *mnt6Instance) pair(g1Point *pointG1, g2Point *pointG23) (*fe6q, error) {
 	f := mnt6.fq6.one()
 	mnt6.millerLoop(f, []*pointG1{g1Point}, []*pointG23{g2Point})
-	mnt6.finalexp(f)
-	return f
+	if err := mnt6.finalexp(f); err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
-func (mnt6 *mnt6Instance) multiPair(g1Points []*pointG1, g2Points []*pointG23) *fe6q {
+func (mnt6 *mnt6Instance) multiPair(g1Points []*pointG1, g2Points []*pointG23) (*fe6q, error) {
 	f := mnt6.fq6.one()
 	mnt6.millerLoop(f, g1Points, g2Points)
-	mnt6.finalexp(f)
-	return f
+	if err := mnt6.finalexp(f); err != nil {
+		return nil, err
+	}
+	return f, nil
 }

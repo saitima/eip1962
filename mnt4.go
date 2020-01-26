@@ -345,12 +345,15 @@ func (mnt4 *mnt4Instance) millerLoop(f *fe4, g1Points []*pointG1, g2Points []*po
 	}
 }
 
-func (mnt4 *mnt4Instance) finalexp(f *fe4) {
+func (mnt4 *mnt4Instance) finalexp(f *fe4) error {
 	fInv, first, firstInv := mnt4.fq4.newElement(), mnt4.fq4.newElement(), mnt4.fq4.newElement()
-	mnt4.fq4.inverse(fInv, f)
+	if ok := mnt4.fq4.hasInverse(fInv, f); !ok {
+		return _error("element has no inverse")
+	}
 	mnt4.finalexpPart1(first, f, fInv)
 	mnt4.finalexpPart1(firstInv, fInv, f)
 	mnt4.finalexpPart2(f, first, firstInv)
+	return nil
 }
 
 func (mnt4 *mnt4Instance) finalexpPart1(f, elt, eltInv *fe4) {
@@ -386,16 +389,20 @@ func (mnt4 *mnt4Instance) calculateCoeffSize() (int, int) {
 }
 
 // Pair ..
-func (mnt4 *mnt4Instance) pair(g1Point *pointG1, g2Point *pointG22) *fe4 {
+func (mnt4 *mnt4Instance) pair(g1Point *pointG1, g2Point *pointG22) (*fe4, error) {
 	f := mnt4.fq4.one()
 	mnt4.millerLoop(f, []*pointG1{g1Point}, []*pointG22{g2Point})
-	mnt4.finalexp(f)
-	return f
+	if err := mnt4.finalexp(f); err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
-func (mnt4 *mnt4Instance) multiPair(g1Points []*pointG1, g2Points []*pointG22) *fe4 {
+func (mnt4 *mnt4Instance) multiPair(g1Points []*pointG1, g2Points []*pointG22) (*fe4, error) {
 	f := mnt4.fq4.one()
 	mnt4.millerLoop(f, g1Points, g2Points)
-	mnt4.finalexp(f)
-	return f
+	if err := mnt4.finalexp(f); err != nil {
+		return nil, err
+	}
+	return f, nil
 }

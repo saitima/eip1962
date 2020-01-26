@@ -1609,6 +1609,7 @@ func TestBLS12384Pairing(t *testing.T) {
 	byteLen := 48
 	modulusBytes := bytes_(byteLen, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
 	groupBytes := bytes_(byteLen, "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")
+	var err error
 	f, err := newField(modulusBytes)
 	if err != nil {
 		t.Fatal(err)
@@ -1712,7 +1713,10 @@ func TestBLS12384Pairing(t *testing.T) {
 	}
 
 	t.Run("Expected", func(t *testing.T) {
-		actual := bls.pair(g1One, g2One)
+		actual, err := bls.pair(g1One, g2One)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if !bls.fq12.equal(expected, actual) {
 			t.Fatalf("bad pairing-1")
 		}
@@ -1737,8 +1741,14 @@ func TestBLS12384Pairing(t *testing.T) {
 		t.Run("First", func(t *testing.T) {
 			bls.g1.affine(G, G)
 			bls.g2.affine(H, H)
-			f1 = bls.pair(G, H)
-			f2 = bls.pair(g1One, g2One)
+			f1, err = bls.pair(G, H)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f2, err = bls.pair(g1One, g2One)
+			if err != nil {
+				t.Fatal(err)
+			}
 			bls.fq12.exp(f2, f2, c)
 			if !bls.fq12.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -1748,7 +1758,10 @@ func TestBLS12384Pairing(t *testing.T) {
 		t.Run("Second", func(t *testing.T) {
 			G = bls.g1.mulScalar(G, g1One, c)
 			bls.g1.affine(G, G)
-			f2 = bls.pair(G, g2One)
+			f2, err = bls.pair(G, g2One)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !bls.fq12.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}
@@ -1757,7 +1770,10 @@ func TestBLS12384Pairing(t *testing.T) {
 		t.Run("Third", func(t *testing.T) {
 			H = bls.g2.mulScalar(H, g2One, c)
 			bls.g2.affine(H, H)
-			f2 = bls.pair(g1One, H)
+			f2, err = bls.pair(g1One, H)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !bls.fq12.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}
@@ -1966,7 +1982,10 @@ func TestMNT4320Pairing(t *testing.T) {
 	}
 
 	t.Run("Expected", func(t *testing.T) {
-		actual := mnt4.pair(g1One, g2One)
+		actual, err := mnt4.pair(g1One, g2One)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if !mnt4.fq4.equal(expected, actual) {
 			t.Logf("\nexpected: %s\b", mnt4.fq4.toString(expected))
 			t.Logf("\actual: %s\b", mnt4.fq4.toString(actual))
@@ -1989,12 +2008,19 @@ func TestMNT4320Pairing(t *testing.T) {
 		}
 
 		var f1, f2 *fe4
+		var err error
 		// e(a*G1, b*G2) = e(G1, G2)^c
 		t.Run("First", func(t *testing.T) {
 			mnt4.g1.affine(G, G)
 			mnt4.g2.affine(H, H)
-			f1 = mnt4.pair(G, H)
-			f2 = mnt4.pair(g1One, g2One)
+			f1, err = mnt4.pair(G, H)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f2, err = mnt4.pair(g1One, g2One)
+			if err != nil {
+				t.Fatal(err)
+			}
 			mnt4.fq4.exp(f2, f2, c)
 			if !mnt4.fq4.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2004,7 +2030,10 @@ func TestMNT4320Pairing(t *testing.T) {
 		t.Run("Second", func(t *testing.T) {
 			G = mnt4.g1.mulScalar(G, g1One, c)
 			mnt4.g1.affine(G, G)
-			f2 = mnt4.pair(G, g2One)
+			f2, err = mnt4.pair(G, g2One)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !mnt4.fq4.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}
@@ -2013,7 +2042,10 @@ func TestMNT4320Pairing(t *testing.T) {
 		t.Run("Third", func(t *testing.T) {
 			H = mnt4.g2.mulScalar(H, g2One, c)
 			mnt4.g2.affine(H, H)
-			f2 = mnt4.pair(g1One, H)
+			f2, err = mnt4.pair(g1One, H)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !mnt4.fq4.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}
@@ -2026,6 +2058,7 @@ func TestMNT4753Pairing(t *testing.T) {
 	byteLen := 96
 	modulusBytes := bytes_(byteLen, "0x1c4c62d92c41110229022eee2cdadb7f997505b8fafed5eb7e8f96c97d87307fdb925e8a0ed8d99d124d9a15af79db117e776f218059db80f0da5cb537e38685acce9767254a4638810719ac425f0e39d54522cdd119f5e9063de245e8001")
 	groupBytes := bytes_(byteLen, "0x1c4c62d92c41110229022eee2cdadb7f997505b8fafed5eb7e8f96c97d87307fdb925e8a0ed8d99d124d9a15af79db26c5c28c859a99b3eebca9429212636b9dff97634993aa4d6c381bc3f0057974ea099170fa13a4fd90776e240000001")
+	var err error
 	f, err := newField(modulusBytes)
 	if err != nil {
 		t.Fatal(err)
@@ -2130,13 +2163,15 @@ func TestMNT4753Pairing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	t.Run("Expected", func(t *testing.T) {
-		actual := mnt4.pair(g1One, g2One)
+		actual, err := mnt4.pair(g1One, g2One)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if !mnt4.fq4.equal(expected, actual) {
-			// t.Logf("\nexpected: %s\b", mnt4.fq4.toString(expected))
-			// t.Logf("\actual: %s\b", mnt4.fq4.toString(actual))
-			// t.Fatalf("bad pairing-1")
+			t.Logf("\nexpected: %s\b", mnt4.fq4.toString(expected))
+			t.Logf("\actual: %s\b", mnt4.fq4.toString(actual))
+			t.Fatalf("bad pairing-1")
 		}
 	})
 
@@ -2159,8 +2194,14 @@ func TestMNT4753Pairing(t *testing.T) {
 		t.Run("First", func(t *testing.T) {
 			mnt4.g1.affine(G, G)
 			mnt4.g2.affine(H, H)
-			f1 = mnt4.pair(G, H)
-			f2 = mnt4.pair(g1One, g2One)
+			f1, err = mnt4.pair(G, H)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f2, err = mnt4.pair(g1One, g2One)
+			if err != nil {
+				t.Fatal(err)
+			}
 			mnt4.fq4.exp(f2, f2, c)
 			if !mnt4.fq4.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2170,7 +2211,10 @@ func TestMNT4753Pairing(t *testing.T) {
 		t.Run("Second", func(t *testing.T) {
 			G = mnt4.g1.mulScalar(G, g1One, c)
 			mnt4.g1.affine(G, G)
-			f2 = mnt4.pair(G, g2One)
+			f2, err = mnt4.pair(G, g2One)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !mnt4.fq4.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}
@@ -2179,7 +2223,10 @@ func TestMNT4753Pairing(t *testing.T) {
 		t.Run("Third", func(t *testing.T) {
 			H = mnt4.g2.mulScalar(H, g2One, c)
 			mnt4.g2.affine(H, H)
-			f2 = mnt4.pair(g1One, H)
+			f2, err = mnt4.pair(g1One, H)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !mnt4.fq4.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}
@@ -2192,6 +2239,7 @@ func TestBN254Pairing(t *testing.T) {
 	byteLen := 32
 	modulusBytes := bytes_(byteLen, "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47")
 	groupBytes := bytes_(byteLen, "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001")
+	var err error
 	f, err := newField(modulusBytes)
 	if err != nil {
 		t.Fatal(err)
@@ -2301,7 +2349,10 @@ func TestBN254Pairing(t *testing.T) {
 	}
 
 	t.Run("Expected", func(t *testing.T) {
-		actual := bn.pair(g1One, g2One)
+		actual, err := bn.pair(g1One, g2One)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if !bn.fq12.equal(expected, actual) {
 			t.Logf("\nexpected: %s\b", bn.fq12.toString(expected))
 			t.Logf("\actual: %s\b", bn.fq12.toString(actual))
@@ -2328,8 +2379,14 @@ func TestBN254Pairing(t *testing.T) {
 		t.Run("First", func(t *testing.T) {
 			bn.g1.affine(G, G)
 			bn.g2.affine(H, H)
-			f1 = bn.pair(G, H)
-			f2 = bn.pair(g1One, g2One)
+			f1, err = bn.pair(G, H)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f2, err = bn.pair(g1One, g2One)
+			if err != nil {
+				t.Fatal(err)
+			}
 			bn.fq12.exp(f2, f2, c)
 			if !bn.fq12.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2339,7 +2396,10 @@ func TestBN254Pairing(t *testing.T) {
 		t.Run("Second", func(t *testing.T) {
 			G = bn.g1.mulScalar(G, g1One, c)
 			bn.g1.affine(G, G)
-			f2 = bn.pair(G, g2One)
+			f2, err = bn.pair(G, g2One)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !bn.fq12.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}
@@ -2348,7 +2408,10 @@ func TestBN254Pairing(t *testing.T) {
 		t.Run("Third", func(t *testing.T) {
 			H = bn.g2.mulScalar(H, g2One, c)
 			bn.g2.affine(H, H)
-			f2 = bn.pair(g1One, H)
+			f2, err = bn.pair(g1One, H)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !bn.fq12.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}
@@ -2361,6 +2424,7 @@ func TestMNT6320Pairing(t *testing.T) {
 	byteLen := 40
 	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
 	groupBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
+	var err error
 	f, err := newField(modulusBytes)
 	if err != nil {
 		t.Fatal(err)
@@ -2470,7 +2534,10 @@ func TestMNT6320Pairing(t *testing.T) {
 	}
 
 	t.Run("Expected", func(t *testing.T) {
-		actual := mnt6.pair(g1One, g2One)
+		actual, err := mnt6.pair(g1One, g2One)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if !mnt6.fq6.equal(expected, actual) {
 			t.Fatalf("bad pairing-1")
 		}
@@ -2495,8 +2562,14 @@ func TestMNT6320Pairing(t *testing.T) {
 		t.Run("First", func(t *testing.T) {
 			mnt6.g1.affine(G, G)
 			mnt6.g2.affine(H, H)
-			f1 = mnt6.pair(G, H)
-			f2 = mnt6.pair(g1One, g2One)
+			f1, err = mnt6.pair(G, H)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f2, err = mnt6.pair(g1One, g2One)
+			if err != nil {
+				t.Fatal(err)
+			}
 			mnt6.fq6.exp(f2, f2, c)
 			if !mnt6.fq6.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2506,7 +2579,10 @@ func TestMNT6320Pairing(t *testing.T) {
 		t.Run("Second", func(t *testing.T) {
 			G = mnt6.g1.mulScalar(G, g1One, c)
 			mnt6.g1.affine(G, G)
-			f2 = mnt6.pair(G, g2One)
+			f2, err = mnt6.pair(G, g2One)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !mnt6.fq6.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}
@@ -2515,7 +2591,10 @@ func TestMNT6320Pairing(t *testing.T) {
 		t.Run("Third", func(t *testing.T) {
 			H = mnt6.g2.mulScalar(H, g2One, c)
 			mnt6.g2.affine(H, H)
-			f2 = mnt6.pair(g1One, H)
+			f2, err = mnt6.pair(g1One, H)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !mnt6.fq6.equal(f1, f2) {
 				t.Errorf("bad pairing")
 			}

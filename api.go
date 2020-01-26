@@ -697,7 +697,10 @@ func pairBN(in []byte) ([]byte, error) {
 		nonResidueInPMinus1Over2,
 		true,
 	)
-	result := engine.multiPair(g1Points, g2Points)
+	result, err := engine.multiPair(g1Points, g2Points)
+	if err != nil {
+		return pairingError, nil
+	}
 	if !fq12.equal(result, fq12.one()) {
 		return pairingError, nil
 	}
@@ -870,7 +873,10 @@ func pairBLS(in []byte) ([]byte, error) {
 		fq12,
 		false,
 	)
-	result := engine.multiPair(g1Points, g2Points)
+	result, err := engine.multiPair(g1Points, g2Points)
+	if err != nil {
+		return pairingError, nil
+	}
 	if !fq12.equal(result, fq12.one()) {
 		return pairingError, nil
 	}
@@ -1049,7 +1055,10 @@ func pairMNT4(in []byte) ([]byte, error) {
 		g2,
 		twist,
 	)
-	result := engine.multiPair(g1Points, g2Points)
+	result, err := engine.multiPair(g1Points, g2Points)
+	if err != nil {
+		return pairingError, nil
+	}
 	if !fq4.equal(result, fq4.one()) {
 		return pairingError, nil
 	}
@@ -1232,7 +1241,10 @@ func pairMNT6(in []byte) ([]byte, error) {
 		g2,
 		twist,
 	)
-	result := engine.multiPair(g1Points, g2Points)
+	result, err := engine.multiPair(g1Points, g2Points)
+	if err != nil {
+		return pairingError, nil
+	}
 	if !fq6.equal(result, fq6.one()) {
 		return pairingError, nil
 	}

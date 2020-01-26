@@ -2,6 +2,7 @@ package eip
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 )
@@ -80,6 +81,6 @@ func isBigEven(a *big.Int) bool {
 	return false
 }
 
-func isPrime(a *big.Int) bool {
-	return true
+func _error(str string) error {
+	return errors.New(str)
 }

@@ -309,13 +309,15 @@ func (bls *blsInstance) expByZ(c, a *fe12) {
 	}
 }
 
-func (bls *blsInstance) finalExp(f *fe12) {
+func (bls *blsInstance) finalExp(f *fe12) error {
 	fq := bls.fq12
 
 	f1 := fq.newElement()
 	fq.frobeniusMap(f1, f, 6)
 	f2 := fq.newElement()
-	fq.inverse(f2, f)
+	if ok := fq.hasInverse(f2, f); !ok {
+		return _error("element has no inverse")
+	}
 	// TODO: check f2 has inverse?
 	r := fq.newElement()
 	fq.mul(r, f1, f2)
@@ -365,21 +367,25 @@ func (bls *blsInstance) finalExp(f *fe12) {
 	fq.mul(y5, y5, y1)
 
 	fq.copy(f, y5)
-
+	return nil
 }
 
-func (bls *blsInstance) pair(point *pointG1, twistPoint *pointG22) *fe12 {
+func (bls *blsInstance) pair(point *pointG1, twistPoint *pointG22) (*fe12, error) {
 	f := bls.fq12.one()
 	bls.millerLoop(f, []*pointG1{point}, []*pointG22{twistPoint})
-	bls.finalExp(f)
-	return f
+	if err := bls.finalExp(f); err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
-func (bls *blsInstance) multiPair(points []*pointG1, twistPoints []*pointG22) *fe12 {
+func (bls *blsInstance) multiPair(points []*pointG1, twistPoints []*pointG22) (*fe12, error) {
 	f := bls.fq12.one()
 	bls.millerLoop(f, points, twistPoints)
-	bls.finalExp(f)
-	return f
+	if err := bls.finalExp(f); err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 func (bls *blsInstance) calculateCoeffLength() int {
