@@ -302,7 +302,7 @@ func createExtension2FieldParamsForPairing(in []byte, modulusLen int, field *fie
 	if field.isZero(nonResidue) {
 		return nil, nil, errors.New("Fp2 non-residue can not be zero")
 	}
-	if !isNonNThRoot(field, nonResidue, degree) {
+	if ok := isNonNThRoot(field, nonResidue, degree); !ok {
 		return nil, nil, errors.New("Non-residue for Fp2 is actually a residue")
 	}
 
@@ -327,7 +327,7 @@ func createExtension3FieldParams(in []byte, modulusLen int, field *field, froben
 	if field.isZero(nonResidue) {
 		return nil, nil, errors.New("Fp3 non-residue can not be zero")
 	}
-	if !isNonNThRoot(field, nonResidue, 3) {
+	if ok := isNonNThRoot(field, nonResidue, 3); !ok {
 		return nil, nil, errors.New("Non-residue for Fp3 is actually a residue")
 	}
 
@@ -352,7 +352,7 @@ func createExtension3FieldParamsForPairing(in []byte, modulusLen int, field *fie
 	if field.isZero(nonResidue) {
 		return nil, nil, errors.New("Fp3 non-residue can not be zero")
 	}
-	if !isNonNThRoot(field, nonResidue, degree) {
+	if ok := isNonNThRoot(field, nonResidue, degree); !ok {
 		return nil, nil, errors.New("Non-residue for Fp3 is actually a residue")
 	}
 
@@ -373,7 +373,7 @@ func isNonNThRoot(field *field, nonResidue fieldElement, power int) bool {
 	result := field.newFieldElement()
 	exp := new(big.Int).Sub(field.pbig, big.NewInt(1))
 	exp, rem := new(big.Int).DivMod(exp, big.NewInt(int64(power)), big.NewInt(0))
-	if rem.Uint64() != 0 {
+	if !isBigZero(rem) {
 		return false
 	}
 	field.exp(result, nonResidue, exp)
@@ -386,7 +386,7 @@ func isNonNThRoot(field *field, nonResidue fieldElement, power int) bool {
 func isNonNThRootFp2(fq2 *fq2, nonResidue *fe2, power int) bool {
 	exp := new(big.Int).Sub(fq2.f.pbig, big.NewInt(1))
 	exp, rem := new(big.Int).DivMod(exp, big.NewInt(int64(power)), big.NewInt(0))
-	if rem.Uint64() != 0 {
+	if !isBigZero(rem) {
 		return false
 	}
 	result := fq2.newElement()
@@ -400,7 +400,7 @@ func isNonNThRootFp2(fq2 *fq2, nonResidue *fe2, power int) bool {
 func isNonNThRootFp3(fq3 *fq3, nonResidue *fe3, power int) bool {
 	exp := new(big.Int).Sub(fq3.f.pbig, big.NewInt(1))
 	exp, rem := new(big.Int).DivMod(exp, big.NewInt(int64(power)), big.NewInt(0))
-	if rem.Uint64() != 0 {
+	if !isBigZero(rem) {
 		return false
 	}
 	result := fq3.newElement()

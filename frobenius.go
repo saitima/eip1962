@@ -12,7 +12,7 @@ func constructBaseForFq6AndFq12(fq *fq2, nonResidue *fe2) (*fe2, *fe2, error) {
 	// u^(q-1/6)
 	power := new(big.Int).Sub(modulus, one)
 	power, rem = new(big.Int).DivMod(power, six, rem)
-	if rem.Uint64() != 0 {
+	if !isBigZero(rem) {
 		return nil, nil, errors.New("remaining is not zero")
 	}
 	f1, f2 := fq.newElement(), fq.newElement()
@@ -22,7 +22,7 @@ func constructBaseForFq6AndFq12(fq *fq2, nonResidue *fe2) (*fe2, *fe2, error) {
 	power = new(big.Int).Mul(modulus, modulus)
 	power = new(big.Int).Sub(power, one)
 	power, rem = new(big.Int).DivMod(power, six, rem)
-	if rem.Uint64() != 0 {
+	if !isBigZero(rem) {
 		return nil, nil, errors.New("remaining is not zero")
 	}
 	fq.exp(f2, nonResidue, power)
@@ -37,7 +37,7 @@ func constructBaseForFq3AndFq6(f *field, nonResidue fieldElement) (fieldElement,
 	// u^(q-1/6)
 	power := new(big.Int).Sub(modulus, one)
 	power, rem = new(big.Int).DivMod(power, six, rem)
-	if rem.Uint64() != 0 {
+	if !isBigZero(rem) {
 		return nil, errors.New("remaining is not zero")
 	}
 	f1 := f.newFieldElement()

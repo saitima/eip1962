@@ -94,7 +94,7 @@ func onesCount(s *big.Int) int {
 }
 
 func calculateHammingWeight(s *big.Int) int {
-	if s.Uint64() == 0 {
+	if isBigZero(s) {
 		return 0
 	}
 	return newRepr(s).onesCount()

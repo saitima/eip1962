@@ -263,7 +263,7 @@ func (fq *fq3) calculateFrobeniusCoeffs() bool {
 	for i := 1; i <= 2; i++ {
 		power.Sub(qPower, bigOne)
 		power.DivMod(power, bigThree, rem)
-		if rem.Uint64() != 0 {
+		if !isBigZero(rem) {
 			return false
 		}
 		fq.f.exp(fq.frobeniusCoeffs[0][i], fq.nonResidue, power)

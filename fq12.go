@@ -393,7 +393,7 @@ func (fq *fq12) calculateFrobeniusCoeffs() bool {
 		}
 		power := power.Sub(qPower, big.NewInt(1))
 		power, rem = power.DivMod(power, big.NewInt(6), rem)
-		if rem.Uint64() != 0 {
+		if !isBigZero(rem) {
 			return false
 		}
 		fq.f.f.exp(fq.frobeniusCoeffs[i], fq.f.nonResidue, power)
