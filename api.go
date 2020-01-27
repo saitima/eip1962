@@ -177,7 +177,7 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(bases) != len(scalars) || len(bases) == 0 {
-		return pairingSuccess, nil // success
+		return pairingSuccess, nil
 	}
 	p := g1.newPoint()
 	g1.multiExp(p, bases, scalars)
@@ -537,7 +537,7 @@ func pairBN(in []byte) ([]byte, error) {
 		return pairingError, err
 	}
 	// ext2
-	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, true)
+	fq2, rest, err := createExtension2FieldParamsForPairing(rest, modulusLen, field, true, 2)
 	if err != nil {
 		return pairingError, err
 	}
@@ -683,7 +683,7 @@ func pairBN(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(g1Points) == 0 {
-		return pairingError, nil // success
+		return pairingError, nil
 	}
 
 	engine := newBNInstance(
@@ -727,7 +727,7 @@ func pairBLS(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, true)
+	fq2, rest, err := createExtension2FieldParamsForPairing(rest, modulusLen, field, true, 2)
 	if err != nil {
 		return pairingError, err
 	}
@@ -860,7 +860,7 @@ func pairBLS(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(g1Points) == 0 {
-		return pairingError, nil // success
+		return pairingError, nil
 	}
 
 	// pairs
@@ -903,7 +903,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 		return pairingError, err
 	}
 	// ext2
-	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, false)
+	fq2, rest, err := createExtension2FieldParamsForPairing(rest, modulusLen, field, false, 4)
 	if err != nil {
 		return pairingError, err
 	}
@@ -1042,7 +1042,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(g1Points) == 0 {
-		return pairingError, nil // success
+		return pairingError, nil
 	}
 
 	engine := newMnt4Instance(
@@ -1089,7 +1089,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	}
 
 	// ext3
-	fq3, rest, err := createExtension3FieldParams(rest, modulusLen, field, false)
+	fq3, rest, err := createExtension3FieldParamsForPairing(rest, modulusLen, field, false, 6)
 	if err != nil {
 		return pairingError, err
 	}
@@ -1228,7 +1228,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
 	if len(g1Points) == 0 {
-		return pairingError, nil // success
+		return pairingError, nil
 	}
 
 	engine := newMNT6Instance(

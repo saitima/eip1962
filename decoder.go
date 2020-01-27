@@ -276,7 +276,33 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, froben
 	if field.isZero(nonResidue) {
 		return nil, nil, errors.New("Fp2 non-residue can not be zero")
 	}
+
 	if !isNonNThRoot(field, nonResidue, 2) {
+		return nil, nil, errors.New("Non-residue for Fp2 is actually a residue")
+	}
+
+	fq2, err := newFq2(field, nil)
+	fq2.f.copy(fq2.nonResidue, nonResidue)
+	if err != nil {
+		return nil, nil, err
+	}
+	if frobenius {
+		if ok := fq2.calculateFrobeniusCoeffs(); !ok {
+			return nil, nil, errors.New("Can not calculate Frobenius coefficients for Fp2")
+		}
+	}
+	return fq2, rest, nil
+}
+
+func createExtension2FieldParamsForPairing(in []byte, modulusLen int, field *field, frobenius bool, degree int) (*fq2, []byte, error) {
+	nonResidue, rest, err := decodeFp(in, modulusLen, field)
+	if err != nil {
+		return nil, nil, err
+	}
+	if field.isZero(nonResidue) {
+		return nil, nil, errors.New("Fp2 non-residue can not be zero")
+	}
+	if !isNonNThRoot(field, nonResidue, degree) {
 		return nil, nil, errors.New("Non-residue for Fp2 is actually a residue")
 	}
 
@@ -302,6 +328,31 @@ func createExtension3FieldParams(in []byte, modulusLen int, field *field, froben
 		return nil, nil, errors.New("Fp3 non-residue can not be zero")
 	}
 	if !isNonNThRoot(field, nonResidue, 3) {
+		return nil, nil, errors.New("Non-residue for Fp3 is actually a residue")
+	}
+
+	fq3, err := newFq3(field, nil)
+	fq3.f.copy(fq3.nonResidue, nonResidue)
+	if err != nil {
+		return nil, nil, err
+	}
+	if frobenius {
+		if ok := fq3.calculateFrobeniusCoeffs(); !ok {
+			return nil, nil, errors.New("Can not calculate Frobenius coefficients for Fp3")
+		}
+	}
+	return fq3, rest, nil
+}
+
+func createExtension3FieldParamsForPairing(in []byte, modulusLen int, field *field, frobenius bool, degree int) (*fq3, []byte, error) {
+	nonResidue, rest, err := decodeFp(in, modulusLen, field)
+	if err != nil {
+		return nil, nil, err
+	}
+	if field.isZero(nonResidue) {
+		return nil, nil, errors.New("Fp3 non-residue can not be zero")
+	}
+	if !isNonNThRoot(field, nonResidue, degree) {
 		return nil, nil, errors.New("Non-residue for Fp3 is actually a residue")
 	}
 
