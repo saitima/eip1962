@@ -602,14 +602,83 @@ func padBytes(in []byte, size int) []byte {
 }
 
 func (f *field) hasInverse(inv, e fieldElement) bool {
-	f.inverse(inv, e)
-	if f.equal(inv, f.zero) {
-		return false
-	}
-	return true
+	return f.inverse(inv, e)
 }
 
-func (f *field) inverse(inv, e fieldElement) {
+func (f *field) inverseFourLimbs(inv, e fieldElement) bool {
+	modBytes := padBytes(f.pbig.Bytes(), 64)
+	field, err := newField(modBytes)
+	if err != nil {
+		return false
+	}
+
+	u, v, s, r := field.newFieldElement(),
+		field.newFieldElement(),
+		field.newFieldElement(),
+		field.newFieldElement()
+	zero := field.newFieldElement()
+	field.copy(u, field.p)
+	field.copy(v, e)
+	field.copy(s, field._one)
+	var k int
+	var found = false
+	byteSize := field.byteSize()
+	bitSize := byteSize * 8
+	// Phase 1
+	for i := 0; i < bitSize*2; i++ {
+		if field.equal(v, zero) {
+			found = true
+			break
+		}
+		if is_even(u) {
+			field.div_two(u)
+			field.mul_two(s)
+		} else if is_even(v) {
+			field.div_two(v)
+			field.mul_two(r)
+		} else if field.cmp(u, v) == 1 {
+			field.subn(u, v)
+			field.div_two(u)
+			field.addn(r, s)
+			field.mul_two(s)
+		} else {
+			field.subn(v, u)
+			field.div_two(v)
+			field.addn(s, r)
+			field.mul_two(r)
+		}
+		k += 1
+	}
+	if !found {
+		field.copy(inv, zero)
+		return false
+	}
+	if k < bitSize {
+		/*
+			this is unexpected
+		*/
+		field.copy(inv, zero)
+		return false
+	}
+
+	if field.cmp(r, field.p) != -1 {
+		field.subn(r, field.p)
+	}
+	field.copy(u, field.p)
+	field.subn(u, r)
+
+	// Phase 2
+	for i := k; i < bitSize*2; i++ {
+		field.double(u, u)
+	}
+	field.copy(inv, u)
+	return true
+
+}
+func (f *field) inverse(inv, e fieldElement) bool {
+	if f.limbSize < 4 {
+		return f.inverseFourLimbs(inv, e)
+	}
 	u, v, s, r := f.newFieldElement(),
 		f.newFieldElement(),
 		f.newFieldElement(),
@@ -649,14 +718,14 @@ func (f *field) inverse(inv, e fieldElement) {
 	}
 	if !found {
 		f.copy(inv, zero)
-		return
+		return false
 	}
 	if k < bitSize {
 		/*
-			THIS IS UNEXPECTED
+			this is unexpected
 		*/
 		f.copy(inv, zero)
-		return
+		return false
 	}
 
 	if f.cmp(r, f.p) != -1 {
@@ -670,6 +739,7 @@ func (f *field) inverse(inv, e fieldElement) {
 		f.double(u, u)
 	}
 	f.copy(inv, u)
+	return true
 }
 
 func (f *field) square(result, a fieldElement) {

@@ -168,19 +168,21 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		bases[i] = g1.newPoint()
+		bases[i], scalars[i] = g1.newPoint(), new(big.Int)
 		g1.copy(bases[i], p)
-		scalars[i] = new(big.Int).Set(scalar)
+		scalars[i].Set(scalar)
 		rest = localRest
 	}
 	if len(rest) != 0 {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
-	if len(bases) != len(scalars) || len(bases) == 0 {
-		return pairingSuccess, nil
-	}
+
 	p := g1.newPoint()
-	g1.multiExp(p, bases, scalars)
+	if len(bases) != len(scalars) || len(bases) == 0 {
+		g1.copy(p, g1.zero())
+	} else {
+		g1.multiExp(p, bases, scalars)
+	}
 	out := make([]byte, 2*modulusLen)
 	encodeG1Point(out, g1.toBytes(p))
 	return out, nil
@@ -198,6 +200,7 @@ func (api *g2Api) run(opType int, in []byte) ([]byte, error) {
 		return nil, errors.New("cant decode extension degree length")
 	}
 	degree := int(degreeBuf[0])
+	// fmt.Printf("[debug] ext degree: %d\n", degree)
 	switch degree {
 	case EXTENSION_TWO_DEGREE:
 		return new(g22Api).run(opType, field, modulusLen, rest)
@@ -346,19 +349,22 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 		if err != nil {
 			return nil, err
 		}
-		bases[i] = g2.newPoint()
+		bases[i], scalars[i] = g2.newPoint(), new(big.Int)
 		g2.copy(bases[i], q)
-		scalars[i] = new(big.Int).Set(scalar)
+		scalars[i].Set(scalar)
 		rest = localRest
 	}
 	if len(rest) != 0 {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
-	if len(bases) != len(scalars) || len(bases) == 0 {
-		return pairingSuccess, nil
-	}
+
 	q := g2.newPoint()
-	g2.multiExp(q, bases, scalars)
+	if len(bases) != len(scalars) || len(bases) == 0 {
+		g2.copy(q, g2.zero())
+	} else {
+		g2.multiExp(q, bases, scalars)
+	}
+
 	out := make([]byte, 4*modulusLen)
 	encodeG22Point(out, g2.toBytes(q))
 	return out, nil
@@ -499,19 +505,21 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 		if err != nil {
 			return nil, err
 		}
-		bases[i] = g2.newPoint()
+		bases[i], scalars[i] = g2.newPoint(), new(big.Int)
 		g2.copy(bases[i], q)
-		scalars[i] = new(big.Int).Set(scalar)
+		scalars[i].Set(scalar)
 		rest = localRest
 	}
 	if len(rest) != 0 {
 		return pairingError, errors.New("Input contains garbage at the end")
 	}
-	if len(bases) != len(scalars) || len(bases) == 0 {
-		return pairingSuccess, nil
-	}
+
 	q := g2.newPoint()
-	g2.multiExp(q, bases, scalars)
+	if len(bases) != len(scalars) || len(bases) == 0 {
+		g2.copy(q, g2.zero())
+	} else {
+		g2.multiExp(q, bases, scalars)
+	}
 	out := make([]byte, 6*modulusLen)
 	encodeG23Point(out, g2.toBytes(q))
 	return out, nil

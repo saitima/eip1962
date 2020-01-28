@@ -65,7 +65,7 @@ func (fq *fq2) toBytes(a *fe2) []byte {
 
 func (fq *fq2) toString(a *fe2) string {
 	return fmt.Sprintf(
-		"c0: %s c1: %s\n",
+		"(%s+%s*u)",
 		fq.f.toString(a[0]),
 		fq.f.toString(a[1]),
 	)
@@ -175,15 +175,7 @@ func (fq *fq2) square(c, a *fe2) {
 	fq.f.double(c[1], t[1])        // c1 = 2*v2
 }
 
-func (fq *fq2) hasInverse(inv, e *fe2) bool {
-	fq.inverse(inv, e)
-	if fq.equal(inv, fq.zero()) {
-		return false
-	}
-	return true
-}
-
-func (fq *fq2) inverse(c, a *fe2) {
+func (fq *fq2) inverse(c, a *fe2) bool {
 	t := fq.t
 	// c0 = a0 * (a0^2 - β * a1^2)^-1
 	// c1 = a1 * (a0^2 - β * a1^2)^-1
@@ -191,10 +183,13 @@ func (fq *fq2) inverse(c, a *fe2) {
 	fq.f.square(t[1], a[1])        // v1 = a1^2
 	fq.mulByNonResidue(t[1], t[1]) // β * v1
 	fq.f.sub(t[1], t[0], t[1])     // v0 = v0 - β * v1
-	fq.f.inverse(t[0], t[1])       // v1 = v0^-1
-	fq.f.mul(c[0], a[0], t[0])     // c0 = a0 * v1
-	fq.f.mul(t[0], a[1], t[0])     // a1 * v1
-	fq.f.neg(c[1], t[0])           // c1 = -a1 * v1
+	if ok := fq.f.inverse(t[0], t[1]); !ok {
+		return false
+	} // v1 = v0^-1;
+	fq.f.mul(c[0], a[0], t[0]) // c0 = a0 * v1
+	fq.f.mul(t[0], a[1], t[0]) // a1 * v1
+	fq.f.neg(c[1], t[0])       // c1 = -a1 * v1
+	return true
 }
 
 func (fq *fq2) exp(c, a *fe2, e *big.Int) {

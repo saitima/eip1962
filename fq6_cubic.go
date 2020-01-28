@@ -192,37 +192,33 @@ func (fq *fq6) square(c, a *fe6) {
 	fq.f.add(t[0], t[0], t[4])
 	fq.f.sub(&c[2], t[1], t[0])
 }
-func (fq *fq6) hasInverse(inv, e *fe6) bool {
-	fq.inverse(inv, e)
-	if fq.equal(inv, fq.zero()) {
+
+func (fq *fq6) inverse(c, a *fe6) bool {
+	t := fq.t
+	fq.f.square(t[0], &a[0])                 // v0 = a0^2
+	fq.f.mul(t[1], &a[1], &a[2])             // v5 = a1 * a2
+	fq.mulByNonResidue(t[1], t[1])           // α * v5
+	fq.f.sub(t[0], t[0], t[1])               // A = v0 - α * v5
+	fq.f.square(t[1], &a[1])                 // v1 = a1^2
+	fq.f.mul(t[2], &a[0], &a[2])             // v4 = a0 * a2
+	fq.f.sub(t[1], t[1], t[2])               // C = v1 - v4
+	fq.f.square(t[2], &a[2])                 // v2 = a2^2
+	fq.mulByNonResidue(t[2], t[2])           // α * v2
+	fq.f.mul(t[3], &a[0], &a[1])             // v3 = a0 * a1
+	fq.f.sub(t[2], t[2], t[3])               // B = α * v2 - v3
+	fq.f.mul(t[3], &a[2], t[2])              // B * a2
+	fq.f.mul(t[4], &a[1], t[1])              // C * a1
+	fq.f.add(t[3], t[3], t[4])               // C * a1 + B * a2
+	fq.mulByNonResidue(t[3], t[3])           // α * (C * a1 + B * a2)
+	fq.f.mul(t[4], &a[0], t[0])              // A * a0
+	fq.f.add(t[3], t[3], t[4])               // v6 = A * a0 * α * (C * a1 + B * a2)
+	if ok := fq.f.inverse(t[3], t[3]); !ok { // F = v6^-1
 		return false
 	}
+	fq.f.mul(&c[0], t[0], t[3]) // c0 = A * F
+	fq.f.mul(&c[1], t[2], t[3]) // c1 = B * F
+	fq.f.mul(&c[2], t[1], t[3]) // c2 = C * F
 	return true
-}
-
-func (fq *fq6) inverse(c, a *fe6) {
-	t := fq.t
-	fq.f.square(t[0], &a[0])       // v0 = a0^2
-	fq.f.mul(t[1], &a[1], &a[2])   // v5 = a1 * a2
-	fq.mulByNonResidue(t[1], t[1]) // α * v5
-	fq.f.sub(t[0], t[0], t[1])     // A = v0 - α * v5
-	fq.f.square(t[1], &a[1])       // v1 = a1^2
-	fq.f.mul(t[2], &a[0], &a[2])   // v4 = a0 * a2
-	fq.f.sub(t[1], t[1], t[2])     // C = v1 - v4
-	fq.f.square(t[2], &a[2])       // v2 = a2^2
-	fq.mulByNonResidue(t[2], t[2]) // α * v2
-	fq.f.mul(t[3], &a[0], &a[1])   // v3 = a0 * a1
-	fq.f.sub(t[2], t[2], t[3])     // B = α * v2 - v3
-	fq.f.mul(t[3], &a[2], t[2])    // B * a2
-	fq.f.mul(t[4], &a[1], t[1])    // C * a1
-	fq.f.add(t[3], t[3], t[4])     // C * a1 + B * a2
-	fq.mulByNonResidue(t[3], t[3]) // α * (C * a1 + B * a2)
-	fq.f.mul(t[4], &a[0], t[0])    // A * a0
-	fq.f.add(t[3], t[3], t[4])     // v6 = A * a0 * α * (C * a1 + B * a2)
-	fq.f.inverse(t[3], t[3])       // F = v6^-1
-	fq.f.mul(&c[0], t[0], t[3])    // c0 = A * F
-	fq.f.mul(&c[1], t[2], t[3])    // c1 = B * F
-	fq.f.mul(&c[2], t[1], t[3])    // c2 = C * F
 }
 
 func (fq *fq6) exp(c, a *fe6, e *big.Int) {

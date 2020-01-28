@@ -195,15 +195,7 @@ func (fq *fq3) square(c, a *fe3) {
 	fq.f.sub(c[2], t[1], t[0])
 }
 
-func (fq *fq3) hasInverse(inv, e *fe3) bool {
-	fq.inverse(inv, e)
-	if fq.equal(inv, fq.zero()) {
-		return false
-	}
-	return true
-}
-
-func (fq *fq3) inverse(c, a *fe3) {
+func (fq *fq3) inverse(c, a *fe3) bool {
 	t := fq.t
 	fq.f.square(t[0], a[0])        // v0 = a0^2
 	fq.f.mul(t[1], a[1], a[2])     // v5 = a1 * a2
@@ -222,10 +214,13 @@ func (fq *fq3) inverse(c, a *fe3) {
 	fq.mulByNonResidue(t[3], t[3]) // α * (C * a1 + B * a2)
 	fq.f.mul(t[4], a[0], t[0])     // A * a0
 	fq.f.add(t[3], t[3], t[4])     // v6 = A * a0 * α * (C * a1 + B * a2)
-	fq.f.inverse(t[3], t[3])       // F = v6^-1
-	fq.f.mul(c[0], t[0], t[3])     // c0 = A * F
-	fq.f.mul(c[1], t[2], t[3])     // c1 = B * F
-	fq.f.mul(c[2], t[1], t[3])     // c2 = C * F
+	if ok := fq.f.inverse(t[3], t[3]); !ok {
+		return false
+	} // F = v6^-1
+	fq.f.mul(c[0], t[0], t[3]) // c0 = A * F
+	fq.f.mul(c[1], t[2], t[3]) // c1 = B * F
+	fq.f.mul(c[2], t[1], t[3]) // c2 = C * F
+	return true
 }
 
 func (fq *fq3) exp(c, a *fe3, e *big.Int) {

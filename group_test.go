@@ -150,9 +150,8 @@ func TestFq2(t *testing.T) {
 	})
 
 	t.Run("Inverse", func(t *testing.T) {
-		fq2.inverse(actual, zero)
-		if !fq2.equal(actual, zero) {
-			t.Fatalf("bad inversion 1")
+		if ok := fq2.inverse(actual, zero); ok {
+			t.Fatalf("bad inverse")
 		}
 		fq2.inverse(actual, one)
 		if !fq2.equal(actual, one) {
@@ -312,8 +311,7 @@ func TestFq6Cubic(t *testing.T) {
 	})
 
 	t.Run("Inverse", func(t *testing.T) {
-		fq6.inverse(actual, zero)
-		if !fq6.equal(actual, zero) {
+		if ok := fq6.inverse(actual, zero); ok {
 			t.Fatalf("bad inversion 1")
 		}
 		fq6.inverse(actual, one)
@@ -471,8 +469,7 @@ func TestFq3(t *testing.T) {
 	})
 
 	t.Run("Inverse", func(t *testing.T) {
-		fq3.inverse(actual, zero)
-		if !fq3.equal(actual, zero) {
+		if ok := fq3.inverse(actual, zero); ok {
 			t.Fatalf("bad inversion 1")
 		}
 		fq3.inverse(actual, one)
@@ -638,8 +635,7 @@ func TestFq4(t *testing.T) {
 	})
 
 	t.Run("Inverse", func(t *testing.T) {
-		fq4.inverse(actual, zero)
-		if !fq4.equal(actual, zero) {
+		if ok := fq4.inverse(actual, zero); ok {
 			t.Fatalf("bad inversion 1")
 		}
 		fq4.inverse(actual, one)
@@ -805,8 +801,7 @@ func TestFq6Quadratic(t *testing.T) {
 	})
 
 	t.Run("Inverse", func(t *testing.T) {
-		fq6.inverse(actual, zero)
-		if !fq6.equal(actual, zero) {
+		if ok := fq6.inverse(actual, zero); ok {
 			t.Fatalf("bad inversion 1")
 		}
 		fq6.inverse(actual, one)
@@ -972,8 +967,7 @@ func TestFq12(t *testing.T) {
 	})
 
 	t.Run("Inverse", func(t *testing.T) {
-		fq12.inverse(actual, zero)
-		if !fq12.equal(actual, zero) {
+		if ok := fq12.inverse(actual, zero); ok {
 			t.Fatalf("bad inversion 1")
 		}
 		fq12.inverse(actual, one)
@@ -1045,11 +1039,11 @@ func TestG1(t *testing.T) {
 	)
 	actual, expected := g.newPoint(), g.zero()
 	one := g.newPoint()
-	t.Run("FromBytes & ToBytes", func(t *testing.T) {
-		one, err = g.fromBytes(oneBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+	one, err = g.fromBytes(oneBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("FromBytes&ToBytes", func(t *testing.T) {
 		q, err := g.fromBytes(
 			g.toBytes(one),
 		)
@@ -1060,7 +1054,6 @@ func TestG1(t *testing.T) {
 			t.Logf("invalid out ")
 		}
 	})
-
 	t.Run("Is on curve", func(t *testing.T) {
 		if !g.isOnCurve(one) {
 			t.Fatalf("point is not on the curve")
@@ -1166,6 +1159,7 @@ func TestG1(t *testing.T) {
 			t.Fatal("bad scalar multiplication 4")
 		}
 	})
+
 	t.Run("Wnaf Multiplication", func(t *testing.T) {
 		g.wnafMul(actual, zero, bigZero)
 		if !g.equal(actual, zero) {
@@ -1185,15 +1179,18 @@ func TestG1(t *testing.T) {
 		}
 	})
 
-	t.Run("Multi Exponentiation", func(t *testing.T) {
+	t.Run("MultiExp", func(t *testing.T) {
 		count := 1000
 		bases := make([]*pointG1, count)
 		scalars := make([]*big.Int, count)
+
 		// prepare bases
 		// bases: S[0]*G, S[1]*G ... S[n-1]*G
 		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
 			// TODO : make sure that s is unique
-			scalars[j], _ = rand.Int(rand.Reader, big.NewInt(10000))
+			scalars[j] = new(big.Int)
+			s, _ := rand.Int(rand.Reader, big.NewInt(10000))
+			scalars[j].Set(s)
 			bases[i] = g.zero()
 			g.mulScalar(bases[i], one, scalars[j])
 		}
@@ -1249,12 +1246,11 @@ func TestG22(t *testing.T) {
 		"0x0606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be",
 	)
 	actual, expected := g.newPoint(), g.zero()
-	one := g.newPoint()
+	one, err := g.fromBytes(oneBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Run("FromBytes & ToBytes", func(t *testing.T) {
-		one, err = g.fromBytes(oneBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
 		q, err := g.fromBytes(
 			g.toBytes(one),
 		)
@@ -1373,7 +1369,7 @@ func TestG22(t *testing.T) {
 		}
 	})
 
-	t.Run("Multi Exponentiation", func(t *testing.T) {
+	t.Run("MultiExp", func(t *testing.T) {
 		count := 1000
 		bases := make([]*pointG22, count)
 		scalars := make([]*big.Int, count)
@@ -1381,7 +1377,9 @@ func TestG22(t *testing.T) {
 		// bases: S[0]*G, S[1]*G ... S[n-1]*G
 		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
 			// TODO : make sure that s is unique
-			scalars[j], _ = rand.Int(rand.Reader, big.NewInt(10000))
+			scalars[j] = new(big.Int)
+			s, _ := rand.Int(rand.Reader, big.NewInt(10000))
+			scalars[j].Set(s)
 			bases[i] = g.zero()
 			g.mulScalar(bases[i], one, scalars[j])
 		}
@@ -1453,12 +1451,12 @@ func TestG23(t *testing.T) {
 		"0xf75d2dd88302c9a4ef941307629a1b3e197277d83abb715f647c2e55a27baf782f5c60e7f7",
 	)
 	actual, expected := g.newPoint(), g.zero()
-	one := g.newPoint()
+	one, err := g.fromBytes(oneBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Run("FromBytes & ToBytes", func(t *testing.T) {
-		one, err = g.fromBytes(oneBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+
 		q, err := g.fromBytes(
 			g.toBytes(one),
 		)
@@ -1577,7 +1575,7 @@ func TestG23(t *testing.T) {
 		}
 	})
 
-	t.Run("Multi Exponentiation", func(t *testing.T) {
+	t.Run("MultiExp", func(t *testing.T) {
 		count := 1000
 		bases := make([]*pointG23, count)
 		scalars := make([]*big.Int, count)
@@ -1585,7 +1583,9 @@ func TestG23(t *testing.T) {
 		// bases: S[0]*G, S[1]*G ... S[n-1]*G
 		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
 			// TODO : make sure that s is unique
-			scalars[j], _ = rand.Int(rand.Reader, big.NewInt(10000))
+			scalars[j] = new(big.Int)
+			s, _ := rand.Int(rand.Reader, big.NewInt(10000))
+			scalars[j].Set(s)
 			bases[i] = g.zero()
 			g.mulScalar(bases[i], one, scalars[j])
 		}

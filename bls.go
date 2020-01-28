@@ -315,7 +315,7 @@ func (bls *blsInstance) finalExp(f *fe12) error {
 	f1 := fq.newElement()
 	fq.frobeniusMap(f1, f, 6)
 	f2 := fq.newElement()
-	if ok := fq.hasInverse(f2, f); !ok {
+	if ok := fq.inverse(f2, f); !ok {
 		return _error("element has no inverse")
 	}
 	// TODO: check f2 has inverse?

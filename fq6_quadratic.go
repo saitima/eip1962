@@ -171,26 +171,21 @@ func (fq *fq6q) square(c, a *fe6q) {
 	fq.f.double(c[1], t[1])        // c1 = 2*v2
 }
 
-func (fq *fq6q) hasInverse(inv, e *fe6q) bool {
-	fq.inverse(inv, e)
-	if fq.equal(inv, fq.zero()) {
-		return false
-	}
-	return true
-}
-
-func (fq *fq6q) inverse(c, a *fe6q) {
+func (fq *fq6q) inverse(c, a *fe6q) bool {
 	t := fq.t
 	// c0 = a0 * (a0^2 - β * a1^2)^-1
 	// c1 = a1 * (a0^2 - β * a1^2)^-1
-	fq.f.square(t[0], a[0])        // v0 = a0^2
-	fq.f.square(t[1], a[1])        // v1 = a1^2
-	fq.mulByNonResidue(t[1], t[1]) // β * v1
-	fq.f.sub(t[1], t[0], t[1])     // v0 = v0 - β * v1
-	fq.f.inverse(t[0], t[1])       // v1 = v0^-1
-	fq.f.mul(c[0], a[0], t[0])     // c0 = a0 * v1
-	fq.f.mul(t[0], a[1], t[0])     // a1 * v1
-	fq.f.neg(c[1], t[0])           // c1 = -a1 * v1
+	fq.f.square(t[0], a[0])                  // v0 = a0^2
+	fq.f.square(t[1], a[1])                  // v1 = a1^2
+	fq.mulByNonResidue(t[1], t[1])           // β * v1
+	fq.f.sub(t[1], t[0], t[1])               // v0 = v0 - β * v1
+	if ok := fq.f.inverse(t[0], t[1]); !ok { // v1 = v0^-1
+		return false
+	}
+	fq.f.mul(c[0], a[0], t[0]) // c0 = a0 * v1
+	fq.f.mul(t[0], a[1], t[0]) // a1 * v1
+	fq.f.neg(c[1], t[0])       // c1 = -a1 * v1
+	return true
 }
 
 func (fq *fq6q) exp(c, a *fe6q, e *big.Int) {

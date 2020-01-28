@@ -9,6 +9,9 @@ import (
 type scalar []uint64
 
 func newRepr(b *big.Int) scalar {
+	if isBigZero(b) {
+		return []uint64{0x00}
+	}
 	byteArr := b.Bytes()
 	requiredPad := len(byteArr) % 8
 	if requiredPad != 0 {

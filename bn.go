@@ -342,7 +342,7 @@ func (bn *bnInstance) finalExp(f *fe12) error {
 	fq12.frobeniusMap(f1, f, 6)
 
 	f2 := fq12.newElement()
-	if ok := fq12.hasInverse(f2, f); !ok {
+	if ok := fq12.inverse(f2, f); !ok {
 		return _error("element has no inverse")
 	}
 

@@ -347,7 +347,7 @@ func (mnt4 *mnt4Instance) millerLoop(f *fe4, g1Points []*pointG1, g2Points []*po
 
 func (mnt4 *mnt4Instance) finalexp(f *fe4) error {
 	fInv, first, firstInv := mnt4.fq4.newElement(), mnt4.fq4.newElement(), mnt4.fq4.newElement()
-	if ok := mnt4.fq4.hasInverse(fInv, f); !ok {
+	if ok := mnt4.fq4.inverse(fInv, f); !ok {
 		return _error("element has no inverse")
 	}
 	mnt4.finalexpPart1(first, f, fInv)

@@ -345,7 +345,7 @@ func (mnt6 *mnt6Instance) millerLoop(f *fe6q, g1Points []*pointG1, g2Points []*p
 
 func (mnt6 *mnt6Instance) finalexp(f *fe6q) error {
 	fInv, first, firstInv := mnt6.fq6.newElement(), mnt6.fq6.newElement(), mnt6.fq6.newElement()
-	if ok := mnt6.fq6.hasInverse(fInv, f); !ok {
+	if ok := mnt6.fq6.inverse(fInv, f); !ok {
 		return _error("element has no inverse")
 	}
 	mnt6.finalexpPart1(first, f, fInv)

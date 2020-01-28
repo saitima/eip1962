@@ -418,39 +418,48 @@ func (g *g1) multiExp(r *pointG1, points []*pointG1, powers []*big.Int) (*pointG
 	if len(points) != len(powers) {
 		return nil, fmt.Errorf("point and scalar vectors should be in same length")
 	}
-	var c uint = 3
-	if len(powers) > 32 {
-		c = uint(math.Ceil(math.Log10(float64(len(powers)))))
+	var c uint32 = 3
+	if len(powers) >= 32 {
+		c = uint32(math.Ceil(math.Log10(float64(len(powers)))))
 	}
-	bucket_size, numBits := (1<<c)-1, g.q.BitLen()
-	windows := make([]*pointG1, numBits/int(c)+1)
+	bucket_size, numBits := (1<<c)-1, uint32(g.q.BitLen())
+	windows := make([]*pointG1, numBits/c+1)
 	bucket := make([]*pointG1, bucket_size)
 	acc, sum, zero := g.zero(), g.zero(), g.zero()
-	s := new(big.Int)
-	for i, m := 0, 0; i <= numBits; i, m = i+int(c), m+1 {
-		for i := 0; i < bucket_size; i++ {
-			bucket[i] = g.newPoint() // TODO: do it in a make or new func
-		}
-		for j := 0; j < len(powers); j++ {
-			s = powers[j]
-			index := s.Uint64() & uint64(bucket_size)
-			if index != 0 {
-				g.add(bucket[index-1], bucket[index-1], points[j])
-			}
-			s.Rsh(s, c)
-		}
+	for i := 0; i < bucket_size; i++ {
+		bucket[i] = g.newPoint()
+	}
+	mask := (uint64(1) << c) - 1
+	j := 0
+	var cur uint32
+	for cur <= numBits {
 		g.copy(acc, zero)
+		bucket = make([]*pointG1, (1<<c)-1)
+		for i := 0; i < len(bucket); i++ {
+			bucket[i] = g.zero()
+		}
+		for i := 0; i < len(powers); i++ {
+			s := newRepr(powers[i])
+			index := uint(s[0] & mask)
+			if index != 0 {
+				g.add(bucket[index-1], bucket[index-1], points[i])
+			}
+			powers[i] = new(big.Int).Rsh(powers[i], uint(c))
+		}
+
 		g.copy(sum, zero)
-		for k := bucket_size - 1; k >= 0; k-- {
-			g.add(sum, sum, bucket[k])
+		for i := len(bucket) - 1; i >= 0; i-- {
+			g.add(sum, sum, bucket[i])
 			g.add(acc, acc, sum)
 		}
-		windows[m] = g.zero()
-		g.copy(windows[m], acc)
+		windows[j] = g.newPoint()
+		g.copy(windows[j], acc)
+		j++
+		cur += c
 	}
-	g.copy(acc, zero)
+	g.copy(acc, g.zero())
 	for i := len(windows) - 1; i >= 0; i-- {
-		for j := 0; j < int(c); j++ {
+		for j := uint32(0); j < c; j++ {
 			g.double(acc, acc)
 		}
 		g.add(acc, acc, windows[i])
