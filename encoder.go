@@ -10,14 +10,16 @@ func encodeG1Point(out []byte, in []byte) {
 
 func encodeG22Point(out []byte, in []byte) {
 	pos := len(in) / 2
-	encodeFq2FixedLen(out[:pos], in[:pos])
-	encodeFq2FixedLen(out[pos:], in[pos:])
+	length := len(out) / 2
+	encodeFq2FixedLen(out[:length], in[:pos])
+	encodeFq2FixedLen(out[length:], in[pos:])
 }
 
 func encodeG23Point(out []byte, in []byte) {
 	pos := len(in) / 2
-	encodeFq3FixedLen(out[:pos], in[:pos])
-	encodeFq3FixedLen(out[pos:], in[pos:])
+	length := len(out) / 2
+	encodeFq3FixedLen(out[:length], in[:pos])
+	encodeFq3FixedLen(out[length:], in[pos:])
 }
 
 func encodeFq2FixedLen(out []byte, in []byte) {
