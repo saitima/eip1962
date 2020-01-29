@@ -82,7 +82,7 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 		return nil, errors.New("point 1 isn't on the curve")
 	}
 	g1.add(p1, p1, p0)
-	out := make([]byte, 2*modulusLen)
+	out := make([]byte, 2*g1.f.byteSize())
 	encodeG1Point(out, g1.toBytes(p1))
 	return out, nil
 }
@@ -121,7 +121,7 @@ func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
 		return nil, errors.New("Input contains garbage at the end")
 	}
 	g1.mulScalar(p, p, s)
-	out := make([]byte, 2*modulusLen)
+	out := make([]byte, 2*g1.f.byteSize())
 	encodeG1Point(out, g1.toBytes(p))
 	return out, nil
 }
@@ -183,7 +183,7 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 	} else {
 		g1.multiExp(p, bases, scalars)
 	}
-	out := make([]byte, 2*modulusLen)
+	out := make([]byte, 2*g1.f.byteSize())
 	encodeG1Point(out, g1.toBytes(p))
 	return out, nil
 }
@@ -262,7 +262,7 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 		return nil, errors.New("point 1 isn't on the curve")
 	}
 	g2.add(q1, q1, q0)
-	out := make([]byte, 4*modulusLen)
+	out := make([]byte, 4*g2.f.f.byteSize())
 	encodeG22Point(out, g2.toBytes(q1))
 	return out, nil
 }
@@ -301,7 +301,7 @@ func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 		return nil, errors.New("q1 isn't on the curve")
 	}
 	g2.mulScalar(q, q, s)
-	out := make([]byte, 4*modulusLen)
+	out := make([]byte, 4*g2.f.f.byteSize())
 	encodeG22Point(out, g2.toBytes(q))
 	return out, nil
 }
@@ -365,7 +365,7 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 		g2.multiExp(q, bases, scalars)
 	}
 
-	out := make([]byte, 4*modulusLen)
+	out := make([]byte, 4*g2.f.f.byteSize())
 	encodeG22Point(out, g2.toBytes(q))
 	return out, nil
 }
@@ -420,7 +420,7 @@ func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 		return nil, errors.New("point 1 isn't on the curve")
 	}
 	g2.add(q1, q1, q0)
-	out := make([]byte, 6*modulusLen)
+	out := make([]byte, 6*g2.f.f.byteSize())
 	encodeG23Point(out, g2.toBytes(q1))
 	return out, nil
 }
@@ -457,7 +457,7 @@ func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 		return nil, errors.New("point isn't on the curve")
 	}
 	g2.mulScalar(q, q, s)
-	out := make([]byte, 6*modulusLen)
+	out := make([]byte, 6*g2.f.f.byteSize())
 	encodeG23Point(out, g2.toBytes(q))
 	return out, nil
 }
@@ -520,7 +520,7 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	} else {
 		g2.multiExp(q, bases, scalars)
 	}
-	out := make([]byte, 6*modulusLen)
+	out := make([]byte, 6*g2.f.f.byteSize())
 	encodeG23Point(out, g2.toBytes(q))
 	return out, nil
 }
