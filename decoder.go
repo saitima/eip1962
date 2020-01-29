@@ -51,6 +51,7 @@ func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 	if int(modulusBuf[0]) == 0 {
 		return nil, 0, nil, errors.New("In modulus encoding highest byte is zero")
 	}
+	// TODO: enable paddin
 	modulusBuf = padHex(modulusBuf)
 	modulus := new(big.Int).SetBytes(modulusBuf)
 	if isBigZero(modulus) {
@@ -72,7 +73,13 @@ func parseBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, error
 	if err != nil {
 		return nil, nil, 0, nil, err
 	}
-	field, err := newField(modulusBuf)
+	// TODO: remove after for fuzz testing
+	var field *field
+	if modulusLen <= 32 {
+		field, err = newField(padBytes(modulusBuf, 32))
+	} else {
+		field, err = newField(modulusBuf)
+	}
 	if err != nil {
 		return nil, nil, 0, nil, errors.New("Failed to create prime field from modulus")
 	}

@@ -640,13 +640,7 @@ func (f *field) inverse(inv, e fieldElement) bool {
 		k += 1
 	}
 	if !found {
-		f.copy(inv, zero)
-		return false
-	}
-	if k < bitSize {
-		/*
-			this is unexpected
-		*/
+		// fmt.Printf("[log] fe has no inverse 1\n")
 		f.copy(inv, zero)
 		return false
 	}
@@ -656,7 +650,11 @@ func (f *field) inverse(inv, e fieldElement) bool {
 	}
 	f.copy(u, f.p)
 	f.subn(u, r)
-
+	if k < bitSize {
+		// fmt.Printf("[log] fe has no inverse 2\n")
+		f.copy(inv, zero)
+		return false
+	}
 	// Phase 2
 	for i := k; i < bitSize*2; i++ {
 		f.double(u, u)

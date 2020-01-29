@@ -46,6 +46,10 @@ func padHex(value []byte) []byte {
 			value[i] = 0x00
 		}
 	}
+	// TODO: remove after for fuzz testing
+	if len(value) <= 32 {
+		value = padBytes(value, 32)
+	}
 	return value
 }
 
