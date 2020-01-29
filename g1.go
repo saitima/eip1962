@@ -120,7 +120,7 @@ func (g *g1) affine(r, p *pointG1) *pointG1 {
 		return r
 	}
 	t := g.t
-	if !g.f.hasInverse(t[0], p[2]) {
+	if ok := g.f.inverse(t[0], p[2]); !ok {
 		g.f.copy(r[0], g.f.zero)
 		g.f.copy(r[1], g.f.zero)
 		g.f.copy(r[2], g.f.zero)

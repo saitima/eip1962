@@ -1,6 +1,7 @@
 package eip
 
 import (
+	"errors"
 	"math/big"
 )
 
@@ -194,14 +195,16 @@ func (bn *bnInstance) ell(f *fe12, coeffs *fe6, p *pointG1) {
 	}
 }
 
-func (bn *bnInstance) prepare(coeffs *[]fe6, Q *pointG22) {
+func (bn *bnInstance) prepare(coeffs *[]fe6, Q *pointG22) bool {
 	f := bn.fq12.f.f.f
 	twoInv := f.newFieldElement()
 	f.double(twoInv, f.one)
-	f.inverse(twoInv, twoInv)
+	if ok := f.inverse(twoInv, twoInv); !ok {
+		return false
+	}
 	if bn.g2.isZero(Q) {
 		// TODO: mark this point as infinity
-		return
+		return true
 	}
 
 	T := bn.g2.newPoint()
@@ -232,6 +235,7 @@ func (bn *bnInstance) prepare(coeffs *[]fe6, Q *pointG22) {
 	bn.g2.copy(Q2, Q)
 	bn.fq12.f.f.mul(Q2[0], Q2[0], bn.fq12.f.frobeniusCoeffs[0][2])
 	bn.additionStep(&(*coeffs)[j], T, Q2)
+	return true
 }
 
 func (bn *bnInstance) prepareWithNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fieldElement) {
@@ -245,6 +249,7 @@ func (bn *bnInstance) prepareWithNaf(coeffs *[]fe6, T, Q *pointG22, twoInv field
 		}
 	}
 }
+
 func (bn *bnInstance) prepareWithoutNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fieldElement) {
 	j := 0
 	//  skip first msb bit
@@ -258,12 +263,14 @@ func (bn *bnInstance) prepareWithoutNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fi
 	}
 }
 
-func (bn *bnInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*pointG22) {
+func (bn *bnInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*pointG22) bool {
 	coeffs := make([][]fe6, len(g1Points))
 	coeffLength := bn.calculateCoeffLength()
 	for i, _ := range g1Points {
 		coeffs[i] = make([]fe6, coeffLength)
-		bn.prepare(&coeffs[i], g2Points[i])
+		if ok := bn.prepare(&coeffs[i], g2Points[i]); !ok {
+			return false
+		}
 	}
 
 	if bn.preferNaf {
@@ -285,6 +292,7 @@ func (bn *bnInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*point
 	for k, point := range g1Points {
 		bn.ell(f, &(coeffs)[k][j], point)
 	}
+	return true
 }
 
 func (bn *bnInstance) millerLoopWithNaf(f *fe12, coeffs [][]fe6, g1Points []*pointG1) {
@@ -335,7 +343,7 @@ func (bn *bnInstance) expByU(c, a *fe12) {
 	}
 }
 
-func (bn *bnInstance) finalExp(f *fe12) error {
+func (bn *bnInstance) finalExp(f *fe12) bool {
 	fq12 := bn.fq12
 
 	f1 := fq12.newElement()
@@ -343,10 +351,8 @@ func (bn *bnInstance) finalExp(f *fe12) error {
 
 	f2 := fq12.newElement()
 	if ok := fq12.inverse(f2, f); !ok {
-		return _error("element has no inverse")
+		return false
 	}
-
-	// TODO: handle case when parameter f doesnt have inverse
 
 	r := fq12.newElement()
 	fq12.mul(r, f1, f2)
@@ -428,23 +434,27 @@ func (bn *bnInstance) finalExp(f *fe12) error {
 	fq12.mul(t0, t0, t1)
 
 	fq12.copy(f, t0)
-	return nil
+	return true
 }
 
 func (bn *bnInstance) pair(point *pointG1, twistPoint *pointG22) (*fe12, error) {
 	f := bn.fq12.one()
-	bn.millerLoop(f, []*pointG1{point}, []*pointG22{twistPoint})
-	if err := bn.finalExp(f); err != nil {
-		return nil, err
+	if ok := bn.millerLoop(f, []*pointG1{point}, []*pointG22{twistPoint}); !ok {
+		return nil, errors.New("element has no inverse")
+	}
+	if ok := bn.finalExp(f); !ok {
+		return nil, errors.New("element has no inverse")
 	}
 	return f, nil
 }
 
 func (bn *bnInstance) multiPair(points []*pointG1, twistPoints []*pointG22) (*fe12, error) {
 	f := bn.fq12.one()
-	bn.millerLoop(f, points, twistPoints)
-	if err := bn.finalExp(f); err != nil {
-		return nil, err
+	if ok := bn.millerLoop(f, points, twistPoints); !ok {
+		return nil, errors.New("element has no inverse")
+	}
+	if ok := bn.finalExp(f); !ok {
+		return nil, errors.New("element has no inverse")
 	}
 	return f, nil
 }

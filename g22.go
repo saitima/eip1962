@@ -278,7 +278,7 @@ func (g *g22) double(r, p *pointG22) *pointG22 {
 func (g *g22) doubleNonZeroA(r, p *pointG22) *pointG22 {
 	// http://www.hyperelliptic.org/EFD/gp/auto-shortw-jacobian.html#doubling-dbl-2007-bl
 	if g.isZero(p) {
-		g.copy(r, p)
+		g.copy(r, g.inf)
 		return r
 	}
 	t := g.t

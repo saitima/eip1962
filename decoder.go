@@ -37,13 +37,13 @@ func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 	if err != nil {
 		return nil, 0, nil, errors.New("Input is not long enough to get modulus length")
 	}
-	if len(modulusLenBuf) > MAX_MODULUS_BYTE_LEN {
+	modulusLen := int(modulusLenBuf[0])
+	if modulusLen == 0 {
 		return nil, 0, nil, errors.New("Modulus length is zero")
 	}
-	if len(modulusLenBuf) == 0 {
+	if modulusLen > MAX_MODULUS_BYTE_LEN {
 		return nil, 0, nil, errors.New("Encoded modulus length is too large")
 	}
-	modulusLen := int(modulusLenBuf[0])
 	modulusBuf, rest, err := split(rest, modulusLen)
 	if err != nil {
 		return nil, 0, nil, errors.New("Input is not long enough to get modulus")

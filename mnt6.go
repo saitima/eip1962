@@ -1,6 +1,7 @@
 package eip
 
 import (
+	"errors"
 	"math/big"
 )
 
@@ -194,7 +195,7 @@ func (mnt6 *mnt6Instance) additionStep(coeffs *additionCoeffs_6, x, y *fe3, r *e
 	fq3.copy(coeffs.crz, r.z)
 }
 
-func (mnt6 *mnt6Instance) precomputeG2(precomputedG2 *precomputedG2_6, g2Point *pointG23, twistInv *fe3) {
+func (mnt6 *mnt6Instance) precomputeG2(precomputedG2 *precomputedG2_6, g2Point *pointG23, twistInv *fe3) bool {
 	fq6 := mnt6.fq6
 
 	xTwist, yTwist := mnt6.fq6.f.newElement(), mnt6.fq6.f.newElement()
@@ -230,7 +231,9 @@ func (mnt6 *mnt6Instance) precomputeG2(precomputedG2 *precomputedG2_6, g2Point *
 
 	if mnt6.zIsnegative {
 		rzInv, rzInv2, rzInv3 := mnt6.fq6.f.newElement(), mnt6.fq6.f.newElement(), mnt6.fq6.f.newElement()
-		fq6.f.inverse(rzInv, r.z)
+		if ok := fq6.f.inverse(rzInv, r.z); !ok {
+			return false
+		}
 		fq6.f.square(rzInv2, rzInv)
 		fq6.f.mul(rzInv3, rzInv2, rzInv)
 
@@ -242,13 +245,16 @@ func (mnt6 *mnt6Instance) precomputeG2(precomputedG2 *precomputedG2_6, g2Point *
 		a = len(precomputedG2.additionCoeffs) - 1 // hack
 		mnt6.additionStep(precomputedG2.additionCoeffs[a], minusRxAffine, minusRyAffine, r)
 	}
+	return true
 }
 
-func (mnt6 *mnt6Instance) atePairingLoop(f *fe6q, g1Point *pointG1, g2Point *pointG23) {
+func (mnt6 *mnt6Instance) atePairingLoop(f *fe6q, g1Point *pointG1, g2Point *pointG23) bool {
 	// TODO: check that points are in affine form
 	fq6 := mnt6.fq6
 	twistInv := mnt6.fq6.f.newElement()
-	fq6.f.inverse(twistInv, mnt6.twist)
+	if ok := fq6.f.inverse(twistInv, mnt6.twist); !ok {
+		return false
+	}
 
 	p := &precomputedG1_6{
 		fq6.f.f.newFieldElement(),
@@ -282,7 +288,9 @@ func (mnt6 *mnt6Instance) atePairingLoop(f *fe6q, g1Point *pointG1, g2Point *poi
 		}
 	}
 
-	mnt6.precomputeG2(q, g2Point, twistInv)
+	if ok := mnt6.precomputeG2(q, g2Point, twistInv); !ok {
+		return false
+	}
 
 	l1Coeff := fq6.f.zero()
 	fq6.f.f.copy(l1Coeff[0], p.x)
@@ -331,27 +339,33 @@ func (mnt6 *mnt6Instance) atePairingLoop(f *fe6q, g1Point *pointG1, g2Point *poi
 		fq6.f.add(gRQ[1], gRQ[1], t)
 		fq6.f.neg(gRQ[1], gRQ[1])
 		fq6.mul(ff, ff, gRQ)
-		fq6.inverse(ff, ff) // TODO: check that f has inverse
+		if ok := fq6.inverse(ff, ff); !ok {
+			return false
+		}
 	}
 
 	fq6.mul(f, f, ff)
+	return true
 }
 
-func (mnt6 *mnt6Instance) millerLoop(f *fe6q, g1Points []*pointG1, g2Points []*pointG23) {
+func (mnt6 *mnt6Instance) millerLoop(f *fe6q, g1Points []*pointG1, g2Points []*pointG23) bool {
 	for i := 0; i < len(g1Points); i++ {
-		mnt6.atePairingLoop(f, g1Points[i], g2Points[i])
+		if ok := mnt6.atePairingLoop(f, g1Points[i], g2Points[i]); !ok {
+			return false
+		}
 	}
+	return true
 }
 
-func (mnt6 *mnt6Instance) finalexp(f *fe6q) error {
+func (mnt6 *mnt6Instance) finalexp(f *fe6q) bool {
 	fInv, first, firstInv := mnt6.fq6.newElement(), mnt6.fq6.newElement(), mnt6.fq6.newElement()
 	if ok := mnt6.fq6.inverse(fInv, f); !ok {
-		return _error("element has no inverse")
+		return false
 	}
 	mnt6.finalexpPart1(first, f, fInv)
 	mnt6.finalexpPart1(firstInv, fInv, f)
 	mnt6.finalexpPart2(f, first, firstInv)
-	return nil
+	return true
 }
 
 func (mnt6 *mnt6Instance) finalexpPart1(f, elt, eltInv *fe6q) {
@@ -391,18 +405,22 @@ func (mnt6 *mnt6Instance) calculateCoeffSize() (int, int) {
 // Pair ..
 func (mnt6 *mnt6Instance) pair(g1Point *pointG1, g2Point *pointG23) (*fe6q, error) {
 	f := mnt6.fq6.one()
-	mnt6.millerLoop(f, []*pointG1{g1Point}, []*pointG23{g2Point})
-	if err := mnt6.finalexp(f); err != nil {
-		return nil, err
+	if ok := mnt6.millerLoop(f, []*pointG1{g1Point}, []*pointG23{g2Point}); !ok {
+		return nil, errors.New("element has no inverse")
+	}
+	if ok := mnt6.finalexp(f); !ok {
+		return nil, errors.New("element has no inverse")
 	}
 	return f, nil
 }
 
 func (mnt6 *mnt6Instance) multiPair(g1Points []*pointG1, g2Points []*pointG23) (*fe6q, error) {
 	f := mnt6.fq6.one()
-	mnt6.millerLoop(f, g1Points, g2Points)
-	if err := mnt6.finalexp(f); err != nil {
-		return nil, err
+	if ok := mnt6.millerLoop(f, g1Points, g2Points); !ok {
+		return nil, errors.New("element has no inverse")
+	}
+	if ok := mnt6.finalexp(f); !ok {
+		return nil, errors.New("element has no inverse")
 	}
 	return f, nil
 }

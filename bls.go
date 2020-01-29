@@ -1,6 +1,7 @@
 package eip
 
 import (
+	"errors"
 	"math/big"
 )
 
@@ -194,14 +195,16 @@ func (bls *blsInstance) ell(f *fe12, coeffs *fe6, p *pointG1) {
 	}
 }
 
-func (bls *blsInstance) prepare(coeffs *[]fe6, Q *pointG22) {
+func (bls *blsInstance) prepare(coeffs *[]fe6, Q *pointG22) bool {
 	f := bls.fq12.f.f.f
 	twoInv := f.newFieldElement()
 	f.double(twoInv, f.one)
-	f.inverse(twoInv, twoInv)
+	if ok := f.inverse(twoInv, twoInv); !ok {
+		return false
+	}
 	if bls.g2.isZero(Q) {
 		// TODO: mark this point as infinity
-		return
+		return true
 	}
 
 	T := bls.g2.newPoint()
@@ -216,6 +219,7 @@ func (bls *blsInstance) prepare(coeffs *[]fe6, Q *pointG22) {
 	if bls.zIsnegative {
 		bls.g2.neg(T, T)
 	}
+	return true
 }
 
 func (bls *blsInstance) prepareWithNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fieldElement) {
@@ -243,12 +247,14 @@ func (bls *blsInstance) prepareWithoutNaf(coeffs *[]fe6, T, Q *pointG22, twoInv 
 	}
 }
 
-func (bls *blsInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*pointG22) {
+func (bls *blsInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*pointG22) bool {
 	coeffs := make([][]fe6, len(g1Points))
 	coeffsLen := bls.calculateCoeffLength()
 	for i := 0; i < len(g1Points); i++ {
 		coeffs[i] = make([]fe6, coeffsLen)
-		bls.prepare(&coeffs[i], g2Points[i])
+		if ok := bls.prepare(&coeffs[i], g2Points[i]); !ok {
+			return false
+		}
 	}
 
 	if bls.preferNaf {
@@ -260,6 +266,7 @@ func (bls *blsInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*poi
 	if bls.zIsnegative {
 		bls.fq12.conjugate(f, f)
 	}
+	return true
 }
 
 func (bls *blsInstance) millerLoopWithNaf(f *fe12, coeffs [][]fe6, g1Points []*pointG1) {
@@ -309,16 +316,15 @@ func (bls *blsInstance) expByZ(c, a *fe12) {
 	}
 }
 
-func (bls *blsInstance) finalExp(f *fe12) error {
+func (bls *blsInstance) finalExp(f *fe12) bool {
 	fq := bls.fq12
 
 	f1 := fq.newElement()
 	fq.frobeniusMap(f1, f, 6)
 	f2 := fq.newElement()
 	if ok := fq.inverse(f2, f); !ok {
-		return _error("element has no inverse")
+		return false
 	}
-	// TODO: check f2 has inverse?
 	r := fq.newElement()
 	fq.mul(r, f1, f2)
 	fq.frobeniusMap(f2, r, 2)
@@ -367,23 +373,27 @@ func (bls *blsInstance) finalExp(f *fe12) error {
 	fq.mul(y5, y5, y1)
 
 	fq.copy(f, y5)
-	return nil
+	return true
 }
 
 func (bls *blsInstance) pair(point *pointG1, twistPoint *pointG22) (*fe12, error) {
 	f := bls.fq12.one()
-	bls.millerLoop(f, []*pointG1{point}, []*pointG22{twistPoint})
-	if err := bls.finalExp(f); err != nil {
-		return nil, err
+	if ok := bls.millerLoop(f, []*pointG1{point}, []*pointG22{twistPoint}); !ok {
+		return nil, errors.New("element has no inverse")
+	}
+	if ok := bls.finalExp(f); !ok {
+		return nil, errors.New("element has no inverse")
 	}
 	return f, nil
 }
 
 func (bls *blsInstance) multiPair(points []*pointG1, twistPoints []*pointG22) (*fe12, error) {
 	f := bls.fq12.one()
-	bls.millerLoop(f, points, twistPoints)
-	if err := bls.finalExp(f); err != nil {
-		return nil, err
+	if ok := bls.millerLoop(f, points, twistPoints); !ok {
+		return nil, errors.New("element has no inverse")
+	}
+	if ok := bls.finalExp(f); !ok {
+		return nil, errors.New("element has no inverse")
 	}
 	return f, nil
 }
