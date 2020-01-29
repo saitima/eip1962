@@ -278,7 +278,7 @@ func (g *g22) double(r, p *pointG22) *pointG22 {
 func (g *g22) doubleNonZeroA(r, p *pointG22) *pointG22 {
 	// http://www.hyperelliptic.org/EFD/gp/auto-shortw-jacobian.html#doubling-dbl-2007-bl
 	if g.isZero(p) {
-		g.copy(r, g.inf)
+		g.copy(r, p)
 		return r
 	}
 	t := g.t
@@ -374,8 +374,13 @@ func (g *g22) mulScalar(c, p *pointG22, e *big.Int) *pointG22 {
 	return c
 }
 
-func (g *g22) checkCorrectSubGroup(c, p *pointG22) *pointG22 {
-	return g.wnafMul(c, p, g.q)
+func (g *g22) checkCorrectSubGroup(p *pointG22) bool {
+	c := g.newPoint()
+	g.wnafMul(c, p, g.q)
+	if g.equal(c, g.zero()) {
+		return true
+	}
+	return false
 }
 
 func (g *g22) wnafMul(c, p *pointG22, e *big.Int) *pointG22 {

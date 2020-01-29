@@ -656,8 +656,6 @@ func pairBN(in []byte) ([]byte, error) {
 
 	var g1Points []*pointG1
 	var g2Points []*pointG22
-	g1zero, g2zero := g1.zero(), g2.zero()
-	g1Tmp, g2Tmp := g1.newPoint(), g2.newPoint()
 	for i := 0; i < numPairs; i++ {
 		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
 		if err != nil {
@@ -673,15 +671,13 @@ func pairBN(in []byte) ([]byte, error) {
 		if !g2.isOnCurve(g2Point) {
 			return pairingError, errors.New("G2 point is not on curve")
 		}
-		g1.checkCorrectSubGroup(g1Tmp, g1Point)
-		if !g1.equal(g1Tmp, g1zero) {
+		if ok := g1.checkCorrectSubGroup(g1Point); !ok {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.checkCorrectSubGroup(g2Tmp, g2Point)
-		if !g2.equal(g2Tmp, g2zero) {
+		if ok := g2.checkCorrectSubGroup(g2Point); !ok {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
-		if !g1.equal(g1zero, g1Point) && !g2.equal(g2zero, g2Point) {
+		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
 			g1Points = append(g1Points, g1Point)
 			g2Points = append(g2Points, g2Point)
 		}
@@ -833,8 +829,6 @@ func pairBLS(in []byte) ([]byte, error) {
 	}
 	var g1Points []*pointG1
 	var g2Points []*pointG22
-	g1zero, g2zero := g1.zero(), g2.zero()
-	g1Tmp, g2Tmp := g1.newPoint(), g2.newPoint()
 	for i := 0; i < numPairs; i++ {
 		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
 		if err != nil {
@@ -850,15 +844,15 @@ func pairBLS(in []byte) ([]byte, error) {
 		if !g2.isOnCurve(g2Point) {
 			return pairingError, errors.New("G2 point is not on curve")
 		}
-		g1.checkCorrectSubGroup(g1Tmp, g1Point)
-		if !g1.equal(g1Tmp, g1zero) {
+
+		if ok := g1.checkCorrectSubGroup(g1Point); !ok {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.checkCorrectSubGroup(g2Tmp, g2Point)
-		if !g2.equal(g2Tmp, g2zero) {
+
+		if ok := g2.checkCorrectSubGroup(g2Point); !ok {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
-		if !g1.equal(g1zero, g1Point) && !g2.equal(g2zero, g2Point) {
+		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
 			g1Points = append(g1Points, g1Point)
 			g2Points = append(g2Points, g2Point)
 		}
@@ -1013,8 +1007,6 @@ func pairMNT4(in []byte) ([]byte, error) {
 
 	var g1Points []*pointG1
 	var g2Points []*pointG22
-	g1zero, g2zero := g1.zero(), g2.zero()
-	g1Tmp, g2Tmp := g1.newPoint(), g2.newPoint()
 	for i := 0; i < numPairs; i++ {
 		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
 		if err != nil {
@@ -1030,17 +1022,13 @@ func pairMNT4(in []byte) ([]byte, error) {
 		if !g2.isOnCurve(g2Point) {
 			return pairingError, errors.New("G2 point is not on curve")
 		}
-		g1.checkCorrectSubGroup(g1Tmp, g1Point)
-		if !g1.equal(g1Tmp, g1zero) {
+		if ok := g1.checkCorrectSubGroup(g1Point); !ok {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-
-		g2.checkCorrectSubGroup(g2Tmp, g2Point)
-		if !g2.equal(g2Tmp, g2zero) {
+		if ok := g2.checkCorrectSubGroup(g2Point); !ok {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
-		if !g1.equal(g1zero, g1Point) && !g2.equal(g2zero, g2Point) {
-
+		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
 			g1Points = append(g1Points, g1Point)
 			g2Points = append(g2Points, g2Point)
 		}
@@ -1201,8 +1189,6 @@ func pairMNT6(in []byte) ([]byte, error) {
 
 	var g1Points []*pointG1
 	var g2Points []*pointG23
-	g1zero, g2zero := g1.zero(), g2.zero()
-	g1Tmp, g2Tmp := g1.newPoint(), g2.newPoint()
 	for i := 0; i < numPairs; i++ {
 		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
 		if err != nil {
@@ -1218,15 +1204,15 @@ func pairMNT6(in []byte) ([]byte, error) {
 		if !g2.isOnCurve(g2Point) {
 			return pairingError, errors.New("G2 point is not on curve")
 		}
-		g1.checkCorrectSubGroup(g1Tmp, g1Point)
-		if !g1.equal(g1Tmp, g1zero) {
+
+		if ok := g1.checkCorrectSubGroup(g1Point); !ok {
 			return pairingError, errors.New("G1 point is not in the expected subgroup")
 		}
-		g2.checkCorrectSubGroup(g2Tmp, g2Point)
-		if !g2.equal(g2Tmp, g2zero) {
+
+		if ok := g2.checkCorrectSubGroup(g2Point); !ok {
 			return pairingError, errors.New("G2 point is not in the expected subgroup")
 		}
-		if !g1.equal(g1zero, g1Point) && !g2.equal(g2zero, g2Point) {
+		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
 			g1Points = append(g1Points, g1Point)
 			g2Points = append(g2Points, g2Point)
 		}
