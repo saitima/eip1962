@@ -674,7 +674,7 @@ func (f *field) oldInverse(inv, e fieldElement) bool {
 }
 func (f *field) inverse(inv, e fieldElement) bool {
 	if f.equal(e, f.zero) {
-		// fmt.Printf("[log] fe has no inverse 0\n")
+		fmt.Printf("[log] fe has no inverse 0\n")
 		f.copy(inv, f.zero)
 		return false
 	}
@@ -717,7 +717,7 @@ func (f *field) inverse(inv, e fieldElement) bool {
 		k += 1
 	}
 	if !found {
-		// fmt.Printf("[log] fe has no inverse 1\n")
+		fmt.Printf("[log] fe has no inverse 1\n")
 		f.copy(inv, zero)
 		return false
 	}
@@ -733,7 +733,7 @@ func (f *field) inverse(inv, e fieldElement) bool {
 	kInRange := modulusBitsCeil <= k && k <= montPower+modulusBitsCeil
 
 	if !kInRange {
-		// fmt.Printf("[log] fe has no inverse 2\n")
+		fmt.Printf("[log] fe has no inverse 2\n")
 		f.copy(inv, zero)
 		return false
 	}
@@ -744,12 +744,12 @@ func (f *field) inverse(inv, e fieldElement) bool {
 	}
 
 	if k > 2*montPower {
-		// fmt.Printf("[log] fe has no inverse 3\n")
+		fmt.Printf("[log] fe has no inverse 3\n")
 		f.copy(inv, zero)
 		return false
 	}
 	if 2*montPower-k > montPower {
-		// fmt.Printf("[log] fe has no inverse 4\n")
+		fmt.Printf("[log] fe has no inverse 4\n")
 		f.copy(inv, zero)
 		return false
 	}
@@ -764,7 +764,7 @@ func (f *field) inverse(inv, e fieldElement) bool {
 	}
 	x, err := f.newFieldElementFromBytesNoTransform(xBytes)
 	if err != nil {
-		// fmt.Printf("[log] fe has no inverse 5\n")
+		fmt.Printf("[log] fe has no inverse 5\n")
 		fmt.Println(err)
 		f.copy(inv, zero)
 		return false
