@@ -15,28 +15,29 @@ import (
 type fieldElement = unsafe.Pointer
 
 type field struct {
-	limbSize int
-	p        fieldElement
-	inp      uint64
-	one      fieldElement
-	_one     fieldElement
-	zero     fieldElement
-	r        fieldElement
-	r2       fieldElement
-	pbig     *big.Int
-	rbig     *big.Int
-	equal    func(a, b fieldElement) bool
-	cmp      func(a, b fieldElement) int8
-	copy     func(dst, stc fieldElement)
-	_mul     func(c, a, b, p fieldElement, inp uint64)
-	_add     func(c, a, b, p fieldElement)
-	_double  func(c, a, p fieldElement)
-	_sub     func(c, a, b, p fieldElement)
-	_neg     func(c, a, p fieldElement)
-	addn     func(a, b fieldElement) uint64
-	subn     func(a, b fieldElement) uint64
-	div_two  func(a fieldElement)
-	mul_two  func(a fieldElement)
+	limbSize  int
+	p         fieldElement
+	inp       uint64
+	one       fieldElement
+	_one      fieldElement
+	zero      fieldElement
+	r         fieldElement
+	r2        fieldElement
+	pbig      *big.Int
+	rbig      *big.Int
+	equal     func(a, b fieldElement) bool
+	cmp       func(a, b fieldElement) int8
+	copy      func(dst, stc fieldElement)
+	_mul      func(c, a, b, p fieldElement, inp uint64)
+	_add      func(c, a, b, p fieldElement)
+	_double   func(c, a, p fieldElement)
+	_sub      func(c, a, b, p fieldElement)
+	_neg      func(c, a, p fieldElement)
+	addn      func(a, b fieldElement) uint64
+	subn      func(a, b fieldElement) uint64
+	div_two   func(a fieldElement)
+	mul_two   func(a fieldElement)
+	bitLength uint64 // TODO: remove after fuzz testing
 }
 
 func newField(p []byte) (*field, error) {
@@ -47,6 +48,9 @@ func newField(p []byte) (*field, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: remove after fuzz testing
+	f.bitLength = uint64(f.pbig.BitLen())
 	R := new(big.Int)
 	R.SetBit(R, f.byteSize()*8, 1).Mod(R, f.pbig)
 	R2 := new(big.Int)
@@ -78,6 +82,7 @@ func newField(p []byte) (*field, error) {
 	}
 
 	f.inp = inpT.Uint64()
+
 	switch f.limbSize {
 	case 1:
 		f.equal = eq1
@@ -359,7 +364,7 @@ func (f *field) randFieldElement(r io.Reader) (fieldElement, error) {
 
 func (f *field) newFieldElementFromBytesNoTransform(in []byte) (fieldElement, error) {
 	if len(in) != f.byteSize() {
-		return nil, fmt.Errorf("bad input size")
+		return nil, fmt.Errorf("bad input size %d %d", len(in), f.byteSize())
 	}
 	fe, _, err := newFieldElementFromBytes(in)
 	if err != nil {
@@ -370,7 +375,7 @@ func (f *field) newFieldElementFromBytesNoTransform(in []byte) (fieldElement, er
 
 func (f *field) newFieldElementFromBytes(in []byte) (fieldElement, error) {
 	if len(in) != f.byteSize() {
-		return nil, fmt.Errorf("bad input size")
+		return nil, fmt.Errorf("bad input size %d %d", len(in), f.byteSize())
 	}
 	if !f.isValid(in) {
 		return nil, fmt.Errorf("input is a larger number than modulus")
@@ -518,6 +523,11 @@ func newFieldElementFromBytes(in []byte) (fieldElement, int, error) {
 	if limbSize < 1 || limbSize > 16 {
 		return nil, 0, fmt.Errorf("given limb size %d not implemented", limbSize)
 	}
+	// TODO: remove after fuzz testing
+	if limbSize < 4 {
+		limbSize = 4
+		in = padBytes(in, 32)
+	}
 	a := newFieldElement(limbSize)
 	var data []uint64
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&data))
@@ -601,7 +611,7 @@ func padBytes(in []byte, size int) []byte {
 	return out
 }
 
-func (f *field) inverse(inv, e fieldElement) bool {
+func (f *field) oldInverse(inv, e fieldElement) bool {
 	u, v, s, r := f.newFieldElement(),
 		f.newFieldElement(),
 		f.newFieldElement(),
@@ -660,6 +670,107 @@ func (f *field) inverse(inv, e fieldElement) bool {
 		f.double(u, u)
 	}
 	f.copy(inv, u)
+	return true
+}
+func (f *field) inverse(inv, e fieldElement) bool {
+	if f.equal(e, f.zero) {
+		// fmt.Printf("[log] fe has no inverse 0\n")
+		f.copy(inv, f.zero)
+		return false
+	}
+	u, v, s, r := f.newFieldElement(),
+		f.newFieldElement(),
+		f.newFieldElement(),
+		f.newFieldElement()
+	zero := f.newFieldElement()
+	f.copy(u, f.p)
+	f.copy(v, e)
+	f.copy(r, f.zero)
+	f.copy(s, f._one)
+	var k uint64
+	var found = false
+	byteSize := f.byteSize()
+	bitSize := byteSize * 8
+	// Phase 1
+	for i := 0; i < bitSize*2; i++ {
+		if f.equal(v, zero) {
+			found = true
+			break
+		}
+		if is_even(u) {
+			f.div_two(u)
+			f.mul_two(s)
+		} else if is_even(v) {
+			f.div_two(v)
+			f.mul_two(r)
+		} else if f.cmp(u, v) == 1 {
+			f.subn(u, v)
+			f.div_two(u)
+			f.addn(r, s)
+			f.mul_two(s)
+		} else if f.cmp(v, u) != -1 {
+			f.subn(v, u)
+			f.div_two(v)
+			f.addn(s, r)
+			f.mul_two(r)
+		}
+		k += 1
+	}
+	if !found {
+		// fmt.Printf("[log] fe has no inverse 1\n")
+		f.copy(inv, zero)
+		return false
+	}
+
+	if f.cmp(r, f.p) != -1 {
+		f.subn(r, f.p)
+	}
+	f.copy(u, f.p)
+	f.subn(u, r)
+
+	montPower := uint64(f.limbSize * 64)
+	modulusBitsCeil := f.bitLength
+	kInRange := modulusBitsCeil <= k && k <= montPower+modulusBitsCeil
+
+	if !kInRange {
+		// fmt.Printf("[log] fe has no inverse 2\n")
+		f.copy(inv, zero)
+		return false
+	}
+
+	if modulusBitsCeil <= k && k <= montPower {
+		f.mul(u, u, f.r2)
+		k += montPower
+	}
+
+	if k > 2*montPower {
+		// fmt.Printf("[log] fe has no inverse 3\n")
+		f.copy(inv, zero)
+		return false
+	}
+	if 2*montPower-k > montPower {
+		// fmt.Printf("[log] fe has no inverse 4\n")
+		f.copy(inv, zero)
+		return false
+	}
+	// now we need montgomery(!) multiplication by 2^(2m - k)
+	// since 2^(2m - k) < 2^m then we are ok with a multiplication without preliminary reduction
+	// of the representation as montgomery multiplication will handle it for us
+	xBig := big.NewInt(1)
+	xBig = new(big.Int).Lsh(xBig, uint(uint32(2*montPower-k)))
+	xBytes := xBig.Bytes()
+	if len(xBytes) < f.limbSize*8 {
+		xBytes = padBytes(xBig.Bytes(), f.limbSize*8)
+	}
+	x, err := f.newFieldElementFromBytesNoTransform(xBytes)
+	if err != nil {
+		// fmt.Printf("[log] fe has no inverse 5\n")
+		fmt.Println(err)
+		f.copy(inv, zero)
+		return false
+	}
+	f.mul(u, u, x)
+	f.toMont(inv, u)
 	return true
 }
 

@@ -7,6 +7,10 @@ import (
 	"math/big"
 )
 
+const (
+	USE_4LIMBS_FOR_LOWER_LIMBS = true
+)
+
 func bytes_(size int, hexStrs ...string) []byte {
 	var out []byte
 	if size > 0 {
@@ -47,7 +51,7 @@ func padHex(value []byte) []byte {
 		}
 	}
 	// TODO: remove after for fuzz testing
-	if len(value) <= 32 {
+	if USE_4LIMBS_FOR_LOWER_LIMBS && len(value) <= 32 {
 		value = padBytes(value, 32)
 	}
 	return value

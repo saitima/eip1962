@@ -3,6 +3,7 @@ package eip
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"math/big"
@@ -15,6 +16,17 @@ var targetNumberOfLimb int = -1
 
 var from = 1
 var to = 8
+
+// TODO: remove after fuzz testing
+func checkLimbSizeControl(limbsInField, limbs int) bool {
+	if limbsInField == limbs {
+		return true
+	}
+	if USE_4LIMBS_FOR_LOWER_LIMBS && limbs <= 4 && limbsInField == 4 {
+		return true
+	}
+	return false
+}
 
 func TestMain(m *testing.M) {
 	_fuz := flag.Int("fuzz", 1, "# of iters")
@@ -63,7 +75,14 @@ func resolveLimbSize(bitSize int) int {
 }
 
 func randBytes(max *big.Int) []byte {
-	return padBytes(randBig(max).Bytes(), resolveLimbSize(max.BitLen())*8)
+	// return padBytes(randBig(max).Bytes(), resolveLimbSize(max.BitLen())*8)
+	out := padBytes(randBig(max).Bytes(), resolveLimbSize(max.BitLen())*8)
+	// TODO: remove after fuzz testing
+	limbSize := resolveLimbSize(max.BitLen())
+	if limbSize < 4 {
+		out = padBytes(out, 32)
+	}
+	return out
 }
 
 func randBig(max *big.Int) *big.Int {
@@ -82,7 +101,7 @@ func BenchmarkField(t *testing.B) {
 		return
 	}
 	field := randField(limbSize)
-	if field.limbSize != limbSize {
+	if !checkLimbSizeControl(field.limbSize, limbSize) {
 		t.Fatalf("bad field construction")
 	}
 	bitSize := limbSize * 64
@@ -193,7 +212,7 @@ func TestSerialization(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_serialization", limbSize*64), func(t *testing.T) {
 			field := randField(limbSize)
-			if field.limbSize != limbSize {
+			if !checkLimbSizeControl(field.limbSize, limbSize) {
 				t.Fatalf("bad field construction\n")
 			}
 			// demont(r) == 1
@@ -210,7 +229,7 @@ func TestSerialization(t *testing.T) {
 			}
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !checkLimbSizeControl(field.limbSize, limbSize) {
 					t.Fatalf("bad field construction")
 				}
 				// bytes
@@ -255,7 +274,7 @@ func TestAdditionCrossAgainstBigInt(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_addition_cross", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !checkLimbSizeControl(field.limbSize, limbSize) {
 					t.Fatalf("Bad field construction")
 				}
 				a, _ := field.randFieldElement(rand.Reader)
@@ -298,7 +317,7 @@ func TestAdditionProperties(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_addition_properties", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !checkLimbSizeControl(field.limbSize, limbSize) {
 					t.Fatalf("bad field construction")
 				}
 				a, _ := field.randFieldElement(rand.Reader)
@@ -367,7 +386,7 @@ func TestMultiplicationCrossAgainstBigInt(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_multiplication_cross", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !checkLimbSizeControl(field.limbSize, limbSize) {
 					t.Fatalf("bad field construction")
 				}
 				a, _ := field.randFieldElement(rand.Reader)
@@ -392,7 +411,7 @@ func TestMultiplicationProperties(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_multiplication_properties", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !checkLimbSizeControl(field.limbSize, limbSize) {
 					t.Fatalf("bad field construction")
 				}
 				a, _ := field.randFieldElement(rand.Reader)
@@ -430,7 +449,7 @@ func TestExponentiation(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_exponention", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !checkLimbSizeControl(field.limbSize, limbSize) {
 					t.Fatalf("bad field construction")
 				}
 				a, _ := field.randFieldElement(rand.Reader)
@@ -465,7 +484,39 @@ func TestExponentiation(t *testing.T) {
 	}
 }
 
-func TestInversion(t *testing.T) {
+// func TestInversion(t *testing.T) {
+// 	for limbSize := from; limbSize < to+1; limbSize++ {
+// 		t.Run(fmt.Sprintf("%d_inversion", limbSize*64), func(t *testing.T) {
+// 			for i := 0; i < fuz; i++ {
+// 				field := randField(limbSize)
+// 				u := field.newFieldElement()
+// 				field.inverse(u, field.zero)
+// 				if !field.equal(u, field.zero) {
+// 					t.Fatalf("(0^-1) == 0)")
+// 				}
+// 				field.inverse(u, field.one)
+// 				if !field.equal(u, field.one) {
+// 					t.Fatalf("(1^-1) == 1)")
+// 				}
+// 				a, _ := field.randFieldElement(rand.Reader)
+// 				field.inverse(u, a)
+// 				field.mul(u, u, a)
+// 				if !field.equal(u, field.r) {
+// 					t.Fatalf("(r*a) * r*(a^-1) == r)")
+// 				}
+// 				v := field.newFieldElement()
+// 				p := new(big.Int).Set(field.pbig)
+// 				field.exp(u, a, p.Sub(p, big.NewInt(2)))
+// 				field.inverse(v, a)
+// 				if !field.equal(v, u) {
+// 					t.Fatalf("a^(p-2) == a^-1")
+// 				}
+// 			}
+// 		})
+// 	}
+// }
+
+func TestNewInversion(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_inversion", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
@@ -494,5 +545,62 @@ func TestInversion(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNewInverse(t *testing.T) {
+	modBytes, err := hex.DecodeString("f3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(modBytes) < 8 {
+		modBytes = padBytes(modBytes, 8)
+	}
+	// fmt.Printf("modBytes: %x\n", modBytes)
+	f, err := newField(modBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	elemBytes, err := hex.DecodeString("e3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(elemBytes) < 32 {
+		elemBytes = padBytes(elemBytes, 32)
+	}
+	elem, err := f.newFieldElementFromBytes(elemBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inv := f.newFieldElement()
+	if ok := f.inverse(inv, elem); !ok {
+		t.Logf("no inverse")
+	}
+	f.mul(inv, inv, elem)
+	if !f.equal(inv, f.one) {
+		t.Fatalf("bad inversion")
+	}
+}
+func TestNewInverse2(t *testing.T) {
+	modLen := 32
+	modBytes := bytes_(modLen, "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47")
+	f, err := newField(modBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	elemBytes := bytes_(modLen, "0x07")
+	elem, err := f.newFieldElementFromBytes(elemBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inv := f.newFieldElement()
+	if ok := f.inverse(inv, elem); !ok {
+		t.Logf("no inverse")
+	}
+	f.mul(inv, inv, elem)
+	if !f.equal(inv, f.one) {
+		t.Logf("inv: %s\n", f.toString(inv))
+		t.Fatalf("bad inversion")
 	}
 }

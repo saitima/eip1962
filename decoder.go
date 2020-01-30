@@ -75,7 +75,7 @@ func parseBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, error
 	}
 	// TODO: remove after for fuzz testing
 	var field *field
-	if modulusLen <= 32 {
+	if USE_4LIMBS_FOR_LOWER_LIMBS && modulusLen <= 32 {
 		field, err = newField(padBytes(modulusBuf, 32))
 	} else {
 		field, err = newField(modulusBuf)

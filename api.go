@@ -81,9 +81,9 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 	if !g1.isOnCurve(p1) {
 		return nil, errors.New("point 1 isn't on the curve")
 	}
-	g1.add(p1, p1, p0)
+	g1.add(p0, p0, p1)
 	out := make([]byte, 2*modulusLen)
-	encodeG1Point(out, g1.toBytes(p1))
+	encodeG1Point(out, g1.toBytes(p0))
 	return out, nil
 }
 
@@ -261,9 +261,10 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if !g2.isOnCurve(q1) {
 		return nil, errors.New("point 1 isn't on the curve")
 	}
-	g2.add(q1, q1, q0)
+
+	g2.add(q0, q0, q1)
 	out := make([]byte, 4*modulusLen)
-	encodeG22Point(out, g2.toBytes(q1))
+	encodeG22Point(out, g2.toBytes(q0))
 	return out, nil
 }
 
@@ -419,9 +420,9 @@ func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if !g2.isOnCurve(q1) {
 		return nil, errors.New("point 1 isn't on the curve")
 	}
-	g2.add(q1, q1, q0)
+	g2.add(q0, q0, q1)
 	out := make([]byte, 6*modulusLen)
-	encodeG23Point(out, g2.toBytes(q1))
+	encodeG23Point(out, g2.toBytes(q0))
 	return out, nil
 }
 

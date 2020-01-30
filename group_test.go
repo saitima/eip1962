@@ -1044,9 +1044,7 @@ func TestG1(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Run("FromBytes&ToBytes", func(t *testing.T) {
-		q, err := g.fromBytes(
-			g.toBytes(one),
-		)
+		q, err := g.fromBytes(g.toBytes(one))
 		if err != nil {
 			t.Fatal(err)
 		}

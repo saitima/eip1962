@@ -108,23 +108,24 @@ func (g *g1) copy(q, p *pointG1) *pointG1 {
 	return q
 }
 
-func (g *g1) affine(r, p *pointG1) *pointG1 {
+func (g *g1) affine(r, p *pointG1) (*pointG1, bool) {
 	if g.isZero(p) {
 		g.f.copy(r[0], g.f.zero)
 		g.f.copy(r[1], g.f.zero)
 		g.f.copy(r[2], g.f.zero)
-		return r
+		return r, true
 	}
 	if g.f.equal(p[2], g.f.one) {
 		g.copy(r, p)
-		return r
+		return r, true
 	}
 	t := g.t
+
 	if ok := g.f.inverse(t[0], p[2]); !ok {
 		g.f.copy(r[0], g.f.zero)
 		g.f.copy(r[1], g.f.zero)
 		g.f.copy(r[2], g.f.zero)
-		return r
+		return r, false
 	}
 	q := g.newPoint()
 	g.f.square(t[1], t[0])
@@ -133,7 +134,7 @@ func (g *g1) affine(r, p *pointG1) *pointG1 {
 	g.f.mul(q[1], p[1], t[0])
 	g.f.copy(q[2], g.f.one)
 	g.copy(r, q)
-	return r
+	return r, true
 }
 
 func (g *g1) toString(p *pointG1) string {

@@ -213,6 +213,7 @@ func (fq *fq6) inverse(c, a *fe6) bool {
 	fq.f.mul(t[4], &a[0], t[0])              // A * a0
 	fq.f.add(t[3], t[3], t[4])               // v6 = A * a0 * α * (C * a1 + B * a2)
 	if ok := fq.f.inverse(t[3], t[3]); !ok { // F = v6^-1
+		fq.copy(c, fq.zero())
 		return false
 	}
 	fq.f.mul(&c[0], t[0], t[3]) // c0 = A * F

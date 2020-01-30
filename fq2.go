@@ -184,6 +184,7 @@ func (fq *fq2) inverse(c, a *fe2) bool {
 	fq.mulByNonResidue(t[1], t[1]) // β * v1
 	fq.f.sub(t[1], t[0], t[1])     // v0 = v0 - β * v1
 	if ok := fq.f.inverse(t[0], t[1]); !ok {
+		fq.copy(c, fq.zero())
 		return false
 	} // v1 = v0^-1;
 	fq.f.mul(c[0], a[0], t[0]) // c0 = a0 * v1
