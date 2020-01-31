@@ -110,9 +110,7 @@ func (g *g1) copy(q, p *pointG1) *pointG1 {
 
 func (g *g1) affine(r, p *pointG1) *pointG1 {
 	if g.isZero(p) {
-		g.f.copy(r[0], g.f.zero)
-		g.f.copy(r[1], g.f.zero)
-		g.f.copy(r[2], g.f.zero)
+		g.copy(r, p)
 		return r
 	}
 	if g.f.equal(p[2], g.f.one) {
@@ -356,7 +354,7 @@ func (g *g1) sub(c, a, b *pointG1) *pointG1 {
 }
 
 func (g *g1) mulScalar(c, p *pointG1, e *big.Int) *pointG1 {
-	q, n := g.newPoint(), g.newPoint()
+	q, n := g.zero(), g.newPoint()
 	g.copy(n, p)
 	l := e.BitLen()
 	for i := 0; i < l; i++ {

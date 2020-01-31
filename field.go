@@ -731,7 +731,6 @@ func (f *field) inverse(inv, e fieldElement) bool {
 	montPower := uint64(f.limbSize * 64)
 	modulusBitsCeil := f.bitLength
 	kInRange := modulusBitsCeil <= k && k <= montPower+modulusBitsCeil
-
 	if !kInRange {
 		fmt.Printf("[log] fe has no inverse 2\n")
 		f.copy(inv, zero)

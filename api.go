@@ -329,7 +329,7 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return pairingError, errors.New("Input is not long enough to get number of pairs")
+		return pairingError, errors.New("Invalid number of pairs")
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {

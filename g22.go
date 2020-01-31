@@ -108,9 +108,7 @@ func (g *g22) copy(q, p *pointG22) *pointG22 {
 
 func (g *g22) affine(r, p *pointG22) *pointG22 {
 	if g.isZero(p) {
-		g.f.copy(r[0], g.f.zero())
-		g.f.copy(r[1], g.f.zero())
-		g.f.copy(r[2], g.f.zero())
+		g.copy(r, p)
 		return r
 	}
 	if g.f.equal(p[2], g.f.one()) {
@@ -361,7 +359,7 @@ func (g *g22) sub(c, a, b *pointG22) *pointG22 {
 }
 
 func (g *g22) mulScalar(c, p *pointG22, e *big.Int) *pointG22 {
-	q, n := g.newPoint(), g.newPoint()
+	q, n := g.zero(), g.newPoint()
 	g.copy(n, p)
 	l := e.BitLen()
 	for i := 0; i < l; i++ {
