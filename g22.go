@@ -362,11 +362,16 @@ func (g *g22) mulScalar(c, p *pointG22, e *big.Int) *pointG22 {
 	q, n := g.zero(), g.newPoint()
 	g.copy(n, p)
 	l := e.BitLen()
-	for i := 0; i < l; i++ {
+	found := false
+	for i := l - 1; i >= 0; i-- {
+		if found {
+			g.double(q, q)
+		} else {
+			found = e.Bit(i) == 1
+		}
 		if e.Bit(i) == 1 {
 			g.add(q, q, n)
 		}
-		g.double(n, n)
 	}
 	g.copy(c, q)
 	return c
