@@ -369,7 +369,7 @@ func (g *g1) mulScalar(c, p *pointG1, e *big.Int) *pointG1 {
 
 func (g *g1) checkCorrectSubGroup(p *pointG1) bool {
 	c := g.newPoint()
-	g.wnafMul(c, p, g.q)
+	g.mulScalar(c, p, g.q)
 	if g.equal(c, g.zero()) {
 		return true
 	}
