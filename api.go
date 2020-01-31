@@ -597,6 +597,10 @@ func pairBN(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp12")
 	}
 
+	if hasInverse := fq2.inverse(fq2.newElement(), fq2NonResidue); !hasInverse {
+		return pairingError, errors.New("Fp2 non-residue must be invertible")
+	}
+
 	b2 := fq2.newElement()
 	if twistType == 0x01 {
 		fq2.mulByFq(b2, fq6.nonResidue, b)
@@ -788,6 +792,10 @@ func pairBLS(in []byte) ([]byte, error) {
 	}
 	if ok := fq12.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp12")
+	}
+
+	if hasInverse := fq2.inverse(fq2.newElement(), fq2NonResidue); !hasInverse {
+		return pairingError, errors.New("Fp2 non-residue must be invertible")
 	}
 
 	b2 := fq2.newElement()
