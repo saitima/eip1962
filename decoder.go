@@ -2,7 +2,6 @@ package eip
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 )
 
@@ -27,7 +26,7 @@ const (
 
 func split(in []byte, offset int) ([]byte, []byte, error) {
 	if len(in) < offset {
-		return nil, nil, fmt.Errorf("cant split at given offset %d", offset)
+		return nil, nil, errors.New("cant split at given offset")
 	}
 	return in[:offset], in[offset:], nil
 }
@@ -281,7 +280,7 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, froben
 		return nil, nil, err
 	}
 	if field.isZero(nonResidue) {
-		return nil, nil, errors.New("Fp2 non-residue can not be zero")
+		return nil, nil, errors.New("Non-residue for Fp2 is zero")
 	}
 
 	if !isNonNThRoot(field, nonResidue, 2) {
@@ -307,8 +306,9 @@ func createExtension2FieldParamsForPairing(in []byte, modulusLen int, field *fie
 		return nil, nil, err
 	}
 	if field.isZero(nonResidue) {
-		return nil, nil, errors.New("Fp2 non-residue can not be zero")
+		return nil, nil, errors.New("Non-residue for Fp2 is zero")
 	}
+
 	if ok := isNonNThRoot(field, nonResidue, degree); !ok {
 		return nil, nil, errors.New("Non-residue for Fp2 is actually a residue")
 	}
@@ -332,7 +332,7 @@ func createExtension3FieldParams(in []byte, modulusLen int, field *field, froben
 		return nil, nil, err
 	}
 	if field.isZero(nonResidue) {
-		return nil, nil, errors.New("Fp3 non-residue can not be zero")
+		return nil, nil, errors.New("Non-residue for Fp3 is zero")
 	}
 	if ok := isNonNThRoot(field, nonResidue, 3); !ok {
 		return nil, nil, errors.New("Non-residue for Fp3 is actually a residue")
@@ -357,7 +357,7 @@ func createExtension3FieldParamsForPairing(in []byte, modulusLen int, field *fie
 		return nil, nil, err
 	}
 	if field.isZero(nonResidue) {
-		return nil, nil, errors.New("Fp3 non-residue can not be zero")
+		return nil, nil, errors.New("Non-residue for Fp3 is zero")
 	}
 	if ok := isNonNThRoot(field, nonResidue, degree); !ok {
 		return nil, nil, errors.New("Non-residue for Fp3 is actually a residue")

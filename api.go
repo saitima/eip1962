@@ -2,7 +2,6 @@ package eip
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 )
 
@@ -83,7 +82,6 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 		return nil, errors.New("point 1 isn't on the curve")
 	}
 	g1.add(p0, p0, p1)
-	fmt.Printf("p0: %s\n", g1.toString(p0))
 	out := make([]byte, 2*modulusLen)
 	encodeG1Point(out, g1.toBytes(p0))
 	return out, nil
@@ -555,9 +553,13 @@ func pairBN(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
+
 	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
 	if err != nil {
 		return pairingError, err
+	}
+	if fq2.isZero(fq2NonResidue) {
+		return pairingError, errors.New("Non-residue for Fp6 is zero")
 	}
 	if !isNonNThRootFp2(fq2, fq2NonResidue, 6) {
 		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
@@ -748,6 +750,9 @@ func pairBLS(in []byte) ([]byte, error) {
 	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
 	if err != nil {
 		return pairingError, err
+	}
+	if fq2.isZero(fq2NonResidue) {
+		return pairingError, errors.New("Non-residue for Fp6 is zero")
 	}
 	if !isNonNThRootFp2(fq2, fq2NonResidue, 6) {
 		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
