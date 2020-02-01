@@ -108,7 +108,9 @@ func (g *g22) copy(q, p *pointG22) *pointG22 {
 
 func (g *g22) affine(r, p *pointG22) *pointG22 {
 	if g.isZero(p) {
-		g.copy(r, p)
+		g.f.copy(r[0], g.f.zero())
+		g.f.copy(r[1], g.f.zero())
+		g.f.copy(r[2], g.f.zero())
 		return r
 	}
 	if g.f.equal(p[2], g.f.one()) {
