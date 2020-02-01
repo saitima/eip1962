@@ -56,7 +56,7 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, order, rest, err := parseGroupOrder(rest)
+	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +82,7 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 		return nil, errors.New("point 1 isn't on the curve")
 	}
 	g1.add(p0, p0, p1)
+
 	out := make([]byte, 2*modulusLen)
 	encodeG1Point(out, g1.toBytes(p0))
 	return out, nil
@@ -97,7 +98,7 @@ func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest)
+	orderLen, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +136,7 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest)
+	orderLen, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +236,7 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	_, order, rest, err := parseGroupOrder(rest)
+	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +278,7 @@ func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest)
+	orderLen, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +317,7 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest)
+	orderLen, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +396,7 @@ func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	_, order, rest, err := parseGroupOrder(rest)
+	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +436,7 @@ func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest)
+	orderLen, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -472,7 +473,7 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	orderLen, order, rest, err := parseGroupOrder(rest)
+	orderLen, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +541,7 @@ func pairBN(in []byte) ([]byte, error) {
 	if !field.isZero(a) {
 		return pairingError, errors.New("A parameter must be zero for BN curve")
 	}
-	_, order, rest, err := parseGroupOrder(rest)
+	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return pairingError, err
 	}
@@ -738,7 +739,7 @@ func pairBLS(in []byte) ([]byte, error) {
 	if !field.isZero(a) {
 		return pairingError, errors.New("A parameter must be zero for BLS12 curve")
 	}
-	_, order, rest, err := parseGroupOrder(rest)
+	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return pairingError, err
 	}
@@ -918,7 +919,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	_, order, rest, err := parseGroupOrder(rest)
+	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return pairingError, err
 	}
@@ -1097,7 +1098,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	_, order, rest, err := parseGroupOrder(rest)
+	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
 		return pairingError, err
 	}

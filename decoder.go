@@ -192,29 +192,25 @@ func decodeBAInExtField3FromEncoding(in []byte, modulusLen int, field *fq3) (*fe
 	return a3, b3, rest, nil
 }
 
-func decodeG1CurveParams(in []byte) ([]byte, int, []byte, error) {
+func decodeGroupOrder(in []byte) (int, *big.Int, []byte, error) {
 	orderLenBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return nil, 0, nil, err
+		return 0, nil, nil, errors.New("Input is not long enough to get modulus length")
 	}
 	orderLen := int(orderLenBuf[0])
+	if orderLen == 0 {
+		return 0, nil, nil, errors.New("Encoded group length is zero")
+	}
 	if orderLen > MAX_GROUP_BYTE_LEN {
-		return nil, 0, nil, errors.New("Encoded group length is too large")
+		return 0, nil, nil, errors.New("Encoded group length is too large")
 	}
 	orderBuf, rest, err := split(rest, orderLen)
 	if err != nil {
-		return nil, 0, nil, err
+		return 0, nil, nil, errors.New("Input is not long enough to get group order")
 	}
-	return orderBuf, orderLen, rest, nil
-
-}
-
-func parseGroupOrder(in []byte) (int, *big.Int, []byte, error) {
-	orderBuf, orderLen, rest, err := decodeG1CurveParams(in)
-	if err != nil {
-		return 0, nil, nil, err
+	if orderBuf[0] == 0 {
+		return 0, nil, nil, errors.New("Encoded group length has zero top byte")
 	}
-
 	order := new(big.Int).SetBytes(orderBuf)
 	if isBigZero(order) {
 		return 0, nil, nil, errors.New("Group order is zero")
