@@ -387,7 +387,8 @@ func isNonNThRoot(field *field, nonResidue fieldElement, power int) bool {
 }
 
 func isNonNThRootFp2(fq2 *fq2, nonResidue *fe2, power int) bool {
-	exp := new(big.Int).Sub(fq2.f.pbig, big.NewInt(1))
+	exp := new(big.Int).Mul(fq2.f.pbig, fq2.f.pbig)
+	exp = new(big.Int).Sub(exp, big.NewInt(1))
 	exp, rem := new(big.Int).DivMod(exp, big.NewInt(int64(power)), big.NewInt(0))
 	if !isBigZero(rem) {
 		return false
@@ -395,20 +396,6 @@ func isNonNThRootFp2(fq2 *fq2, nonResidue *fe2, power int) bool {
 	result := fq2.newElement()
 	fq2.exp(result, nonResidue, exp)
 	if fq2.equal(result, fq2.one()) {
-		return false
-	}
-	return true
-}
-
-func isNonNThRootFp3(fq3 *fq3, nonResidue *fe3, power int) bool {
-	exp := new(big.Int).Sub(fq3.f.pbig, big.NewInt(1))
-	exp, rem := new(big.Int).DivMod(exp, big.NewInt(int64(power)), big.NewInt(0))
-	if !isBigZero(rem) {
-		return false
-	}
-	result := fq3.newElement()
-	fq3.exp(result, nonResidue, exp)
-	if fq3.equal(result, fq3.one()) {
 		return false
 	}
 	return true
