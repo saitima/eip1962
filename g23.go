@@ -18,7 +18,7 @@ type g23 struct {
 	inf *pointG23
 }
 
-func newG23(f *fq3, a, b *fe3, q []byte) (*g23, error) {
+func newG23(f *fq3, a, b *fe3, q *big.Int) (*g23, error) {
 	t := [9]*fe3{}
 	for i := 0; i < 9; i++ {
 		t[i] = f.zero()
@@ -27,7 +27,7 @@ func newG23(f *fq3, a, b *fe3, q []byte) (*g23, error) {
 		f:   f,
 		a:   f.newElement(),
 		b:   f.newElement(),
-		q:   new(big.Int).SetBytes(q),
+		q:   new(big.Int).Set(q),
 		t:   t,
 		inf: &pointG23{f.zero(), f.one(), f.zero()},
 	}
@@ -39,10 +39,6 @@ func newG23(f *fq3, a, b *fe3, q []byte) (*g23, error) {
 	}
 	g.f.copy(g.a, a)
 	g.f.copy(g.b, b)
-	g.inf = g.newPoint()
-	g.f.copy(g.inf[0], g.f.zero())
-	g.f.copy(g.inf[1], g.f.one())
-	g.f.copy(g.inf[2], g.f.zero())
 	return g, nil
 }
 
@@ -154,9 +150,7 @@ func (g *g23) toStringNoTransform(p *pointG23) string {
 
 func (g *g23) zero() *pointG23 {
 	p := g.newPoint()
-	g.f.copy(p[0], g.f.zero())
-	g.f.copy(p[1], g.f.one())
-	g.f.copy(p[2], g.f.zero())
+	g.copy(p, g.inf)
 	return p
 }
 
@@ -339,6 +333,10 @@ func (g *g23) doubleZeroA(r, p *pointG23) *pointG23 {
 }
 
 func (g *g23) neg(r, p *pointG23) *pointG23 {
+	if g.isZero(p) {
+		g.copy(r, g.inf)
+		return r
+	}
 	g.f.copy(r[0], p[0])
 	g.f.neg(r[1], p[1])
 	g.f.copy(r[2], p[2])

@@ -1028,7 +1028,8 @@ func TestG1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, err := newG1(f, a, b, groupBytes)
+	order := new(big.Int).SetBytes(groupBytes)
+	g, err := newG1(f, a, b, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1231,8 +1232,8 @@ func TestG22(t *testing.T) {
 	a2, b2 := fq2.zero(), fq2.newElement()
 	f.copy(b2[0], b)
 	f.copy(b2[1], b)
-
-	g, err := newG22(fq2, a2, b2, groupBytes)
+	order := new(big.Int).SetBytes(groupBytes)
+	g, err := newG22(fq2, a2, b2, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1433,8 +1434,8 @@ func TestG23(t *testing.T) {
 	fq3.mul(twist3, twist2, twist)
 	fq3.mulByFq(a3, twist2, a)
 	fq3.mulByFq(b3, twist3, b)
-
-	g, err := newG23(fq3, a3, b3, groupBytes)
+	order := new(big.Int).SetBytes(groupBytes)
+	g, err := newG23(fq3, a3, b3, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1623,8 +1624,8 @@ func TestBLS12384Pairing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	g1, err := newG1(f, a, b, groupBytes)
+	order := new(big.Int).SetBytes(groupBytes)
+	g1, err := newG1(f, a, b, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1641,7 +1642,7 @@ func TestBLS12384Pairing(t *testing.T) {
 	f.copy(b2[1], b)
 
 	// G2
-	g2, err := newG22(fq2, a2, b2, groupBytes)
+	g2, err := newG22(fq2, a2, b2, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1665,7 +1666,7 @@ func TestBLS12384Pairing(t *testing.T) {
 		t.Fatal("invalid exponent")
 	}
 
-	bls := newBLSInstance(z, true, 1, g1, g2, fq12, true)
+	bls := newBLSInstance(z, true, TWIST_M, g1, g2, fq12, true)
 
 	generatorBytes := bytes_(byteLen,
 		"0x17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb",
@@ -1796,7 +1797,8 @@ func BenchmarkBLS(t *testing.B) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g1, err := newG1(f, a, b, groupBytes)
+	order := new(big.Int).SetBytes(groupBytes)
+	g1, err := newG1(f, a, b, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1811,7 +1813,7 @@ func BenchmarkBLS(t *testing.B) {
 	f.copy(b2[0], b)
 	f.copy(b2[1], b)
 	// G2
-	g2, err := newG22(fq2, a2, b2, groupBytes)
+	g2, err := newG22(fq2, a2, b2, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1835,7 +1837,7 @@ func BenchmarkBLS(t *testing.B) {
 		t.Fatal("invalid exponent")
 	}
 
-	bls := newBLSInstance(z, true, 1, g1, g2, fq12, true)
+	bls := newBLSInstance(z, true, TWIST_M, g1, g2, fq12, true)
 
 	bytesLen := 48
 	generatorBytes := bytes_(bytesLen,
@@ -1887,8 +1889,8 @@ func TestMNT4320Pairing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	g1, err := newG1(f, a, b, groupBytes)
+	order := new(big.Int).SetBytes(groupBytes)
+	g1, err := newG1(f, a, b, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1925,7 +1927,7 @@ func TestMNT4320Pairing(t *testing.T) {
 	fq2.mulByFq(b2, twist3, b)
 
 	// G2
-	g2, err := newG22(fq2, a2, b2, groupBytes)
+	g2, err := newG22(fq2, a2, b2, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2072,8 +2074,8 @@ func TestMNT4753Pairing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	g1, err := newG1(f, a, b, groupBytes)
+	order := new(big.Int).SetBytes(groupBytes)
+	g1, err := newG1(f, a, b, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2109,7 +2111,7 @@ func TestMNT4753Pairing(t *testing.T) {
 	fq2.mulByFq(b2, twist3, b)
 
 	// G2
-	g2, err := newG22(fq2, a2, b2, groupBytes)
+	g2, err := newG22(fq2, a2, b2, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2253,8 +2255,8 @@ func TestBN254Pairing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	g1, err := newG1(f, a, b, groupBytes)
+	order := new(big.Int).SetBytes(groupBytes)
+	g1, err := newG1(f, a, b, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2289,7 +2291,7 @@ func TestBN254Pairing(t *testing.T) {
 	fq2.inverse(b2, fq6.nonResidue)
 	fq2.mulByFq(b2, b2, b)
 	// G2
-	g2, err := newG22(fq2, a2, b2, groupBytes)
+	g2, err := newG22(fq2, a2, b2, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2301,7 +2303,7 @@ func TestBN254Pairing(t *testing.T) {
 	sixUPlus2 := new(big.Int).Mul(u, big.NewInt(6))
 	sixUPlus2 = new(big.Int).Add(sixUPlus2, big.NewInt(2))
 
-	bn := newBNInstance(u, sixUPlus2, false, 2, g1, g2, fq12, nonResidueInPMinus1Over2, true)
+	bn := newBNInstance(u, sixUPlus2, false, TWIST_D, g1, g2, fq12, nonResidueInPMinus1Over2, true)
 
 	generatorBytes := bytes_(byteLen,
 		"0x01",
@@ -2438,8 +2440,8 @@ func TestMNT6320Pairing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	g1, err := newG1(f, a, b, groupBytes)
+	order := new(big.Int).SetBytes(groupBytes)
+	g1, err := newG1(f, a, b, order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2473,7 +2475,7 @@ func TestMNT6320Pairing(t *testing.T) {
 	fq3.mulByFq(b3, twist3, b)
 
 	// G2
-	g2, err := newG23(fq3, a3, b3, groupBytes)
+	g2, err := newG23(fq3, a3, b3, order)
 	if err != nil {
 		t.Fatal(err)
 	}

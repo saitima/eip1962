@@ -8,6 +8,8 @@ import (
 var (
 	zero                         = []byte{0x00}
 	pairingError, pairingSuccess = []byte{0x00}, []byte{0x01}
+	TWIST_M, TWIST_D             = 0x01, 0x02
+	NEGATIVE_EXP, POSITIVE_EXP   = 0x01, 0x00
 	OPERATION_G1_ADD             = 0x01
 	OPERATION_G1_MUL             = 0x02
 	OPERATION_G1_MULTIEXP        = 0x03
@@ -48,19 +50,7 @@ func (api *API) Run(opType int, in []byte) ([]byte, error) {
 type g1Api struct{}
 
 func (api *g1Api) addPoints(in []byte) ([]byte, error) {
-	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
-	if err != nil {
-		return nil, err
-	}
-	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
-	if err != nil {
-		return nil, err
-	}
-	_, order, rest, err := decodeGroupOrder(rest)
-	if err != nil {
-		return nil, err
-	}
-	g1, err := newG1(field, a, b, order.Bytes())
+	g1, modulusLen, _, rest, err := decodeG1(in)
 	if err != nil {
 		return nil, err
 	}
@@ -89,21 +79,7 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 }
 
 func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
-	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
-	if err != nil {
-		return nil, err
-	}
-
-	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
-	if err != nil {
-		return nil, err
-	}
-	orderLen, order, rest, err := decodeGroupOrder(rest)
-	if err != nil {
-		return nil, err
-	}
-
-	g1, err := newG1(field, a, b, order.Bytes())
+	g1, modulusLen, order, rest, err := decodeG1(in)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +90,7 @@ func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
 	if !g1.isOnCurve(p) {
 		return nil, errors.New("point isn't on the curve")
 	}
+	orderLen := len(order.Bytes())
 	s, rest, err := decodeScalar(rest, orderLen, order)
 	if err != nil {
 		return nil, err
@@ -128,22 +105,11 @@ func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
 }
 
 func (api *g1Api) multiExp(in []byte) ([]byte, error) {
-	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	g1, modulusLen, order, rest, err := decodeG1(in)
 	if err != nil {
 		return nil, err
 	}
-	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
-	if err != nil {
-		return nil, err
-	}
-	orderLen, order, rest, err := decodeGroupOrder(rest)
-	if err != nil {
-		return nil, err
-	}
-	g1, err := newG1(field, a, b, order.Bytes())
-	if err != nil {
-		return nil, err
-	}
+	orderLen := len(order.Bytes())
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return pairingError, errors.New("Input is not long enough to get number of pairs")
@@ -180,7 +146,7 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 
 	p := g1.newPoint()
 	if len(bases) != len(scalars) || len(bases) == 0 {
-		g1.copy(p, g1.zero())
+		g1.copy(p, g1.inf)
 	} else {
 		g1.multiExp(p, bases, scalars)
 	}
@@ -228,19 +194,7 @@ func (api *g22Api) run(opType int, field *field, modulusLen int, in []byte) ([]b
 }
 
 func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, error) {
-	fq2, rest, err := createExtension2FieldParams(in, modulusLen, field, false)
-	if err != nil {
-		return nil, err
-	}
-	a2, b2, rest, err := decodeBAInExtField2FromEncoding(rest, modulusLen, fq2)
-	if err != nil {
-		return nil, err
-	}
-	_, order, rest, err := decodeGroupOrder(rest)
-	if err != nil {
-		return nil, err
-	}
-	g2, err := newG22(fq2, a2, b2, order.Bytes())
+	g2, _, rest, err := decodeG22(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +206,6 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-
 	if len(rest) != 0 {
 		return nil, errors.New("Input contains garbage at the end")
 	}
@@ -262,7 +215,6 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 	if !g2.isOnCurve(q1) {
 		return nil, errors.New("point 1 isn't on the curve")
 	}
-
 	g2.add(q0, q0, q1)
 	out := make([]byte, 4*modulusLen)
 	encodeG22Point(out, g2.toBytes(q0))
@@ -270,24 +222,11 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 }
 
 func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, error) {
-	fq2, rest, err := createExtension2FieldParams(in, modulusLen, field, false)
+	g2, order, rest, err := decodeG22(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
-	a2, b2, rest, err := decodeBAInExtField2FromEncoding(rest, modulusLen, fq2)
-	if err != nil {
-		return nil, err
-	}
-	orderLen, order, rest, err := decodeGroupOrder(rest)
-	if err != nil {
-		return nil, err
-	}
-	g2, err := newG22(fq2, a2, b2, order.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	fq2.copy(g2.a, a2)
-	fq2.copy(g2.b, b2)
+	orderLen := len(order.Bytes())
 	q, rest, err := decodeG22Point(rest, modulusLen, g2)
 	if err != nil {
 		return nil, err
@@ -309,23 +248,11 @@ func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 }
 
 func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, error) {
-	fq2, rest, err := createExtension2FieldParams(in, modulusLen, field, false)
+	g2, order, rest, err := decodeG22(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
-	a2, b2, rest, err := decodeBAInExtField2FromEncoding(rest, modulusLen, fq2)
-	if err != nil {
-		return nil, err
-	}
-	orderLen, order, rest, err := decodeGroupOrder(rest)
-	if err != nil {
-		return nil, err
-	}
-	g2, err := newG22(fq2, a2, b2, order.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
+	orderLen := len(order.Bytes())
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return pairingError, errors.New("Invalid number of pairs")
@@ -362,7 +289,7 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 
 	q := g2.newPoint()
 	if len(bases) != len(scalars) || len(bases) == 0 {
-		g2.copy(q, g2.zero())
+		g2.copy(q, g2.inf)
 	} else {
 		g2.multiExp(q, bases, scalars)
 	}
@@ -388,19 +315,7 @@ func (api *g23Api) run(opType int, field *field, modulusLen int, in []byte) ([]b
 }
 
 func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, error) {
-	fq3, rest, err := createExtension3FieldParams(in, modulusLen, field, false)
-	if err != nil {
-		return nil, err
-	}
-	a2, b2, rest, err := decodeBAInExtField3FromEncoding(rest, modulusLen, fq3)
-	if err != nil {
-		return nil, err
-	}
-	_, order, rest, err := decodeGroupOrder(rest)
-	if err != nil {
-		return nil, err
-	}
-	g2, err := newG23(fq3, a2, b2, order.Bytes())
+	g2, _, rest, err := decodeG23(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
@@ -428,22 +343,11 @@ func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 }
 
 func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, error) {
-	fq3, rest, err := createExtension3FieldParams(in, modulusLen, field, false)
+	g2, order, rest, err := decodeG23(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
-	a3, b3, rest, err := decodeBAInExtField3FromEncoding(rest, modulusLen, fq3)
-	if err != nil {
-		return nil, err
-	}
-	orderLen, order, rest, err := decodeGroupOrder(rest)
-	if err != nil {
-		return nil, err
-	}
-	g2, err := newG23(fq3, a3, b3, order.Bytes())
-	if err != nil {
-		return nil, err
-	}
+	orderLen := len(order.Bytes())
 	q, rest, err := decodeG23Point(rest, modulusLen, g2)
 	if err != nil {
 		return nil, err
@@ -465,22 +369,11 @@ func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 }
 
 func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, error) {
-	fq3, rest, err := createExtension3FieldParams(in, modulusLen, field, false)
+	g2, order, rest, err := decodeG23(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
-	a2, b2, rest, err := decodeBAInExtField3FromEncoding(rest, modulusLen, fq3)
-	if err != nil {
-		return nil, err
-	}
-	orderLen, order, rest, err := decodeGroupOrder(rest)
-	if err != nil {
-		return nil, err
-	}
-	g2, err := newG23(fq3, a2, b2, order.Bytes())
-	if err != nil {
-		return nil, err
-	}
+	orderLen := len(order.Bytes())
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return pairingError, errors.New("Input is not long enough to get number of pairs")
@@ -489,7 +382,7 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	if numPairs == 0 {
 		return pairingError, errors.New("zero pairs encoded")
 	}
-	// TODO: make handling 6*modulusLen generic
+
 	if len(rest) != (6*modulusLen+orderLen)*numPairs {
 		return nil, errors.New("Input length is invalid for number of pairs")
 	}
@@ -518,7 +411,7 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 
 	q := g2.newPoint()
 	if len(bases) != len(scalars) || len(bases) == 0 {
-		g2.copy(q, g2.zero())
+		g2.copy(q, g2.inf)
 	} else {
 		g2.multiExp(q, bases, scalars)
 	}
@@ -528,12 +421,10 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 }
 
 func pairBN(in []byte) ([]byte, error) {
-	// base field
 	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
 	if err != nil {
 		return pairingError, err
 	}
-	// g1
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
 		return pairingError, err
@@ -545,11 +436,11 @@ func pairBN(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	g1, err := newG1(field, a, b, order.Bytes())
+	g1, err := newG1(field, a, b, order)
 	if err != nil {
 		return pairingError, err
 	}
-	// ext2
+
 	fq2, rest, err := createExtension2FieldParamsForPairing(rest, modulusLen, field, true, 2)
 	if err != nil {
 		return pairingError, err
@@ -565,14 +456,9 @@ func pairBN(in []byte) ([]byte, error) {
 	if !isNonNThRootFp2(fq2, fq2NonResidue, 6) {
 		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
 	}
-	// twist type 0x01: M, 0x02: D
-	twistTypeBuf, rest, err := split(rest, TWIST_TYPE_LENGTH)
+	twistType, rest, err := decodeTwistType(rest)
 	if err != nil {
-		return pairingError, errors.New("Input is not long enough to get twist type")
-	}
-	twistType := twistTypeBuf[0]
-	if twistType != 0x01 && twistType != 0x02 {
-		return pairingError, errors.New("Unknown twist type supplied")
+		return pairingError, err
 	}
 
 	f1, f2, err := constructBaseForFq6AndFq12(fq2, fq2NonResidue)
@@ -580,7 +466,6 @@ func pairBN(in []byte) ([]byte, error) {
 		return pairingError, errors.New("Can not make base precomputations for Fp6/Fp12 frobenius")
 	}
 
-	// ext6
 	fq6, err := newFq6(fq2, nil)
 	if err != nil {
 		return pairingError, err
@@ -589,7 +474,6 @@ func pairBN(in []byte) ([]byte, error) {
 	if ok := fq6.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp6")
 	}
-	// ext12
 	fq12, err := newFq12(fq6, nil)
 	if err != nil {
 		return pairingError, err
@@ -603,7 +487,7 @@ func pairBN(in []byte) ([]byte, error) {
 	}
 
 	b2 := fq2.newElement()
-	if twistType == 0x01 {
+	if twistType == TWIST_M {
 		fq2.mulByFq(b2, fq6.nonResidue, b)
 	} else {
 		fq6NonResidueInv := fq2.newElement()
@@ -611,12 +495,10 @@ func pairBN(in []byte) ([]byte, error) {
 		fq2.mulByFq(b2, fq6NonResidueInv, b)
 	}
 
-	// g2
-	g2, err := newG22(fq2, fq2.zero(), b2, order.Bytes())
+	g2, err := newG22(fq2, fq2.zero(), b2, order)
 	if err != nil {
 		return pairingError, err
 	}
-	// u
 	u, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
 		return pairingError, err
@@ -624,33 +506,19 @@ func pairBN(in []byte) ([]byte, error) {
 	if isBigZero(u) {
 		return pairingError, errors.New("Loop count parameters can not be zero")
 	}
-	// u is negative
-	uIsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
+	uIsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
-		return pairingError, errors.New("X is not encoded properly")
+		return pairingError, err
 	}
-	// maybe better? uIsNegativeBuf[0 : SIGN_ENCODING_LENGTH-1]
-	var (
-		uIsNegative bool
-		sixUPlus2   *big.Int
-	)
-
+	var sixUPlus2 *big.Int
 	six, two := big.NewInt(6), big.NewInt(2)
-	switch uIsNegativeBuf[0] {
-	case 0x01:
-		uIsNegative = true
+	if uIsNegative {
 		sixUPlus2 = new(big.Int).Mul(six, u)
 		sixUPlus2 = new(big.Int).Sub(sixUPlus2, two)
-		break
-	case 0x00:
-		uIsNegative = false
+	} else {
 		sixUPlus2 = new(big.Int).Mul(six, u)
 		sixUPlus2 = new(big.Int).Add(sixUPlus2, two)
-		break
-	default:
-		return pairingError, errors.New("Unknown parameter u sign")
 	}
-
 	if weight := calculateHammingWeight(sixUPlus2); weight > MAX_BN_SIX_U_PLUS_TWO_HAMMING {
 		return pairingError, errors.New("|6*U + 2| has too large hamming weight")
 	}
@@ -725,13 +593,10 @@ func pairBN(in []byte) ([]byte, error) {
 }
 
 func pairBLS(in []byte) ([]byte, error) {
-	// base field
 	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
 	if err != nil {
 		return pairingError, err
 	}
-
-	// g1
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
 		return pairingError, err
@@ -743,7 +608,7 @@ func pairBLS(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	g1, err := newG1(field, a, b, order.Bytes())
+	g1, err := newG1(field, a, b, order)
 	if err != nil {
 		return pairingError, err
 	}
@@ -762,22 +627,14 @@ func pairBLS(in []byte) ([]byte, error) {
 	if !isNonNThRootFp2(fq2, fq2NonResidue, 6) {
 		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
 	}
-	// twist type 0x01: M, 0x02: D
-	twistTypeBuf, rest, err := split(rest, TWIST_TYPE_LENGTH)
+	twistType, rest, err := decodeTwistType(rest)
 	if err != nil {
-		return pairingError, errors.New("Input is not long enough to get twist type")
+		return pairingError, err
 	}
-	twistType := twistTypeBuf[0]
-	if twistType != 0x01 && twistType != 0x02 {
-		return pairingError, errors.New("Unknown twist type supplied")
-	}
-
 	f1, f2, err := constructBaseForFq6AndFq12(fq2, fq2NonResidue)
 	if err != nil {
 		return pairingError, errors.New("Can not make base precomputations for Fp6/Fp12 frobenius")
 	}
-
-	// ext6
 	fq6, err := newFq6(fq2, nil)
 	if err != nil {
 		return pairingError, err
@@ -786,7 +643,6 @@ func pairBLS(in []byte) ([]byte, error) {
 	if ok := fq6.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp6")
 	}
-	// ext12
 	fq12, err := newFq12(fq6, nil)
 	if err != nil {
 		return pairingError, err
@@ -800,20 +656,17 @@ func pairBLS(in []byte) ([]byte, error) {
 	}
 
 	b2 := fq2.newElement()
-	if twistType == 0x01 {
+	if twistType == TWIST_M {
 		fq2.mulByFq(b2, fq6.nonResidue, b)
 	} else {
 		fq6NonResidueInv := fq2.newElement()
 		fq2.inverse(fq6NonResidueInv, fq6.nonResidue)
 		fq2.mulByFq(b2, fq6NonResidueInv, b)
 	}
-	// g2
-	g2, err := newG22(fq2, fq2.zero(), b2, order.Bytes())
+	g2, err := newG22(fq2, fq2.zero(), b2, order)
 	if err != nil {
 		return pairingError, err
 	}
-
-	// z
 	z, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
 		return pairingError, err
@@ -821,27 +674,14 @@ func pairBLS(in []byte) ([]byte, error) {
 	if z.Cmp(big.NewInt(0)) == 0 {
 		return pairingError, errors.New("Loop count parameters can not be zero")
 	}
-	// u is negative
-	zIsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
-	if err != nil {
-		return pairingError, errors.New("z is not encoded properly")
-	}
-	// maybe better? uIsNegativeBuf[0 : SIGN_ENCODING_LENGTH-1]
-	var zIsNegative bool
-	switch zIsNegativeBuf[0] {
-	case 0x01:
-		zIsNegative = true
-		break
-	case 0x00:
-		zIsNegative = false
-		break
-	default:
-		return pairingError, errors.New("Unknown parameter z sign")
-	}
+
 	if weight := calculateHammingWeight(z); weight > MAX_BLS12_X_HAMMING {
 		return pairingError, errors.New("z has too large hamming weight")
 	}
-
+	zIsNegative, rest, err := decodePairingExpSign(rest)
+	if err != nil {
+		return pairingError, err
+	}
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return pairingError, errors.New("Input is not long enough to get number of pairs")
@@ -887,8 +727,6 @@ func pairBLS(in []byte) ([]byte, error) {
 	if len(g1Points) == 0 {
 		return pairingError, nil
 	}
-
-	// pairs
 	engine := newBLSInstance(
 		z,
 		zIsNegative,
@@ -909,12 +747,10 @@ func pairBLS(in []byte) ([]byte, error) {
 }
 
 func pairMNT4(in []byte) ([]byte, error) {
-	// base field
 	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
 	if err != nil {
 		return pairingError, err
 	}
-	// g1
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
 		return pairingError, err
@@ -923,11 +759,10 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	g1, err := newG1(field, a, b, order.Bytes())
+	g1, err := newG1(field, a, b, order)
 	if err != nil {
 		return pairingError, err
 	}
-	// ext2
 	fq2, rest, err := createExtension2FieldParamsForPairing(rest, modulusLen, field, false, 4)
 	if err != nil {
 		return pairingError, err
@@ -935,8 +770,6 @@ func pairMNT4(in []byte) ([]byte, error) {
 
 	f1 := constructBaseForFq2AndFq4(field, fq2.nonResidue)
 	fq2.calculateFrobeniusCoeffsWithPrecomputation(f1)
-
-	// ext4
 	fq4, err := newFq4(fq2, nil)
 	if err != nil {
 		return pairingError, err
@@ -950,13 +783,10 @@ func pairMNT4(in []byte) ([]byte, error) {
 	fq2.mul(twist3, twist2, twist)
 	fq2.mulByFq(a2, twist2, g1.a)
 	fq2.mulByFq(b2, twist3, g1.b)
-
-	// g2
-	g2, err := newG22(fq2, a2, b2, order.Bytes())
+	g2, err := newG22(fq2, a2, b2, order)
 	if err != nil {
 		return pairingError, err
 	}
-	// x
 	x, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
 		return pairingError, err
@@ -968,26 +798,10 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if weight := calculateHammingWeight(x); weight > MAX_ATE_PAIRING_ATE_LOOP_COUNT_HAMMING {
 		return pairingError, errors.New("X has too large hamming weight")
 	}
-
-	// x is negative
-	xIsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
+	xIsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
-		return pairingError, errors.New("Input is not long enough to get X sign encoding")
+		return pairingError, err
 	}
-	// maybe better? uIsNegativeBuf[0 : SIGN_ENCODING_LENGTH-1]
-	var xIsNegative bool
-	switch xIsNegativeBuf[0] {
-	case 0x01:
-		xIsNegative = true
-		break
-	case 0x00:
-		xIsNegative = false
-		break
-	default:
-		return pairingError, errors.New("X sign is not encoded properly")
-	}
-
-	// expW0
 	expW0, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_FINAL_EXP_W0_BIT_LENGTH)
 	if err != nil {
 		return pairingError, err
@@ -995,7 +809,6 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if isBigZero(expW0) {
 		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
 	}
-	// expW1
 	expW1, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_FINAL_EXP_W1_BIT_LENGTH)
 	if err != nil {
 		return pairingError, err
@@ -1003,22 +816,10 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if isBigZero(expW1) {
 		return pairingError, errors.New("Final exp w1 loop count parameters can not be zero")
 	}
-	expW0IsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
+	expW0IsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
 		return pairingError, errors.New("Exp_w0 sign is not encoded properly")
 	}
-	var expW0IsNegative bool
-	switch expW0IsNegativeBuf[0] {
-	case 0x01:
-		expW0IsNegative = true
-		break
-	case 0x00:
-		expW0IsNegative = false
-		break
-	default:
-		return pairingError, errors.New("Unknown expW0 sign")
-	}
-
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return pairingError, errors.New("Input is not long enough to get number of pairs")
@@ -1087,13 +888,10 @@ func pairMNT4(in []byte) ([]byte, error) {
 }
 
 func pairMNT6(in []byte) ([]byte, error) {
-	// base field
 	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
 	if err != nil {
 		return pairingError, err
 	}
-
-	// g1
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
 		return pairingError, err
@@ -1102,12 +900,10 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	g1, err := newG1(field, a, b, order.Bytes())
+	g1, err := newG1(field, a, b, order)
 	if err != nil {
 		return pairingError, err
 	}
-
-	// ext3
 	fq3, rest, err := createExtension3FieldParamsForPairing(rest, modulusLen, field, false, 6)
 	if err != nil {
 		return pairingError, err
@@ -1117,8 +913,6 @@ func pairMNT6(in []byte) ([]byte, error) {
 		return pairingError, err
 	}
 	fq3.calculateFrobeniusCoeffsWithPrecomputation(f1)
-
-	// ext6 quadratic
 	fq6, err := newFq6Quadratic(fq3, nil)
 	if err != nil {
 		return pairingError, err
@@ -1132,12 +926,10 @@ func pairMNT6(in []byte) ([]byte, error) {
 	fq3.mul(twist3, twist2, twist)
 	fq3.mulByFq(a3, twist2, g1.a)
 	fq3.mulByFq(b3, twist3, g1.b)
-	// g2
-	g2, err := newG23(fq3, a3, b3, order.Bytes())
+	g2, err := newG23(fq3, a3, b3, order)
 	if err != nil {
 		return pairingError, err
 	}
-	// x
 	x, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
 		return pairingError, err
@@ -1149,26 +941,10 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if weight := calculateHammingWeight(x); weight > MAX_ATE_PAIRING_ATE_LOOP_COUNT_HAMMING {
 		return pairingError, errors.New("x has too large hamming weight")
 	}
-
-	// u is negative
-	xIsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
+	xIsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
-		return pairingError, errors.New("x is not encoded properly")
+		return pairingError, err
 	}
-	// maybe better? uIsNegativeBuf[0 : SIGN_ENCODING_LENGTH-1]
-	var xIsNegative bool
-	switch xIsNegativeBuf[0] {
-	case 0x01:
-		xIsNegative = true
-		break
-	case 0x00:
-		xIsNegative = false
-		break
-	default:
-		return pairingError, errors.New("Unknown parameter x sign")
-	}
-
-	// expW0
 	expW0, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
 		return pairingError, err
@@ -1176,7 +952,6 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if isBigZero(expW0) {
 		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
 	}
-	// expW1
 	expW1, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
 		return pairingError, err
@@ -1184,23 +959,10 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if isBigZero(expW1) {
 		return pairingError, errors.New("Final exp w1 loop count parameters can not be zero")
 	}
-
-	expW0IsNegativeBuf, rest, err := split(rest, SIGN_ENCODING_LENGTH)
+	expW0IsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
 		return pairingError, errors.New("Exp_w0 sign is not encoded properly")
 	}
-	var expW0IsNegative bool
-	switch expW0IsNegativeBuf[0] {
-	case 0x01:
-		expW0IsNegative = true
-		break
-	case 0x00:
-		expW0IsNegative = false
-		break
-	default:
-		return pairingError, errors.New("Unknown expW0 sign")
-	}
-
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return pairingError, errors.New("Input is not long enough to get number of pairs")

@@ -18,7 +18,7 @@ type g22 struct {
 	inf *pointG22
 }
 
-func newG22(f *fq2, a, b *fe2, q []byte) (*g22, error) {
+func newG22(f *fq2, a, b *fe2, q *big.Int) (*g22, error) {
 	t := [9]*fe2{}
 	for i := 0; i < 9; i++ {
 		t[i] = f.zero()
@@ -27,7 +27,7 @@ func newG22(f *fq2, a, b *fe2, q []byte) (*g22, error) {
 		f:   f,
 		a:   f.newElement(),
 		b:   f.newElement(),
-		q:   new(big.Int).SetBytes(q),
+		q:   new(big.Int).Set(q),
 		t:   t,
 		inf: &pointG22{f.zero(), f.one(), f.zero()},
 	}
@@ -39,10 +39,6 @@ func newG22(f *fq2, a, b *fe2, q []byte) (*g22, error) {
 	}
 	g.f.copy(g.a, a)
 	g.f.copy(g.b, b)
-	g.inf = g.newPoint()
-	g.f.copy(g.inf[0], g.f.zero())
-	g.f.copy(g.inf[1], g.f.one())
-	g.f.copy(g.inf[2], g.f.zero())
 	return g, nil
 }
 
@@ -74,7 +70,7 @@ func (g *g22) fromXY(x, y *fe2) *pointG22 {
 	if g.f.isZero(x) && g.f.isZero(y) {
 		return g.zero()
 	}
-	p := g.zero()
+	p := g.newPoint()
 	g.f.copy(p[0], x)
 	g.f.copy(p[1], y)
 	g.f.copy(p[2], g.f.one())
@@ -154,9 +150,7 @@ func (g *g22) toStringNoTransform(p *pointG22) string {
 
 func (g *g22) zero() *pointG22 {
 	p := g.newPoint()
-	g.f.copy(p[0], g.f.zero())
-	g.f.copy(p[1], g.f.one())
-	g.f.copy(p[2], g.f.zero())
+	g.copy(p, g.inf)
 	return p
 }
 
@@ -165,8 +159,6 @@ func (g *g22) isZero(p *pointG22) bool {
 }
 
 func (g *g22) equal(p1, p2 *pointG22) bool {
-	// TODO: Affine equality ?
-	// TODO: P and -P equals why?
 	if g.isZero(p1) {
 		return g.isZero(p2)
 	}
@@ -347,9 +339,12 @@ func (g *g22) doubleZeroA(r, p *pointG22) *pointG22 {
 }
 
 func (g *g22) neg(r, p *pointG22) *pointG22 {
-	g.f.copy(r[0], p[0])
+	if g.isZero(p) {
+		g.copy(r, g.inf)
+		return r
+	}
+	g.copy(r, p)
 	g.f.neg(r[1], p[1])
-	g.f.copy(r[2], p[2])
 	return r
 }
 
@@ -382,7 +377,7 @@ func (g *g22) mulScalar(c, p *pointG22, e *big.Int) *pointG22 {
 func (g *g22) checkCorrectSubGroup(p *pointG22) bool {
 	c := g.newPoint()
 	g.wnafMul(c, p, g.q)
-	if g.equal(c, g.zero()) {
+	if g.equal(c, g.inf) {
 		return true
 	}
 	return false
@@ -441,7 +436,7 @@ func (g *g22) multiExp(r *pointG22, points []*pointG22, powers []*big.Int) (*poi
 	bucket_size, numBits := (1<<c)-1, uint32(g.q.BitLen())
 	windows := make([]*pointG22, numBits/c+1)
 	bucket := make([]*pointG22, bucket_size)
-	acc, sum, zero := g.zero(), g.zero(), g.zero()
+	acc, sum := g.newPoint(), g.newPoint()
 	for i := 0; i < bucket_size; i++ {
 		bucket[i] = g.newPoint()
 	}
@@ -449,10 +444,10 @@ func (g *g22) multiExp(r *pointG22, points []*pointG22, powers []*big.Int) (*poi
 	j := 0
 	var cur uint32
 	for cur <= numBits {
-		g.copy(acc, zero)
+		g.copy(acc, g.inf)
 		bucket = make([]*pointG22, (1<<c)-1)
 		for i := 0; i < len(bucket); i++ {
-			bucket[i] = g.zero()
+			bucket[i] = g.newPoint()
 		}
 		for i := 0; i < len(powers); i++ {
 			s := newRepr(powers[i])
@@ -463,7 +458,7 @@ func (g *g22) multiExp(r *pointG22, points []*pointG22, powers []*big.Int) (*poi
 			powers[i] = new(big.Int).Rsh(powers[i], uint(c))
 		}
 
-		g.copy(sum, zero)
+		g.copy(sum, g.inf)
 		for i := len(bucket) - 1; i >= 0; i-- {
 			g.add(sum, sum, bucket[i])
 			g.add(acc, acc, sum)
@@ -473,7 +468,7 @@ func (g *g22) multiExp(r *pointG22, points []*pointG22, powers []*big.Int) (*poi
 		j++
 		cur += c
 	}
-	g.copy(acc, g.zero())
+	g.copy(acc, g.inf)
 	for i := len(windows) - 1; i >= 0; i-- {
 		for j := uint32(0); j < c; j++ {
 			g.double(acc, acc)

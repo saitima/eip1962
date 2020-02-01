@@ -8,7 +8,7 @@ import (
 type blsInstance struct {
 	z           *big.Int
 	zIsnegative bool
-	twistType   uint8
+	twistType   int
 	g1          *g1
 	g2          *g22
 	fq12        *fq12
@@ -18,7 +18,7 @@ type blsInstance struct {
 	zNaf        []int8
 }
 
-func newBLSInstance(z *big.Int, zIsnegative bool, twistType uint8, g1 *g1, g2 *g22, fq12 *fq12, forceNoNaf bool) *blsInstance {
+func newBLSInstance(z *big.Int, zIsnegative bool, twistType int, g1 *g1, g2 *g22, fq12 *fq12, forceNoNaf bool) *blsInstance {
 	naf := ternaryWnaf(z)
 	originalBits := onesCount(z)
 	originalHamming := calculateHammingWeight(z)

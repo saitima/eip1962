@@ -438,3 +438,91 @@ func decodeLoopParameters(in []byte, limit int) (*big.Int, []byte, error) {
 	}
 	return param, rest, nil
 }
+
+func decodeTwistType(in []byte) (int, []byte, error) {
+	// twist type 0x01: M, 0x02: D
+	twistTypeBuf, rest, err := split(in, TWIST_TYPE_LENGTH)
+	if err != nil {
+		return 0, nil, errors.New("Input is not long enough to get twist type")
+	}
+	twistType := int(twistTypeBuf[0])
+	if twistType != TWIST_M && twistType != TWIST_D {
+		return 0, nil, errors.New("Unknown twist type supplied")
+	}
+	return twistType, rest, nil
+}
+
+func decodePairingExpSign(in []byte) (bool, []byte, error) {
+	expIsNegativeBuf, rest, err := split(in, SIGN_ENCODING_LENGTH)
+	if err != nil {
+		return false, nil, errors.New("exp is not encoded properly")
+	}
+	switch int(expIsNegativeBuf[0]) {
+	case NEGATIVE_EXP:
+		return true, rest, nil
+	case POSITIVE_EXP:
+		return false, rest, nil
+	default:
+		return false, nil, errors.New("Unknown parameter exp sign")
+	}
+}
+
+func decodeG1(in []byte) (*g1, int, *big.Int, []byte, error) {
+	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	if err != nil {
+		return nil, 0, nil, nil, err
+	}
+	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
+	if err != nil {
+		return nil, 0, nil, nil, err
+	}
+	_, order, rest, err := decodeGroupOrder(rest)
+	if err != nil {
+		return nil, 0, nil, nil, err
+	}
+	g1, err := newG1(field, a, b, order)
+	if err != nil {
+		return nil, 0, nil, nil, err
+	}
+	return g1, modulusLen, order, rest, nil
+}
+
+func decodeG22(in []byte, field *field, modulusLen int) (*g22, *big.Int, []byte, error) {
+	fq2, rest, err := createExtension2FieldParams(in, modulusLen, field, false)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	a2, b2, rest, err := decodeBAInExtField2FromEncoding(rest, modulusLen, fq2)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	_, order, rest, err := decodeGroupOrder(rest)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	g22, err := newG22(fq2, a2, b2, order)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return g22, order, rest, nil
+}
+
+func decodeG23(in []byte, field *field, modulusLen int) (*g23, *big.Int, []byte, error) {
+	fq3, rest, err := createExtension3FieldParams(in, modulusLen, field, false)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	a2, b2, rest, err := decodeBAInExtField3FromEncoding(rest, modulusLen, fq3)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	_, order, rest, err := decodeGroupOrder(rest)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	g23, err := newG23(fq3, a2, b2, order)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return g23, order, rest, nil
+}

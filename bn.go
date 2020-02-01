@@ -9,7 +9,7 @@ type bnInstance struct {
 	u                        *big.Int
 	sixUPlus2                *big.Int
 	uIsnegative              bool
-	twistType                uint8
+	twistType                int
 	g1                       *g1
 	g2                       *g22
 	fq12                     *fq12
@@ -20,7 +20,7 @@ type bnInstance struct {
 	sixUPlus2Naf             []int8
 }
 
-func newBNInstance(u, sixUplus2 *big.Int, uIsnegative bool, twistType uint8, g1 *g1, g2 *g22, fq12 *fq12, nonResidue *fe2, forceNoNaf bool) bnInstance {
+func newBNInstance(u, sixUplus2 *big.Int, uIsnegative bool, twistType int, g1 *g1, g2 *g22, fq12 *fq12, nonResidue *fe2, forceNoNaf bool) bnInstance {
 	naf := ternaryWnaf(sixUplus2)
 	originalBits := sixUplus2.BitLen()
 	originalHamming := calculateHammingWeight(sixUplus2)

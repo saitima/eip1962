@@ -18,7 +18,7 @@ type g1 struct {
 	inf *pointG1
 }
 
-func newG1(f *field, a, b fieldElement, q []byte) (*g1, error) {
+func newG1(f *field, a, b fieldElement, q *big.Int) (*g1, error) {
 	t := [9]fieldElement{}
 	for i := 0; i < 9; i++ {
 		t[i] = f.newFieldElement()
@@ -27,7 +27,7 @@ func newG1(f *field, a, b fieldElement, q []byte) (*g1, error) {
 		f: f,
 		a: f.newFieldElement(),
 		b: f.newFieldElement(),
-		q: new(big.Int).SetBytes(q),
+		q: new(big.Int).Set(q),
 		t: t,
 	}
 	if a == nil || b == nil {
@@ -77,7 +77,7 @@ func (g *g1) fromXY(x, y fieldElement) *pointG1 {
 	if g.f.isZero(x) && g.f.isZero(y) {
 		return g.zero()
 	}
-	p := g.zero()
+	p := g.newPoint()
 	g.f.copy(p[0], x)
 	g.f.copy(p[1], y)
 	g.f.copy(p[2], g.f.one)
@@ -93,6 +93,7 @@ func (g *g1) toBytes(p *pointG1) []byte {
 	copy(out[byteLen:], g.f.toBytes(a[1]))
 	return out
 }
+
 func (g *g1) toBytesAllocated(out []byte, p *pointG1) []byte {
 	a := g.newPoint()
 	g.affine(a, p)
@@ -157,9 +158,7 @@ func (g *g1) toStringNoTransform(p *pointG1) string {
 
 func (g *g1) zero() *pointG1 {
 	p := g.newPoint()
-	g.f.copy(p[0], g.f.zero)
-	g.f.copy(p[1], g.f.one)
-	g.f.copy(p[2], g.f.zero)
+	g.copy(p, g.inf)
 	return p
 }
 
@@ -342,9 +341,12 @@ func (g *g1) doubleZeroA(r, p *pointG1) *pointG1 {
 }
 
 func (g *g1) neg(r, p *pointG1) *pointG1 {
-	g.f.copy(r[0], p[0])
+	if g.isZero(p) {
+		g.copy(r, g.inf)
+		return r
+	}
+	g.copy(r, p)
 	g.f.neg(r[1], p[1])
-	g.f.copy(r[2], p[2])
 	return r
 }
 
@@ -377,7 +379,7 @@ func (g *g1) mulScalar(c, p *pointG1, e *big.Int) *pointG1 {
 func (g *g1) checkCorrectSubGroup(p *pointG1) bool {
 	c := g.newPoint()
 	g.wnafMul(c, p, g.q)
-	if g.equal(c, g.zero()) {
+	if g.equal(c, g.inf) {
 		return true
 	}
 	return false
@@ -436,7 +438,7 @@ func (g *g1) multiExp(r *pointG1, points []*pointG1, powers []*big.Int) (*pointG
 	bucket_size, numBits := (1<<c)-1, uint32(g.q.BitLen())
 	windows := make([]*pointG1, numBits/c+1)
 	bucket := make([]*pointG1, bucket_size)
-	acc, sum, zero := g.zero(), g.zero(), g.zero()
+	acc, sum := g.newPoint(), g.newPoint()
 	for i := 0; i < bucket_size; i++ {
 		bucket[i] = g.newPoint()
 	}
@@ -444,10 +446,10 @@ func (g *g1) multiExp(r *pointG1, points []*pointG1, powers []*big.Int) (*pointG
 	j := 0
 	var cur uint32
 	for cur <= numBits {
-		g.copy(acc, zero)
+		g.copy(acc, g.inf)
 		bucket = make([]*pointG1, (1<<c)-1)
 		for i := 0; i < len(bucket); i++ {
-			bucket[i] = g.zero()
+			bucket[i] = g.newPoint()
 		}
 		for i := 0; i < len(powers); i++ {
 			s := newRepr(powers[i])
@@ -458,7 +460,7 @@ func (g *g1) multiExp(r *pointG1, points []*pointG1, powers []*big.Int) (*pointG
 			powers[i] = new(big.Int).Rsh(powers[i], uint(c))
 		}
 
-		g.copy(sum, zero)
+		g.copy(sum, g.inf)
 		for i := len(bucket) - 1; i >= 0; i-- {
 			g.add(sum, sum, bucket[i])
 			g.add(acc, acc, sum)
@@ -468,7 +470,7 @@ func (g *g1) multiExp(r *pointG1, points []*pointG1, powers []*big.Int) (*pointG
 		j++
 		cur += c
 	}
-	g.copy(acc, g.zero())
+	g.copy(acc, g.inf)
 	for i := len(windows) - 1; i >= 0; i-- {
 		for j := uint32(0); j < c; j++ {
 			g.double(acc, acc)

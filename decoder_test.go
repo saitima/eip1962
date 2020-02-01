@@ -151,6 +151,7 @@ func (v *TestVectorJSON) makeG1ScalarBinary() {
 }
 
 func (v *TestVectorJSON) makeG1MulBinary() ([]byte, []byte, error) {
+	v.buf.WriteByte(byte(OPERATION_G1_MUL))
 	v.makeBaseFieldBinary()
 	v.makeG1GroupBinary()
 	v.makeG1PointBinary()
@@ -224,6 +225,7 @@ func (v *TestVectorJSON) makeG2ScalarBinary() {
 }
 
 func (v *TestVectorJSON) makeG22MulBinary() ([]byte, []byte, error) {
+	v.buf.WriteByte(byte(OPERATION_G2_MUL))
 	v.makeBaseFieldBinary()
 	v.makeExtension2Field()
 	v.makeG22PointBinary()
@@ -248,6 +250,7 @@ func (v *TestVectorJSON) makeG22MulBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeG23MulBinary() ([]byte, []byte, error) {
+	v.buf.WriteByte(byte(OPERATION_G2_MUL))
 	v.makeBaseFieldBinary() // 1 fe
 	v.makeExtension3Field() // 7 fe
 	v.makeG23PointBinary()  // 6 fe
@@ -274,27 +277,28 @@ func (v *TestVectorJSON) makeG23MulBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeBNPairingBinary() ([]byte, []byte, error) {
+	v.buf.WriteByte(byte(OPERATION_BNPAIR))
 	v.makeBaseFieldBinary()                // base field
 	v.makeG1GroupBinary()                  // g1
 	v.buf.Write(v.encode(v.NonResidue))    // non residue
 	v.buf.Write(v.encode(v.NonResidue2_0)) // quadratic non residue
 	v.buf.Write(v.encode(v.NonResidue2_1))
 	if v.IsDType == "True" {
-		v.buf.WriteByte(0x02) // twist type D
+		v.buf.WriteByte(byte(TWIST_D)) // twist type D
 	} else {
-		v.buf.WriteByte(0x01) // twist type M
+		v.buf.WriteByte(byte(TWIST_M)) // twist type M
 	}
 
 	if v.X[:1] == "-" {
 		length := len(v.X[3:]) / 2
 		v.buf.WriteByte(byte(length))        // x length
 		v.buf.Write(bytes_(length, v.X[1:])) // x encoded
-		v.buf.WriteByte(0x01)                // sign of x
+		v.buf.WriteByte(byte(NEGATIVE_EXP))  // sign of x
 	} else {
 		length := len(v.X[2:]) / 2
 		v.buf.WriteByte(byte(length))    // x length
 		v.buf.Write(bytes_(length, v.X)) // x encoded
-		v.buf.WriteByte(0x00)
+		v.buf.WriteByte(byte(POSITIVE_EXP))
 	}
 	v.buf.WriteByte(byte(0x02)) // num pairs
 	// e(P, Q)*e(-P, Q)=1
@@ -326,15 +330,16 @@ func (v *TestVectorJSON) makeBNPairingBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeBLSPairingBinary() ([]byte, []byte, error) {
+	v.buf.WriteByte(byte(OPERATION_BLS12PAIR))
 	v.makeBaseFieldBinary()                // base field
 	v.makeG1GroupBinary()                  // g1
 	v.buf.Write(v.encode(v.NonResidue))    // non residue
 	v.buf.Write(v.encode(v.NonResidue2_0)) // quadratic non residue
 	v.buf.Write(v.encode(v.NonResidue2_1))
 	if v.IsDType == "True" {
-		v.buf.WriteByte(0x02) // twist type D
+		v.buf.WriteByte(byte(TWIST_D)) // twist type D
 	} else {
-		v.buf.WriteByte(0x01) // twist type M
+		v.buf.WriteByte(byte(TWIST_M)) // twist type M
 	}
 
 	if v.X[:1] == "-" {
@@ -344,7 +349,7 @@ func (v *TestVectorJSON) makeBLSPairingBinary() ([]byte, []byte, error) {
 		}
 		v.buf.WriteByte(byte(length))        // x length
 		v.buf.Write(bytes_(length, v.X[1:])) // x encoded
-		v.buf.WriteByte(0x01)                // sign of x
+		v.buf.WriteByte(byte(NEGATIVE_EXP))  // sign of x
 	} else {
 		length := len(v.X[2:]) / 2
 		if length%2 != 0 {
@@ -384,17 +389,18 @@ func (v *TestVectorJSON) makeBLSPairingBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeMNT4PairingBinary() ([]byte, []byte, error) {
-	v.makeBaseFieldBinary()             // base field
-	v.makeG1GroupBinary()               // g1
-	v.buf.Write(v.encode(v.NonResidue)) // non residue
+	v.buf.WriteByte(byte(OPERATION_MNT4PAIR)) // op type
+	v.makeBaseFieldBinary()                   // base field
+	v.makeG1GroupBinary()                     // g1
+	v.buf.Write(v.encode(v.NonResidue))       // non residue
 
 	v.writeExp(v.X, true)
 	v.writeExp(v.ExpW0, false)
 	v.writeExp(v.ExpW1, false)
 	if v.ExpW0[:1] == "-" {
-		v.buf.WriteByte(0x01)
+		v.buf.WriteByte(byte(NEGATIVE_EXP))
 	} else {
-		v.buf.WriteByte(0x00)
+		v.buf.WriteByte(byte(POSITIVE_EXP))
 	}
 
 	v.buf.WriteByte(byte(0x02)) // num pairs
@@ -427,6 +433,7 @@ func (v *TestVectorJSON) makeMNT4PairingBinary() ([]byte, []byte, error) {
 }
 
 func (v *TestVectorJSON) makeMNT6PairingBinary() ([]byte, []byte, error) {
+	v.buf.WriteByte(byte(OPERATION_MNT6PAIR))
 	v.makeBaseFieldBinary()             // base field
 	v.makeG1GroupBinary()               // g1
 	v.buf.Write(v.encode(v.NonResidue)) // non residue
@@ -435,9 +442,9 @@ func (v *TestVectorJSON) makeMNT6PairingBinary() ([]byte, []byte, error) {
 	v.writeExp(v.ExpW0, false)
 	v.writeExp(v.ExpW1, false)
 	if v.ExpW0[:1] == "-" {
-		v.buf.WriteByte(0x01)
+		v.buf.WriteByte(byte(NEGATIVE_EXP))
 	} else {
-		v.buf.WriteByte(0x00)
+		v.buf.WriteByte(byte(POSITIVE_EXP))
 	}
 
 	v.buf.WriteByte(byte(0x02)) // num pairs
@@ -474,15 +481,15 @@ func (v *TestVectorJSON) makeMNT6PairingBinary() ([]byte, []byte, error) {
 }
 func (v *TestVectorJSON) writeExp(in string, appendSign bool) {
 	var start, length int
-	var sign byte
+	var sign int
 	if in[:1] == "-" {
 		start = 3
 		length = len(in[start:])
-		sign = 0x01
+		sign = NEGATIVE_EXP
 	} else {
 		start = 2
 		length = len(in[start:])
-		sign = 0x00
+		sign = POSITIVE_EXP
 	}
 
 	if length%2 != 0 {
@@ -492,6 +499,6 @@ func (v *TestVectorJSON) writeExp(in string, appendSign bool) {
 	v.buf.WriteByte(byte(byteLen))           // x length
 	v.buf.Write(bytes_(byteLen, in[start:])) // x encoded
 	if appendSign {
-		v.buf.WriteByte(sign) // sign of x
+		v.buf.WriteByte(byte(sign)) // sign of x
 	}
 }
