@@ -278,8 +278,7 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, froben
 	if field.isZero(nonResidue) {
 		return nil, nil, errors.New("Non-residue for Fp2 is zero")
 	}
-
-	if !isNonNThRoot(field, nonResidue, 2) {
+	if notSquare := isNonNThRoot(field, nonResidue, 2); !notSquare {
 		return nil, nil, errors.New("Non-residue for Fp2 is actually a residue")
 	}
 

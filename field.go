@@ -333,8 +333,13 @@ func (f *field) mul(c, a, b fieldElement) {
 func (f *field) exp(c, a fieldElement, e *big.Int) {
 	z := f.newFieldElement()
 	f.copy(z, f.r)
-	for i := e.BitLen(); i >= 0; i-- {
-		f.mul(z, z, z)
+	found := false
+	for i := e.BitLen() - 1; i >= 0; i-- {
+		if found {
+			f.mul(z, z, z)
+		} else {
+			found = e.Bit(i) == 1
+		}
 		if e.Bit(i) == 1 {
 			f.mul(z, z, a)
 		}

@@ -197,8 +197,13 @@ func (fq *fq12) inverse(c, a *fe12) bool {
 
 func (fq *fq12) exp(c, a *fe12, e *big.Int) {
 	z := fq.one()
+	found := false
 	for i := e.BitLen() - 1; i >= 0; i-- {
-		fq.square(z, z)
+		if found {
+			fq.square(z, z)
+		} else {
+			found = e.Bit(i) == 1
+		}
 		if e.Bit(i) == 1 {
 			fq.mul(z, z, a)
 		}
