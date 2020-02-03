@@ -1712,9 +1712,9 @@ func TestBLS12384Pairing(t *testing.T) {
 	}
 
 	t.Run("Expected", func(t *testing.T) {
-		actual, err := bls.pair(g1One, g2One)
-		if err != nil {
-			t.Fatal(err)
+		actual, hasValue := bls.pair(g1One, g2One)
+		if !hasValue {
+			t.Fatalf("Pairing engine returned no value")
 		}
 		if !bls.fq12.equal(expected, actual) {
 			t.Fatalf("bad pairing-1")
@@ -1736,17 +1736,18 @@ func TestBLS12384Pairing(t *testing.T) {
 		}
 
 		var f1, f2 *fe12
+		var hasValue bool
 		// e(a*G1, b*G2) = e(G1, G2)^c
 		t.Run("First", func(t *testing.T) {
 			bls.g1.affine(G, G)
 			bls.g2.affine(H, H)
-			f1, err = bls.pair(G, H)
-			if err != nil {
-				t.Fatal(err)
+			f1, hasValue = bls.pair(G, H)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
-			f2, err = bls.pair(g1One, g2One)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = bls.pair(g1One, g2One)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			bls.fq12.exp(f2, f2, c)
 			if !bls.fq12.equal(f1, f2) {
@@ -1757,9 +1758,9 @@ func TestBLS12384Pairing(t *testing.T) {
 		t.Run("Second", func(t *testing.T) {
 			G = bls.g1.mulScalar(G, g1One, c)
 			bls.g1.affine(G, G)
-			f2, err = bls.pair(G, g2One)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = bls.pair(G, g2One)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			if !bls.fq12.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -1769,9 +1770,9 @@ func TestBLS12384Pairing(t *testing.T) {
 		t.Run("Third", func(t *testing.T) {
 			H = bls.g2.mulScalar(H, g2One, c)
 			bls.g2.affine(H, H)
-			f2, err = bls.pair(g1One, H)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = bls.pair(g1One, H)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			if !bls.fq12.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -1982,9 +1983,9 @@ func TestMNT4320Pairing(t *testing.T) {
 	}
 
 	t.Run("Expected", func(t *testing.T) {
-		actual, err := mnt4.pair(g1One, g2One)
-		if err != nil {
-			t.Fatal(err)
+		actual, hasValue := mnt4.pair(g1One, g2One)
+		if !hasValue {
+			t.Fatalf("Pairing engine returned no value")
 		}
 		if !mnt4.fq4.equal(expected, actual) {
 			t.Logf("\nexpected: %s\b", mnt4.fq4.toString(expected))
@@ -2008,18 +2009,18 @@ func TestMNT4320Pairing(t *testing.T) {
 		}
 
 		var f1, f2 *fe4
-		var err error
+		var hasValue bool
 		// e(a*G1, b*G2) = e(G1, G2)^c
 		t.Run("First", func(t *testing.T) {
 			mnt4.g1.affine(G, G)
 			mnt4.g2.affine(H, H)
-			f1, err = mnt4.pair(G, H)
-			if err != nil {
-				t.Fatal(err)
+			f1, hasValue = mnt4.pair(G, H)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
-			f2, err = mnt4.pair(g1One, g2One)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = mnt4.pair(g1One, g2One)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			mnt4.fq4.exp(f2, f2, c)
 			if !mnt4.fq4.equal(f1, f2) {
@@ -2030,9 +2031,9 @@ func TestMNT4320Pairing(t *testing.T) {
 		t.Run("Second", func(t *testing.T) {
 			G = mnt4.g1.mulScalar(G, g1One, c)
 			mnt4.g1.affine(G, G)
-			f2, err = mnt4.pair(G, g2One)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = mnt4.pair(G, g2One)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			if !mnt4.fq4.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2042,9 +2043,9 @@ func TestMNT4320Pairing(t *testing.T) {
 		t.Run("Third", func(t *testing.T) {
 			H = mnt4.g2.mulScalar(H, g2One, c)
 			mnt4.g2.affine(H, H)
-			f2, err = mnt4.pair(g1One, H)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = mnt4.pair(g1One, H)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			if !mnt4.fq4.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2164,9 +2165,9 @@ func TestMNT4753Pairing(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Run("Expected", func(t *testing.T) {
-		actual, err := mnt4.pair(g1One, g2One)
-		if err != nil {
-			t.Fatal(err)
+		actual, hasValue := mnt4.pair(g1One, g2One)
+		if !hasValue {
+			t.Fatalf("Pairing engine returned no value")
 		}
 		if !mnt4.fq4.equal(expected, actual) {
 			t.Logf("\nexpected: %s\b", mnt4.fq4.toString(expected))
@@ -2190,17 +2191,18 @@ func TestMNT4753Pairing(t *testing.T) {
 		}
 
 		var f1, f2 *fe4
+		var hasValue bool
 		// e(a*G1, b*G2) = e(G1, G2)^c
 		t.Run("First", func(t *testing.T) {
 			mnt4.g1.affine(G, G)
 			mnt4.g2.affine(H, H)
-			f1, err = mnt4.pair(G, H)
-			if err != nil {
-				t.Fatal(err)
+			f1, hasValue = mnt4.pair(G, H)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
-			f2, err = mnt4.pair(g1One, g2One)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = mnt4.pair(g1One, g2One)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			mnt4.fq4.exp(f2, f2, c)
 			if !mnt4.fq4.equal(f1, f2) {
@@ -2211,9 +2213,9 @@ func TestMNT4753Pairing(t *testing.T) {
 		t.Run("Second", func(t *testing.T) {
 			G = mnt4.g1.mulScalar(G, g1One, c)
 			mnt4.g1.affine(G, G)
-			f2, err = mnt4.pair(G, g2One)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = mnt4.pair(G, g2One)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			if !mnt4.fq4.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2223,9 +2225,9 @@ func TestMNT4753Pairing(t *testing.T) {
 		t.Run("Third", func(t *testing.T) {
 			H = mnt4.g2.mulScalar(H, g2One, c)
 			mnt4.g2.affine(H, H)
-			f2, err = mnt4.pair(g1One, H)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = mnt4.pair(g1One, H)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			if !mnt4.fq4.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2349,9 +2351,9 @@ func TestBN254Pairing(t *testing.T) {
 	}
 
 	t.Run("Expected", func(t *testing.T) {
-		actual, err := bn.pair(g1One, g2One)
-		if err != nil {
-			t.Fatal(err)
+		actual, hasValue := bn.pair(g1One, g2One)
+		if !hasValue {
+			t.Fatalf("Pairing engine returned no value")
 		}
 		if !bn.fq12.equal(expected, actual) {
 			t.Logf("\nexpected: %s\b", bn.fq12.toString(expected))
@@ -2375,17 +2377,18 @@ func TestBN254Pairing(t *testing.T) {
 		}
 
 		var f1, f2 *fe12
+		var hasValue bool
 		// e(a*G1, b*G2) = e(G1, G2)^c
 		t.Run("First", func(t *testing.T) {
 			bn.g1.affine(G, G)
 			bn.g2.affine(H, H)
-			f1, err = bn.pair(G, H)
-			if err != nil {
-				t.Fatal(err)
+			f1, hasValue = bn.pair(G, H)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
-			f2, err = bn.pair(g1One, g2One)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = bn.pair(g1One, g2One)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			bn.fq12.exp(f2, f2, c)
 			if !bn.fq12.equal(f1, f2) {
@@ -2396,9 +2399,9 @@ func TestBN254Pairing(t *testing.T) {
 		t.Run("Second", func(t *testing.T) {
 			G = bn.g1.mulScalar(G, g1One, c)
 			bn.g1.affine(G, G)
-			f2, err = bn.pair(G, g2One)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = bn.pair(G, g2One)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			if !bn.fq12.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2408,9 +2411,9 @@ func TestBN254Pairing(t *testing.T) {
 		t.Run("Third", func(t *testing.T) {
 			H = bn.g2.mulScalar(H, g2One, c)
 			bn.g2.affine(H, H)
-			f2, err = bn.pair(g1One, H)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = bn.pair(g1One, H)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			if !bn.fq12.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2534,9 +2537,9 @@ func TestMNT6320Pairing(t *testing.T) {
 	}
 
 	t.Run("Expected", func(t *testing.T) {
-		actual, err := mnt6.pair(g1One, g2One)
-		if err != nil {
-			t.Fatal(err)
+		actual, hasValue := mnt6.pair(g1One, g2One)
+		if !hasValue {
+			t.Fatalf("Pairing engine returned no value")
 		}
 		if !mnt6.fq6.equal(expected, actual) {
 			t.Fatalf("bad pairing-1")
@@ -2558,17 +2561,18 @@ func TestMNT6320Pairing(t *testing.T) {
 		}
 
 		var f1, f2 *fe6q
+		var hasValue bool
 		// e(a*G1, b*G2) = e(G1, G2)^c
 		t.Run("First", func(t *testing.T) {
 			mnt6.g1.affine(G, G)
 			mnt6.g2.affine(H, H)
-			f1, err = mnt6.pair(G, H)
-			if err != nil {
-				t.Fatal(err)
+			f1, hasValue = mnt6.pair(G, H)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
-			f2, err = mnt6.pair(g1One, g2One)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = mnt6.pair(g1One, g2One)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			mnt6.fq6.exp(f2, f2, c)
 			if !mnt6.fq6.equal(f1, f2) {
@@ -2579,9 +2583,9 @@ func TestMNT6320Pairing(t *testing.T) {
 		t.Run("Second", func(t *testing.T) {
 			G = mnt6.g1.mulScalar(G, g1One, c)
 			mnt6.g1.affine(G, G)
-			f2, err = mnt6.pair(G, g2One)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = mnt6.pair(G, g2One)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			if !mnt6.fq6.equal(f1, f2) {
 				t.Errorf("bad pairing")
@@ -2591,9 +2595,9 @@ func TestMNT6320Pairing(t *testing.T) {
 		t.Run("Third", func(t *testing.T) {
 			H = mnt6.g2.mulScalar(H, g2One, c)
 			mnt6.g2.affine(H, H)
-			f2, err = mnt6.pair(g1One, H)
-			if err != nil {
-				t.Fatal(err)
+			f2, hasValue = mnt6.pair(g1One, H)
+			if !hasValue {
+				t.Fatalf("Pairing engine returned no value")
 			}
 			if !mnt6.fq6.equal(f1, f2) {
 				t.Errorf("bad pairing")

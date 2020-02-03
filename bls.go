@@ -1,7 +1,6 @@
 package eip
 
 import (
-	"errors"
 	"math/big"
 )
 
@@ -376,26 +375,26 @@ func (bls *blsInstance) finalExp(f *fe12) bool {
 	return true
 }
 
-func (bls *blsInstance) pair(point *pointG1, twistPoint *pointG22) (*fe12, error) {
+func (bls *blsInstance) pair(point *pointG1, twistPoint *pointG22) (*fe12, bool) {
 	f := bls.fq12.one()
 	if ok := bls.millerLoop(f, []*pointG1{point}, []*pointG22{twistPoint}); !ok {
-		return nil, errors.New("element has no inverse")
+		return nil, false
 	}
 	if ok := bls.finalExp(f); !ok {
-		return nil, errors.New("element has no inverse")
+		return nil, false
 	}
-	return f, nil
+	return f, true
 }
 
-func (bls *blsInstance) multiPair(points []*pointG1, twistPoints []*pointG22) (*fe12, error) {
+func (bls *blsInstance) multiPair(points []*pointG1, twistPoints []*pointG22) (*fe12, bool) {
 	f := bls.fq12.one()
 	if ok := bls.millerLoop(f, points, twistPoints); !ok {
-		return nil, errors.New("element has no inverse")
+		return nil, false
 	}
 	if ok := bls.finalExp(f); !ok {
-		return nil, errors.New("element has no inverse")
+		return nil, false
 	}
-	return f, nil
+	return f, true
 }
 
 func (bls *blsInstance) calculateCoeffLength() int {

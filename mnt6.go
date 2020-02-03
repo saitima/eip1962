@@ -1,7 +1,6 @@
 package eip
 
 import (
-	"errors"
 	"math/big"
 )
 
@@ -402,25 +401,24 @@ func (mnt6 *mnt6Instance) calculateCoeffSize() (int, int) {
 	return d, a
 }
 
-// Pair ..
-func (mnt6 *mnt6Instance) pair(g1Point *pointG1, g2Point *pointG23) (*fe6q, error) {
+func (mnt6 *mnt6Instance) pair(g1Point *pointG1, g2Point *pointG23) (*fe6q, bool) {
 	f := mnt6.fq6.one()
 	if ok := mnt6.millerLoop(f, []*pointG1{g1Point}, []*pointG23{g2Point}); !ok {
-		return nil, errors.New("element has no inverse")
+		return nil, false
 	}
 	if ok := mnt6.finalexp(f); !ok {
-		return nil, errors.New("element has no inverse")
+		return nil, false
 	}
-	return f, nil
+	return f, true
 }
 
-func (mnt6 *mnt6Instance) multiPair(g1Points []*pointG1, g2Points []*pointG23) (*fe6q, error) {
+func (mnt6 *mnt6Instance) multiPair(g1Points []*pointG1, g2Points []*pointG23) (*fe6q, bool) {
 	f := mnt6.fq6.one()
 	if ok := mnt6.millerLoop(f, g1Points, g2Points); !ok {
-		return nil, errors.New("element has no inverse")
+		return nil, false
 	}
 	if ok := mnt6.finalexp(f); !ok {
-		return nil, errors.New("element has no inverse")
+		return nil, false
 	}
-	return f, nil
+	return f, true
 }

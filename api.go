@@ -582,9 +582,9 @@ func pairBN(in []byte) ([]byte, error) {
 		nonResidueInPMinus1Over2,
 		true,
 	)
-	result, err := engine.multiPair(g1Points, g2Points)
-	if err != nil {
-		return pairingError, nil
+	result, hasValue := engine.multiPair(g1Points, g2Points)
+	if !hasValue {
+		return pairingError, errors.New("Pairing engine returned no value")
 	}
 	if !fq12.equal(result, fq12.one()) {
 		return pairingError, nil
@@ -736,8 +736,8 @@ func pairBLS(in []byte) ([]byte, error) {
 		fq12,
 		false,
 	)
-	result, err := engine.multiPair(g1Points, g2Points)
-	if err != nil {
+	result, hasValue := engine.multiPair(g1Points, g2Points)
+	if !hasValue {
 		return pairingError, errors.New("Pairing engine returned no value")
 	}
 	if !fq12.equal(result, fq12.one()) {
@@ -876,9 +876,9 @@ func pairMNT4(in []byte) ([]byte, error) {
 		g2,
 		twist,
 	)
-	result, err := engine.multiPair(g1Points, g2Points)
-	if err != nil {
-		return pairingError, nil
+	result, hasValue := engine.multiPair(g1Points, g2Points)
+	if !hasValue {
+		return pairingError, errors.New("Pairing engine returned no value")
 	}
 	if !fq4.equal(result, fq4.one()) {
 		return pairingError, nil
@@ -1021,9 +1021,9 @@ func pairMNT6(in []byte) ([]byte, error) {
 		g2,
 		twist,
 	)
-	result, err := engine.multiPair(g1Points, g2Points)
-	if err != nil {
-		return pairingError, nil
+	result, hasValue := engine.multiPair(g1Points, g2Points)
+	if !hasValue {
+		return pairingError, errors.New("Pairing engine returned no value")
 	}
 	if !fq6.equal(result, fq6.one()) {
 		return pairingError, nil
