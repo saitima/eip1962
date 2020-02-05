@@ -10,6 +10,7 @@ var (
 	pairingError, pairingSuccess = []byte{0x00}, []byte{0x01}
 	TWIST_M, TWIST_D             = 0x01, 0x02
 	NEGATIVE_EXP, POSITIVE_EXP   = 0x01, 0x00
+	BOOLEAN_FALSE, BOOLEAN_TRUE  = 0x00, 0x01
 	OPERATION_G1_ADD             = 0x01
 	OPERATION_G1_MUL             = 0x02
 	OPERATION_G1_MULTIEXP        = 0x03
@@ -50,7 +51,7 @@ func (api *API) Run(opType int, in []byte) ([]byte, error) {
 type g1Api struct{}
 
 func (api *g1Api) addPoints(in []byte) ([]byte, error) {
-	g1, modulusLen, _, rest, err := decodeG1(in)
+	g1, modulusLen, _, _, rest, err := decodeG1(in)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +80,7 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 }
 
 func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
-	g1, modulusLen, order, rest, err := decodeG1(in)
+	g1, modulusLen, order, orderLen, rest, err := decodeG1(in)
 	if err != nil {
 		return nil, err
 	}
@@ -87,36 +88,34 @@ func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !g1.isOnCurve(p) {
-		return nil, errors.New("point isn't on the curve")
-	}
-	orderLen := len(order.Bytes())
-	s, rest, err := decodeScalar(rest, orderLen, order)
+	scalar, rest, err := decodeScalar(rest, orderLen, order)
 	if err != nil {
 		return nil, err
 	}
 	if len(rest) != 0 {
 		return nil, errors.New("Input contains garbage at the end")
 	}
-	g1.mulScalar(p, p, s)
+	if !g1.isOnCurve(p) {
+		return nil, errors.New("point isn't on the curve")
+	}
+	g1.mulScalar(p, p, scalar)
 	out := make([]byte, 2*modulusLen)
 	encodeG1Point(out, g1.toBytes(p))
 	return out, nil
 }
 
 func (api *g1Api) multiExp(in []byte) ([]byte, error) {
-	g1, modulusLen, order, rest, err := decodeG1(in)
+	g1, modulusLen, order, orderLen, rest, err := decodeG1(in)
 	if err != nil {
 		return nil, err
 	}
-	orderLen := len(order.Bytes())
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return pairingError, errors.New("Input is not long enough to get number of pairs")
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {
-		return pairingError, errors.New("zero pairs encoded")
+		return pairingError, errors.New("Invalid number of pairs")
 	}
 	if len(rest) != (2*modulusLen+orderLen)*numPairs {
 		return nil, errors.New("Input length is invalid for number of pairs")
@@ -194,7 +193,7 @@ func (api *g22Api) run(opType int, field *field, modulusLen int, in []byte) ([]b
 }
 
 func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, error) {
-	g2, _, rest, err := decodeG22(in, field, modulusLen)
+	g2, _, _, rest, err := decodeG22(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
@@ -222,16 +221,15 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 }
 
 func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, error) {
-	g2, order, rest, err := decodeG22(in, field, modulusLen)
+	g2, order, orderLen, rest, err := decodeG22(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
-	orderLen := len(order.Bytes())
 	q, rest, err := decodeG22Point(rest, modulusLen, g2)
 	if err != nil {
 		return nil, err
 	}
-	s, rest, err := decodeScalar(rest, orderLen, order)
+	scalar, rest, err := decodeScalar(rest, orderLen, order)
 	if err != nil {
 		return nil, err
 	}
@@ -241,25 +239,24 @@ func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 	if !g2.isOnCurve(q) {
 		return nil, errors.New("q1 isn't on the curve")
 	}
-	g2.mulScalar(q, q, s)
+	g2.mulScalar(q, q, scalar)
 	out := make([]byte, 4*modulusLen)
 	encodeG22Point(out, g2.toBytes(q))
 	return out, nil
 }
 
 func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, error) {
-	g2, order, rest, err := decodeG22(in, field, modulusLen)
+	g2, order, orderLen, rest, err := decodeG22(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
-	orderLen := len(order.Bytes())
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return pairingError, errors.New("Invalid number of pairs")
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {
-		return pairingError, errors.New("zero pairs encoded")
+		return pairingError, errors.New("Invalid number of pairs")
 	}
 	if len(rest) != (4*modulusLen+orderLen)*numPairs {
 		return nil, errors.New("Input length is invalid for number of pairs")
@@ -315,7 +312,7 @@ func (api *g23Api) run(opType int, field *field, modulusLen int, in []byte) ([]b
 }
 
 func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, error) {
-	g2, _, rest, err := decodeG23(in, field, modulusLen)
+	g2, _, _, rest, err := decodeG23(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
@@ -343,11 +340,10 @@ func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 }
 
 func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, error) {
-	g2, order, rest, err := decodeG23(in, field, modulusLen)
+	g2, order, orderLen, rest, err := decodeG23(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
-	orderLen := len(order.Bytes())
 	q, rest, err := decodeG23Point(rest, modulusLen, g2)
 	if err != nil {
 		return nil, err
@@ -369,11 +365,10 @@ func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 }
 
 func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, error) {
-	g2, order, rest, err := decodeG23(in, field, modulusLen)
+	g2, order, orderLen, rest, err := decodeG23(in, field, modulusLen)
 	if err != nil {
 		return nil, err
 	}
-	orderLen := len(order.Bytes())
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return pairingError, errors.New("Input is not long enough to get number of pairs")
@@ -440,12 +435,10 @@ func pairBN(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-
-	fq2, rest, err := createExtension2FieldParamsForPairing(rest, modulusLen, field, true, 2)
+	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, 2, true)
 	if err != nil {
 		return pairingError, err
 	}
-
 	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
 	if err != nil {
 		return pairingError, err
@@ -538,7 +531,15 @@ func pairBN(in []byte) ([]byte, error) {
 	var g1Points []*pointG1
 	var g2Points []*pointG22
 	for i := 0; i < numPairs; i++ {
+		needG1SubGroupCheck, rest, err := decodeBoolean(rest)
+		if err != nil {
+			return pairingError, err
+		}
 		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		if err != nil {
+			return pairingError, err
+		}
+		needG2SubGroupCheck, rest, err := decodeBoolean(rest)
 		if err != nil {
 			return pairingError, err
 		}
@@ -552,11 +553,15 @@ func pairBN(in []byte) ([]byte, error) {
 		if !g2.isOnCurve(g2Point) {
 			return pairingError, errors.New("G2 point is not on curve")
 		}
-		if ok := g1.checkCorrectSubGroup(g1Point); !ok {
-			return pairingError, errors.New("G1 point is not in the expected subgroup")
+		if needG1SubGroupCheck {
+			if ok := g1.checkCorrectSubGroup(g1Point); !ok {
+				return pairingError, errors.New("G1 point is not in the expected subgroup")
+			}
 		}
-		if ok := g2.checkCorrectSubGroup(g2Point); !ok {
-			return pairingError, errors.New("G2 point is not in the expected subgroup")
+		if needG2SubGroupCheck {
+			if ok := g2.checkCorrectSubGroup(g2Point); !ok {
+				return pairingError, errors.New("G2 point is not in the expected subgroup")
+			}
 		}
 		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
 			g1Points = append(g1Points, g1Point)
@@ -612,11 +617,10 @@ func pairBLS(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	fq2, rest, err := createExtension2FieldParamsForPairing(rest, modulusLen, field, true, 2)
+	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, 2, true)
 	if err != nil {
 		return pairingError, err
 	}
-
 	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
 	if err != nil {
 		return pairingError, err
@@ -693,7 +697,15 @@ func pairBLS(in []byte) ([]byte, error) {
 	var g1Points []*pointG1
 	var g2Points []*pointG22
 	for i := 0; i < numPairs; i++ {
+		needG1SubGroupCheck, rest, err := decodeBoolean(rest)
+		if err != nil {
+			return pairingError, err
+		}
 		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		if err != nil {
+			return pairingError, err
+		}
+		needG2SubGroupCheck, rest, err := decodeBoolean(rest)
 		if err != nil {
 			return pairingError, err
 		}
@@ -708,12 +720,15 @@ func pairBLS(in []byte) ([]byte, error) {
 			return pairingError, errors.New("G2 point is not on curve")
 		}
 
-		if ok := g1.checkCorrectSubGroup(g1Point); !ok {
-			return pairingError, errors.New("G1 point is not in the expected subgroup")
+		if needG1SubGroupCheck {
+			if ok := g1.checkCorrectSubGroup(g1Point); !ok {
+				return pairingError, errors.New("G1 point is not in the expected subgroup")
+			}
 		}
-
-		if ok := g2.checkCorrectSubGroup(g2Point); !ok {
-			return pairingError, errors.New("G2 point is not in the expected subgroup")
+		if needG2SubGroupCheck {
+			if ok := g2.checkCorrectSubGroup(g2Point); !ok {
+				return pairingError, errors.New("G2 point is not in the expected subgroup")
+			}
 		}
 		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
 			g1Points = append(g1Points, g1Point)
@@ -763,7 +778,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	fq2, rest, err := createExtension2FieldParamsForPairing(rest, modulusLen, field, false, 4)
+	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, 4, false)
 	if err != nil {
 		return pairingError, err
 	}
@@ -832,7 +847,15 @@ func pairMNT4(in []byte) ([]byte, error) {
 	var g1Points []*pointG1
 	var g2Points []*pointG22
 	for i := 0; i < numPairs; i++ {
+		needG1SubGroupCheck, rest, err := decodeBoolean(rest)
+		if err != nil {
+			return pairingError, err
+		}
 		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		if err != nil {
+			return pairingError, err
+		}
+		needG2SubGroupCheck, rest, err := decodeBoolean(rest)
 		if err != nil {
 			return pairingError, err
 		}
@@ -846,11 +869,15 @@ func pairMNT4(in []byte) ([]byte, error) {
 		if !g2.isOnCurve(g2Point) {
 			return pairingError, errors.New("G2 point is not on curve")
 		}
-		if ok := g1.checkCorrectSubGroup(g1Point); !ok {
-			return pairingError, errors.New("G1 point is not in the expected subgroup")
+		if needG1SubGroupCheck {
+			if ok := g1.checkCorrectSubGroup(g1Point); !ok {
+				return pairingError, errors.New("G1 point is not in the expected subgroup")
+			}
 		}
-		if ok := g2.checkCorrectSubGroup(g2Point); !ok {
-			return pairingError, errors.New("G2 point is not in the expected subgroup")
+		if needG2SubGroupCheck {
+			if ok := g2.checkCorrectSubGroup(g2Point); !ok {
+				return pairingError, errors.New("G2 point is not in the expected subgroup")
+			}
 		}
 		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
 			g1Points = append(g1Points, g1Point)
@@ -904,7 +931,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-	fq3, rest, err := createExtension3FieldParamsForPairing(rest, modulusLen, field, false, 6)
+	fq3, rest, err := createExtension3FieldParams(rest, modulusLen, field, 6, false)
 	if err != nil {
 		return pairingError, err
 	}
@@ -975,7 +1002,15 @@ func pairMNT6(in []byte) ([]byte, error) {
 	var g1Points []*pointG1
 	var g2Points []*pointG23
 	for i := 0; i < numPairs; i++ {
+		needG1SubGroupCheck, rest, err := decodeBoolean(rest)
+		if err != nil {
+			return pairingError, err
+		}
 		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		if err != nil {
+			return pairingError, err
+		}
+		needG2SubGroupCheck, rest, err := decodeBoolean(rest)
 		if err != nil {
 			return pairingError, err
 		}
@@ -989,13 +1024,15 @@ func pairMNT6(in []byte) ([]byte, error) {
 		if !g2.isOnCurve(g2Point) {
 			return pairingError, errors.New("G2 point is not on curve")
 		}
-
-		if ok := g1.checkCorrectSubGroup(g1Point); !ok {
-			return pairingError, errors.New("G1 point is not in the expected subgroup")
+		if needG1SubGroupCheck {
+			if ok := g1.checkCorrectSubGroup(g1Point); !ok {
+				return pairingError, errors.New("G1 point is not in the expected subgroup")
+			}
 		}
-
-		if ok := g2.checkCorrectSubGroup(g2Point); !ok {
-			return pairingError, errors.New("G2 point is not in the expected subgroup")
+		if needG2SubGroupCheck {
+			if ok := g2.checkCorrectSubGroup(g2Point); !ok {
+				return pairingError, errors.New("G2 point is not in the expected subgroup")
+			}
 		}
 		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
 			g1Points = append(g1Points, g1Point)

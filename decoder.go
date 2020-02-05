@@ -8,6 +8,7 @@ import (
 const (
 	BYTES_FOR_LENGTH_ENCODING               = 1
 	EXTENSION_DEGREE_LENGTH_ENCODING        = 1
+	BOOLEAN_ENCODING_LENGTH                 = 1
 	EXTENSION_TWO_DEGREE                    = 2
 	EXTENSION_THREE_DEGREE                  = 3
 	TWIST_TYPE_LENGTH                       = 1
@@ -50,7 +51,6 @@ func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 	if int(modulusBuf[0]) == 0 {
 		return nil, 0, nil, errors.New("In modulus encoding highest byte is zero")
 	}
-	// TODO: enable paddin
 	modulusBuf = padHex(modulusBuf)
 	modulus := new(big.Int).SetBytes(modulusBuf)
 	if isBigZero(modulus) {
@@ -82,7 +82,10 @@ func parseBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, error
 	if err != nil {
 		return nil, nil, 0, nil, errors.New("Failed to create prime field from modulus")
 	}
-	modulus := field.pbig
+	if len(rest) < modulusLen {
+		return nil, nil, 0, nil, errors.New("FInput is not long enough")
+	}
+	modulus := new(big.Int).Set(field.pbig)
 	return field, modulus, modulusLen, rest, nil
 }
 
@@ -195,7 +198,7 @@ func decodeBAInExtField3FromEncoding(in []byte, modulusLen int, field *fq3) (*fe
 func decodeGroupOrder(in []byte) (int, *big.Int, []byte, error) {
 	orderLenBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return 0, nil, nil, errors.New("Input is not long enough to get modulus length")
+		return 0, nil, nil, errors.New("Input is not long enough to get group order length")
 	}
 	orderLen := int(orderLenBuf[0])
 	if orderLen == 0 {
@@ -208,10 +211,10 @@ func decodeGroupOrder(in []byte) (int, *big.Int, []byte, error) {
 	if err != nil {
 		return 0, nil, nil, errors.New("Input is not long enough to get group order")
 	}
-	if orderBuf[0] == 0 {
-		return 0, nil, nil, errors.New("Encoded group length has zero top byte")
-	}
-	order := new(big.Int).SetBytes(orderBuf)
+	// if orderBuf[0] == 0 {
+	// 	return 0, nil, nil, errors.New("Encoded group length has zero top byte")
+	// }
+	order := new(big.Int).SetBytes(padBytes(orderBuf, orderLen))
 	if isBigZero(order) {
 		return 0, nil, nil, errors.New("Group order is zero")
 	}
@@ -263,14 +266,13 @@ func decodeScalar(in []byte, orderLen int, order *big.Int) (*big.Int, []byte, er
 		return nil, nil, err
 	}
 	s := new(big.Int).SetBytes(buf)
-	if s.Cmp(order) != -1 {
-		return nil, nil, errors.New("Scalar is larger than the group order")
-	}
+	// if s.Cmp(order) != -1 {
+	// 	return nil, nil, errors.New("Scalar is larger than the group order")
+	// }
 	return s, rest, nil
 }
 
-// G2
-func createExtension2FieldParams(in []byte, modulusLen int, field *field, frobenius bool) (*fq2, []byte, error) {
+func createExtension2FieldParams(in []byte, modulusLen int, field *field, degree int, needFrobenius bool) (*fq2, []byte, error) {
 	nonResidue, rest, err := decodeFp(in, modulusLen, field)
 	if err != nil {
 		return nil, nil, err
@@ -278,7 +280,7 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, froben
 	if field.isZero(nonResidue) {
 		return nil, nil, errors.New("Non-residue for Fp2 is zero")
 	}
-	if notSquare := isNonNThRoot(field, nonResidue, 2); !notSquare {
+	if notSquare := isNonNThRoot(field, nonResidue, degree); !notSquare {
 		return nil, nil, errors.New("Non-residue for Fp2 is actually a residue")
 	}
 
@@ -287,7 +289,7 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, froben
 	if err != nil {
 		return nil, nil, err
 	}
-	if frobenius {
+	if needFrobenius {
 		if ok := fq2.calculateFrobeniusCoeffs(); !ok {
 			return nil, nil, errors.New("Can not calculate Frobenius coefficients for Fp2")
 		}
@@ -295,58 +297,7 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, froben
 	return fq2, rest, nil
 }
 
-func createExtension2FieldParamsForPairing(in []byte, modulusLen int, field *field, frobenius bool, degree int) (*fq2, []byte, error) {
-	nonResidue, rest, err := decodeFp(in, modulusLen, field)
-	if err != nil {
-		return nil, nil, err
-	}
-	if field.isZero(nonResidue) {
-		return nil, nil, errors.New("Non-residue for Fp2 is zero")
-	}
-
-	if ok := isNonNThRoot(field, nonResidue, degree); !ok {
-		return nil, nil, errors.New("Non-residue for Fp2 is actually a residue")
-	}
-
-	fq2, err := newFq2(field, nil)
-	fq2.f.copy(fq2.nonResidue, nonResidue)
-	if err != nil {
-		return nil, nil, err
-	}
-	if frobenius {
-		if ok := fq2.calculateFrobeniusCoeffs(); !ok {
-			return nil, nil, errors.New("Can not calculate Frobenius coefficients for Fp2")
-		}
-	}
-	return fq2, rest, nil
-}
-
-func createExtension3FieldParams(in []byte, modulusLen int, field *field, frobenius bool) (*fq3, []byte, error) {
-	nonResidue, rest, err := decodeFp(in, modulusLen, field)
-	if err != nil {
-		return nil, nil, err
-	}
-	if field.isZero(nonResidue) {
-		return nil, nil, errors.New("Non-residue for Fp3 is zero")
-	}
-	if ok := isNonNThRoot(field, nonResidue, 3); !ok {
-		return nil, nil, errors.New("Non-residue for Fp3 is actually a residue")
-	}
-
-	fq3, err := newFq3(field, nil)
-	fq3.f.copy(fq3.nonResidue, nonResidue)
-	if err != nil {
-		return nil, nil, err
-	}
-	if frobenius {
-		if ok := fq3.calculateFrobeniusCoeffs(); !ok {
-			return nil, nil, errors.New("Can not calculate Frobenius coefficients for Fp3")
-		}
-	}
-	return fq3, rest, nil
-}
-
-func createExtension3FieldParamsForPairing(in []byte, modulusLen int, field *field, frobenius bool, degree int) (*fq3, []byte, error) {
+func createExtension3FieldParams(in []byte, modulusLen int, field *field, degree int, needFrobenius bool) (*fq3, []byte, error) {
 	nonResidue, rest, err := decodeFp(in, modulusLen, field)
 	if err != nil {
 		return nil, nil, err
@@ -363,7 +314,7 @@ func createExtension3FieldParamsForPairing(in []byte, modulusLen int, field *fie
 	if err != nil {
 		return nil, nil, err
 	}
-	if frobenius {
+	if needFrobenius {
 		if ok := fq3.calculateFrobeniusCoeffs(); !ok {
 			return nil, nil, errors.New("Can not calculate Frobenius coefficients for Fp3")
 		}
@@ -453,62 +404,77 @@ func decodePairingExpSign(in []byte) (bool, []byte, error) {
 	}
 }
 
-func decodeG1(in []byte) (*g1, int, *big.Int, []byte, error) {
+func decodeBoolean(in []byte) (bool, []byte, error) {
+	booleanBuf, rest, err := split(in, BOOLEAN_ENCODING_LENGTH)
+	if err != nil {
+		return false, nil, errors.New("Input is not long enough to get boolean")
+	}
+	switch int(booleanBuf[0]) {
+	case BOOLEAN_FALSE:
+		return false, rest, nil
+	case BOOLEAN_TRUE:
+		return true, rest, nil
+	default:
+		return false, nil, errors.New("Boolean is not encoded properly")
+	}
+}
+
+func decodeG1(in []byte) (*g1, int, *big.Int, int, []byte, error) {
 	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
 	if err != nil {
-		return nil, 0, nil, nil, err
+		return nil, 0, nil, 0, nil, err
 	}
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
-		return nil, 0, nil, nil, err
+		return nil, 0, nil, 0, nil, err
 	}
-	_, order, rest, err := decodeGroupOrder(rest)
+	orderLen, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
-		return nil, 0, nil, nil, err
+		return nil, 0, nil, 0, nil, err
 	}
 	g1, err := newG1(field, a, b, order)
 	if err != nil {
-		return nil, 0, nil, nil, err
+		return nil, 0, nil, 0, nil, err
 	}
-	return g1, modulusLen, order, rest, nil
+	return g1, modulusLen, order, orderLen, rest, nil
 }
 
-func decodeG22(in []byte, field *field, modulusLen int) (*g22, *big.Int, []byte, error) {
-	fq2, rest, err := createExtension2FieldParams(in, modulusLen, field, false)
+func decodeG22(in []byte, field *field, modulusLen int) (*g22, *big.Int, int, []byte, error) {
+	fq2, rest, err := createExtension2FieldParams(in, modulusLen, field, 2, false)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, 0, nil, err
 	}
 	a2, b2, rest, err := decodeBAInExtField2FromEncoding(rest, modulusLen, fq2)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, 0, nil, err
 	}
-	_, order, rest, err := decodeGroupOrder(rest)
+	orderLen, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, 0, nil, err
 	}
 	g22, err := newG22(fq2, a2, b2, order)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, 0, nil, err
 	}
-	return g22, order, rest, nil
+	return g22, order, orderLen, rest, nil
 }
 
-func decodeG23(in []byte, field *field, modulusLen int) (*g23, *big.Int, []byte, error) {
-	fq3, rest, err := createExtension3FieldParams(in, modulusLen, field, false)
+func decodeG23(in []byte, field *field, modulusLen int) (*g23, *big.Int, int, []byte, error) {
+	fq3, rest, err := createExtension3FieldParams(in, modulusLen, field, 3, false)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, 0, nil, err
 	}
 	a2, b2, rest, err := decodeBAInExtField3FromEncoding(rest, modulusLen, fq3)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, 0, nil, err
 	}
-	_, order, rest, err := decodeGroupOrder(rest)
+	orderLen, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, 0, nil, err
 	}
 	g23, err := newG23(fq3, a2, b2, order)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, 0, nil, err
 	}
-	return g23, order, rest, nil
+	return g23, order, orderLen, rest, nil
 }
