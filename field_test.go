@@ -3,7 +3,6 @@ package eip
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"math/big"
@@ -15,17 +14,14 @@ var fuz int = 1
 var targetNumberOfLimb int = -1
 
 var from = 1
-var to = 8
+var to = 16
 
-// TODO: remove after fuzz testing
-func checkLimbSizeControl(limbsInField, limbs int) bool {
-	if limbsInField == limbs {
-		return true
+func TestArch(t *testing.T) {
+	answer := "Yes."
+	if nonADXBMI2 {
+		answer = "No."
 	}
-	if USE_4LIMBS_FOR_LOWER_LIMBS && limbs <= 4 && limbsInField == 4 {
-		return true
-	}
-	return false
+	fmt.Printf("Is using ADX backend extension? %s\n", answer)
 }
 
 func TestMain(m *testing.M) {
@@ -53,8 +49,11 @@ func randField(limbSize int) *field {
 	rawpbytes := pbig.Bytes()
 	pbytes := make([]byte, byteSize)
 	copy(pbytes[byteSize-len(rawpbytes):], pbig.Bytes())
-	f, _ := newField(pbytes)
-	return f
+	field, err := newField(pbytes)
+	if err != nil {
+		panic(err)
+	}
+	return field
 }
 
 func debugBytes(a ...[]byte) {
@@ -75,14 +74,7 @@ func resolveLimbSize(bitSize int) int {
 }
 
 func randBytes(max *big.Int) []byte {
-	// return padBytes(randBig(max).Bytes(), resolveLimbSize(max.BitLen())*8)
-	out := padBytes(randBig(max).Bytes(), resolveLimbSize(max.BitLen())*8)
-	// TODO: remove after fuzz testing
-	limbSize := resolveLimbSize(max.BitLen())
-	if limbSize < 4 {
-		out = padBytes(out, 32)
-	}
-	return out
+	return padBytes(randBig(max).Bytes(), resolveLimbSize(max.BitLen())*8)
 }
 
 func randBig(max *big.Int) *big.Int {
@@ -101,12 +93,12 @@ func BenchmarkField(t *testing.B) {
 		return
 	}
 	field := randField(limbSize)
-	if !checkLimbSizeControl(field.limbSize, limbSize) {
+	if field.limbSize != limbSize {
 		t.Fatalf("bad field construction")
 	}
 	bitSize := limbSize * 64
-	a, _ := field.randFieldElement(rand.Reader)
-	b, _ := field.randFieldElement(rand.Reader)
+	a := field.randFieldElement(rand.Reader)
+	b := field.randFieldElement(rand.Reader)
 	c := field.newFieldElement()
 	t.Run(fmt.Sprintf("%d_add", bitSize), func(t *testing.B) {
 		for i := 0; i < t.N; i++ {
@@ -140,7 +132,7 @@ func TestShift(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_shift", limbSize*64), func(t *testing.T) {
 			field := randField(limbSize)
-			a, _ := field.randFieldElement(rand.Reader)
+			a := field.randFieldElement(rand.Reader)
 			bi := field.toBigNoTransform(a)
 			da := field.newFieldElement()
 			field.copy(da, a)
@@ -198,7 +190,7 @@ func TestCopy(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_copy", limbSize*64), func(t *testing.T) {
 			field := randField(limbSize)
-			a, _ := field.randFieldElement(rand.Reader)
+			a := field.randFieldElement(rand.Reader)
 			b := field.newFieldElement()
 			field.copy(b, a)
 			if !field.equal(a, b) {
@@ -212,7 +204,7 @@ func TestSerialization(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_serialization", limbSize*64), func(t *testing.T) {
 			field := randField(limbSize)
-			if !checkLimbSizeControl(field.limbSize, limbSize) {
+			if field.limbSize != limbSize {
 				t.Fatalf("bad field construction\n")
 			}
 			// demont(r) == 1
@@ -229,7 +221,7 @@ func TestSerialization(t *testing.T) {
 			}
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if !checkLimbSizeControl(field.limbSize, limbSize) {
+				if field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
 				// bytes
@@ -274,11 +266,11 @@ func TestAdditionCrossAgainstBigInt(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_addition_cross", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if !checkLimbSizeControl(field.limbSize, limbSize) {
+				if field.limbSize != limbSize {
 					t.Fatalf("Bad field construction")
 				}
-				a, _ := field.randFieldElement(rand.Reader)
-				b, _ := field.randFieldElement(rand.Reader)
+				a := field.randFieldElement(rand.Reader)
+				b := field.randFieldElement(rand.Reader)
 				c := field.newFieldElement()
 				big_a := field.toBig(a)
 				big_b := field.toBig(b)
@@ -317,11 +309,11 @@ func TestAdditionProperties(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_addition_properties", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if !checkLimbSizeControl(field.limbSize, limbSize) {
+				if field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
-				a, _ := field.randFieldElement(rand.Reader)
-				b, _ := field.randFieldElement(rand.Reader)
+				a := field.randFieldElement(rand.Reader)
+				b := field.randFieldElement(rand.Reader)
 				c_1 := field.newFieldElement()
 				c_2 := field.newFieldElement()
 				field.add(c_1, a, field.zero)
@@ -361,7 +353,7 @@ func TestAdditionProperties(t *testing.T) {
 				if !field.equal(c_1, c_2) {
 					t.Fatalf("a - b = - ( b - a )")
 				}
-				c_x, _ := field.randFieldElement(rand.Reader)
+				c_x := field.randFieldElement(rand.Reader)
 				field.add(c_1, a, b)
 				field.add(c_1, c_1, c_x)
 				field.add(c_2, a, c_x)
@@ -386,11 +378,11 @@ func TestMultiplicationCrossAgainstBigInt(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_multiplication_cross", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if !checkLimbSizeControl(field.limbSize, limbSize) {
+				if field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
-				a, _ := field.randFieldElement(rand.Reader)
-				b, _ := field.randFieldElement(rand.Reader)
+				a := field.randFieldElement(rand.Reader)
+				b := field.randFieldElement(rand.Reader)
 				c := field.newFieldElement()
 				big_a := field.toBig(a)
 				big_b := field.toBig(b)
@@ -411,11 +403,11 @@ func TestMultiplicationProperties(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_multiplication_properties", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if !checkLimbSizeControl(field.limbSize, limbSize) {
+				if field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
-				a, _ := field.randFieldElement(rand.Reader)
-				b, _ := field.randFieldElement(rand.Reader)
+				a := field.randFieldElement(rand.Reader)
+				b := field.randFieldElement(rand.Reader)
 				c_1 := field.newFieldElement()
 				c_2 := field.newFieldElement()
 				field.mul(c_1, a, field.zero)
@@ -431,7 +423,7 @@ func TestMultiplicationProperties(t *testing.T) {
 				if !field.equal(c_1, c_2) {
 					t.Fatalf("a * b == b * a")
 				}
-				c_x, _ := field.randFieldElement(rand.Reader)
+				c_x := field.randFieldElement(rand.Reader)
 				field.mul(c_1, a, b)
 				field.mul(c_1, c_1, c_x)
 				field.mul(c_2, c_x, b)
@@ -449,10 +441,10 @@ func TestExponentiation(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_exponention", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if !checkLimbSizeControl(field.limbSize, limbSize) {
+				if field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
-				a, _ := field.randFieldElement(rand.Reader)
+				a := field.randFieldElement(rand.Reader)
 				u := field.newFieldElement()
 				field.exp(u, a, big.NewInt(0))
 				if !field.equal(u, field.one) {
@@ -484,39 +476,7 @@ func TestExponentiation(t *testing.T) {
 	}
 }
 
-// func TestInversion(t *testing.T) {
-// 	for limbSize := from; limbSize < to+1; limbSize++ {
-// 		t.Run(fmt.Sprintf("%d_inversion", limbSize*64), func(t *testing.T) {
-// 			for i := 0; i < fuz; i++ {
-// 				field := randField(limbSize)
-// 				u := field.newFieldElement()
-// 				field.inverse(u, field.zero)
-// 				if !field.equal(u, field.zero) {
-// 					t.Fatalf("(0^-1) == 0)")
-// 				}
-// 				field.inverse(u, field.one)
-// 				if !field.equal(u, field.one) {
-// 					t.Fatalf("(1^-1) == 1)")
-// 				}
-// 				a, _ := field.randFieldElement(rand.Reader)
-// 				field.inverse(u, a)
-// 				field.mul(u, u, a)
-// 				if !field.equal(u, field.r) {
-// 					t.Fatalf("(r*a) * r*(a^-1) == r)")
-// 				}
-// 				v := field.newFieldElement()
-// 				p := new(big.Int).Set(field.pbig)
-// 				field.exp(u, a, p.Sub(p, big.NewInt(2)))
-// 				field.inverse(v, a)
-// 				if !field.equal(v, u) {
-// 					t.Fatalf("a^(p-2) == a^-1")
-// 				}
-// 			}
-// 		})
-// 	}
-// }
-
-func TestNewInversion(t *testing.T) {
+func TestInversion(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_inversion", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
@@ -530,7 +490,7 @@ func TestNewInversion(t *testing.T) {
 				if !field.equal(u, field.one) {
 					t.Fatalf("(1^-1) == 1)")
 				}
-				a, _ := field.randFieldElement(rand.Reader)
+				a := field.randFieldElement(rand.Reader)
 				field.inverse(u, a)
 				field.mul(u, u, a)
 				if !field.equal(u, field.r) {
@@ -545,62 +505,5 @@ func TestNewInversion(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestNewInverse(t *testing.T) {
-	modBytes, err := hex.DecodeString("f3")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(modBytes) < 8 {
-		modBytes = padBytes(modBytes, 8)
-	}
-	// fmt.Printf("modBytes: %x\n", modBytes)
-	f, err := newField(modBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	elemBytes, err := hex.DecodeString("e3")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(elemBytes) < 32 {
-		elemBytes = padBytes(elemBytes, 32)
-	}
-	elem, err := f.newFieldElementFromBytes(elemBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	inv := f.newFieldElement()
-	if ok := f.inverse(inv, elem); !ok {
-		t.Logf("no inverse")
-	}
-	f.mul(inv, inv, elem)
-	if !f.equal(inv, f.one) {
-		t.Fatalf("bad inversion")
-	}
-}
-func TestNewInverse2(t *testing.T) {
-	modLen := 32
-	modBytes := bytes_(modLen, "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47")
-	f, err := newField(modBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	elemBytes := bytes_(modLen, "0x07")
-	elem, err := f.newFieldElementFromBytes(elemBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	inv := f.newFieldElement()
-	if ok := f.inverse(inv, elem); !ok {
-		t.Logf("no inverse")
-	}
-	f.mul(inv, inv, elem)
-	if !f.equal(inv, f.one) {
-		t.Logf("inv: %s\n", f.toString(inv))
-		t.Fatalf("bad inversion")
 	}
 }
