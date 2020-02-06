@@ -5,6 +5,10 @@ import (
 	"math/big"
 )
 
+const (
+	USE_4LIMBS_FOR_LOWER_LIMBS = true
+)
+
 var (
 	zero                         = []byte{0x00}
 	pairingError, pairingSuccess = []byte{0x00}, []byte{0x01}
@@ -157,7 +161,7 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 type g2Api struct{}
 
 func (api *g2Api) run(opType int, in []byte) ([]byte, error) {
-	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +170,6 @@ func (api *g2Api) run(opType int, in []byte) ([]byte, error) {
 		return nil, errors.New("cant decode extension degree length")
 	}
 	degree := int(degreeBuf[0])
-	// fmt.Printf("[debug] ext degree: %d\n", degree)
 	switch degree {
 	case EXTENSION_TWO_DEGREE:
 		return new(g22Api).run(opType, field, modulusLen, rest)
@@ -416,7 +419,7 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 }
 
 func pairBN(in []byte) ([]byte, error) {
-	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
 		return pairingError, err
 	}
@@ -531,15 +534,15 @@ func pairBN(in []byte) ([]byte, error) {
 	var g1Points []*pointG1
 	var g2Points []*pointG22
 	for i := 0; i < numPairs; i++ {
-		needG1SubGroupCheck, rest, err := decodeBoolean(rest)
+		needG1SubGroupCheck, localRest, err := decodeBoolean(rest)
 		if err != nil {
 			return pairingError, err
 		}
-		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		g1Point, localRest, err := decodeG1Point(localRest, modulusLen, g1)
 		if err != nil {
 			return pairingError, err
 		}
-		needG2SubGroupCheck, rest, err := decodeBoolean(rest)
+		needG2SubGroupCheck, localRest, err := decodeBoolean(localRest)
 		if err != nil {
 			return pairingError, err
 		}
@@ -598,7 +601,7 @@ func pairBN(in []byte) ([]byte, error) {
 }
 
 func pairBLS(in []byte) ([]byte, error) {
-	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
 		return pairingError, err
 	}
@@ -697,15 +700,15 @@ func pairBLS(in []byte) ([]byte, error) {
 	var g1Points []*pointG1
 	var g2Points []*pointG22
 	for i := 0; i < numPairs; i++ {
-		needG1SubGroupCheck, rest, err := decodeBoolean(rest)
+		needG1SubGroupCheck, localRest, err := decodeBoolean(rest)
 		if err != nil {
 			return pairingError, err
 		}
-		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		g1Point, localRest, err := decodeG1Point(localRest, modulusLen, g1)
 		if err != nil {
 			return pairingError, err
 		}
-		needG2SubGroupCheck, rest, err := decodeBoolean(rest)
+		needG2SubGroupCheck, localRest, err := decodeBoolean(localRest)
 		if err != nil {
 			return pairingError, err
 		}
@@ -762,7 +765,7 @@ func pairBLS(in []byte) ([]byte, error) {
 }
 
 func pairMNT4(in []byte) ([]byte, error) {
-	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
 		return pairingError, err
 	}
@@ -847,15 +850,15 @@ func pairMNT4(in []byte) ([]byte, error) {
 	var g1Points []*pointG1
 	var g2Points []*pointG22
 	for i := 0; i < numPairs; i++ {
-		needG1SubGroupCheck, rest, err := decodeBoolean(rest)
+		needG1SubGroupCheck, localRest, err := decodeBoolean(rest)
 		if err != nil {
 			return pairingError, err
 		}
-		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		g1Point, localRest, err := decodeG1Point(localRest, modulusLen, g1)
 		if err != nil {
 			return pairingError, err
 		}
-		needG2SubGroupCheck, rest, err := decodeBoolean(rest)
+		needG2SubGroupCheck, localRest, err := decodeBoolean(localRest)
 		if err != nil {
 			return pairingError, err
 		}
@@ -915,7 +918,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 }
 
 func pairMNT6(in []byte) ([]byte, error) {
-	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
 		return pairingError, err
 	}
@@ -1002,15 +1005,15 @@ func pairMNT6(in []byte) ([]byte, error) {
 	var g1Points []*pointG1
 	var g2Points []*pointG23
 	for i := 0; i < numPairs; i++ {
-		needG1SubGroupCheck, rest, err := decodeBoolean(rest)
+		needG1SubGroupCheck, localRest, err := decodeBoolean(rest)
 		if err != nil {
 			return pairingError, err
 		}
-		g1Point, localRest, err := decodeG1Point(rest, modulusLen, g1)
+		g1Point, localRest, err := decodeG1Point(localRest, modulusLen, g1)
 		if err != nil {
 			return pairingError, err
 		}
-		needG2SubGroupCheck, rest, err := decodeBoolean(rest)
+		needG2SubGroupCheck, localRest, err := decodeBoolean(localRest)
 		if err != nil {
 			return pairingError, err
 		}

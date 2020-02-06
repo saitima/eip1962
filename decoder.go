@@ -32,7 +32,7 @@ func split(in []byte, offset int) ([]byte, []byte, error) {
 	return in[:offset], in[offset:], nil
 }
 
-func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
+func parseBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 	modulusLenBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
 		return nil, 0, nil, errors.New("Input is not long enough to get modulus length")
@@ -66,9 +66,8 @@ func decodeBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 	return modulusBuf, modulusLen, rest, nil
 }
 
-// G1
-func parseBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, error) {
-	modulusBuf, modulusLen, rest, err := decodeBaseFieldParams(in)
+func decodeBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, error) {
+	modulusBuf, modulusLen, rest, err := parseBaseFieldParams(in)
 	if err != nil {
 		return nil, nil, 0, nil, err
 	}
@@ -211,9 +210,6 @@ func decodeGroupOrder(in []byte) (int, *big.Int, []byte, error) {
 	if err != nil {
 		return 0, nil, nil, errors.New("Input is not long enough to get group order")
 	}
-	// if orderBuf[0] == 0 {
-	// 	return 0, nil, nil, errors.New("Encoded group length has zero top byte")
-	// }
 	order := new(big.Int).SetBytes(padBytes(orderBuf, orderLen))
 	if isBigZero(order) {
 		return 0, nil, nil, errors.New("Group order is zero")
@@ -266,9 +262,6 @@ func decodeScalar(in []byte, orderLen int, order *big.Int) (*big.Int, []byte, er
 		return nil, nil, err
 	}
 	s := new(big.Int).SetBytes(buf)
-	// if s.Cmp(order) != -1 {
-	// 	return nil, nil, errors.New("Scalar is larger than the group order")
-	// }
 	return s, rest, nil
 }
 
@@ -377,7 +370,6 @@ func decodeLoopParameters(in []byte, limit int) (*big.Int, []byte, error) {
 }
 
 func decodeTwistType(in []byte) (int, []byte, error) {
-	// twist type 0x01: M, 0x02: D
 	twistTypeBuf, rest, err := split(in, TWIST_TYPE_LENGTH)
 	if err != nil {
 		return 0, nil, errors.New("Input is not long enough to get twist type")
@@ -420,7 +412,7 @@ func decodeBoolean(in []byte) (bool, []byte, error) {
 }
 
 func decodeG1(in []byte) (*g1, int, *big.Int, int, []byte, error) {
-	field, _, modulusLen, rest, err := parseBaseFieldFromEncoding(in)
+	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
 		return nil, 0, nil, 0, nil, err
 	}

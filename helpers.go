@@ -7,10 +7,6 @@ import (
 	"math/big"
 )
 
-const (
-	USE_4LIMBS_FOR_LOWER_LIMBS = true
-)
-
 func bytes_(size int, hexStrs ...string) []byte {
 	var out []byte
 	if size > 0 {

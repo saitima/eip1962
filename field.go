@@ -444,7 +444,7 @@ func (f *field) newFieldElementFromBytesNoTransform(in []byte) (fieldElement, er
 
 func (f *field) newFieldElementFromBytes(in []byte) (fieldElement, error) {
 	if len(in) != f.byteSize() {
-		return nil, fmt.Errorf("bad input size")
+		return nil, fmt.Errorf("bad input size %d %d", len(in), f.byteSize())
 	}
 	if !f.isValid(in) {
 		return nil, fmt.Errorf("input is a larger number than modulus")

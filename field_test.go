@@ -93,7 +93,7 @@ func BenchmarkField(t *testing.B) {
 		return
 	}
 	field := randField(limbSize)
-	if field.limbSize != limbSize {
+	if !USE_4LIMBS_FOR_LOWER_LIMBS && field.limbSize != limbSize {
 		t.Fatalf("bad field construction")
 	}
 	bitSize := limbSize * 64
@@ -204,7 +204,7 @@ func TestSerialization(t *testing.T) {
 	for limbSize := from; limbSize < to+1; limbSize++ {
 		t.Run(fmt.Sprintf("%d_serialization", limbSize*64), func(t *testing.T) {
 			field := randField(limbSize)
-			if field.limbSize != limbSize {
+			if !USE_4LIMBS_FOR_LOWER_LIMBS && field.limbSize != limbSize {
 				t.Fatalf("bad field construction\n")
 			}
 			// demont(r) == 1
@@ -221,14 +221,20 @@ func TestSerialization(t *testing.T) {
 			}
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !USE_4LIMBS_FOR_LOWER_LIMBS && field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
 				// bytes
 				b0 := randBytes(field.pbig)
+				if USE_4LIMBS_FOR_LOWER_LIMBS && len(b0) < 32 {
+					b0 = padBytes(b0, 32)
+				}
 				a0, err := field.newFieldElementFromBytes(b0)
 				if err != nil {
 					t.Fatal(err)
+				}
+				if USE_4LIMBS_FOR_LOWER_LIMBS && len(b0) < 32 {
+					b0 = padBytes(b0, 32)
 				}
 				b1 = field.toBytes(a0)
 				if !bytes.Equal(b0, b1) {
@@ -266,7 +272,7 @@ func TestAdditionCrossAgainstBigInt(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_addition_cross", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !USE_4LIMBS_FOR_LOWER_LIMBS && field.limbSize != limbSize {
 					t.Fatalf("Bad field construction")
 				}
 				a := field.randFieldElement(rand.Reader)
@@ -309,7 +315,7 @@ func TestAdditionProperties(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_addition_properties", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !USE_4LIMBS_FOR_LOWER_LIMBS && field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
 				a := field.randFieldElement(rand.Reader)
@@ -378,7 +384,7 @@ func TestMultiplicationCrossAgainstBigInt(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_multiplication_cross", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !USE_4LIMBS_FOR_LOWER_LIMBS && field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
 				a := field.randFieldElement(rand.Reader)
@@ -403,7 +409,7 @@ func TestMultiplicationProperties(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_multiplication_properties", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !USE_4LIMBS_FOR_LOWER_LIMBS && field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
 				a := field.randFieldElement(rand.Reader)
@@ -441,7 +447,7 @@ func TestExponentiation(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_exponention", limbSize*64), func(t *testing.T) {
 			for i := 0; i < fuz; i++ {
 				field := randField(limbSize)
-				if field.limbSize != limbSize {
+				if !USE_4LIMBS_FOR_LOWER_LIMBS && field.limbSize != limbSize {
 					t.Fatalf("bad field construction")
 				}
 				a := field.randFieldElement(rand.Reader)
