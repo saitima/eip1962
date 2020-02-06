@@ -456,12 +456,10 @@ func pairBN(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-
 	f1, f2, err := constructBaseForFq6AndFq12(fq2, fq2NonResidue)
 	if err != nil {
 		return pairingError, errors.New("Can not make base precomputations for Fp6/Fp12 frobenius")
 	}
-
 	fq6, err := newFq6(fq2, nil)
 	if err != nil {
 		return pairingError, err
@@ -477,20 +475,16 @@ func pairBN(in []byte) ([]byte, error) {
 	if ok := fq12.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp12")
 	}
-
-	if hasInverse := fq2.inverse(fq2.newElement(), fq2NonResidue); !hasInverse {
+	fq2NonResidueInv := fq2.newElement()
+	if hasInverse := fq2.inverse(fq2NonResidueInv, fq2NonResidue); !hasInverse {
 		return pairingError, errors.New("Fp2 non-residue must be invertible")
 	}
-
 	b2 := fq2.newElement()
 	if twistType == TWIST_M {
 		fq2.mulByFq(b2, fq6.nonResidue, b)
 	} else {
-		fq6NonResidueInv := fq2.newElement()
-		fq2.inverse(fq6NonResidueInv, fq6.nonResidue)
-		fq2.mulByFq(b2, fq6NonResidueInv, b)
+		fq2.mulByFq(b2, fq2NonResidueInv, b)
 	}
-
 	g2, err := newG22(fq2, fq2.zero(), b2, order)
 	if err != nil {
 		return pairingError, err
@@ -530,7 +524,6 @@ func pairBN(in []byte) ([]byte, error) {
 	if numPairs == 0 {
 		return pairingError, errors.New("zero pairs encoded")
 	}
-
 	var g1Points []*pointG1
 	var g2Points []*pointG22
 	for i := 0; i < numPairs; i++ {
@@ -657,18 +650,15 @@ func pairBLS(in []byte) ([]byte, error) {
 	if ok := fq12.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
 		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp12")
 	}
-
-	if hasInverse := fq2.inverse(fq2.newElement(), fq2NonResidue); !hasInverse {
+	fq2NonResidueInv := fq2.newElement()
+	if hasInverse := fq2.inverse(fq2NonResidueInv, fq2NonResidue); !hasInverse {
 		return pairingError, errors.New("Fp2 non-residue must be invertible")
 	}
-
 	b2 := fq2.newElement()
 	if twistType == TWIST_M {
 		fq2.mulByFq(b2, fq6.nonResidue, b)
 	} else {
-		fq6NonResidueInv := fq2.newElement()
-		fq2.inverse(fq6NonResidueInv, fq6.nonResidue)
-		fq2.mulByFq(b2, fq6NonResidueInv, b)
+		fq2.mulByFq(b2, fq2NonResidueInv, b)
 	}
 	g2, err := newG22(fq2, fq2.zero(), b2, order)
 	if err != nil {
@@ -785,7 +775,6 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if err != nil {
 		return pairingError, err
 	}
-
 	f1 := constructBaseForFq2AndFq4(field, fq2.nonResidue)
 	fq2.calculateFrobeniusCoeffsWithPrecomputation(f1)
 	fq4, err := newFq4(fq2, nil)
@@ -913,7 +902,6 @@ func pairMNT4(in []byte) ([]byte, error) {
 	if !fq4.equal(result, fq4.one()) {
 		return pairingError, nil
 	}
-
 	return pairingSuccess, nil
 }
 
@@ -967,7 +955,6 @@ func pairMNT6(in []byte) ([]byte, error) {
 	if isBigZero(x) {
 		return pairingError, errors.New("Ate pairing loop count parameters can not be zero")
 	}
-
 	if weight := calculateHammingWeight(x); weight > MAX_ATE_PAIRING_ATE_LOOP_COUNT_HAMMING {
 		return pairingError, errors.New("x has too large hamming weight")
 	}

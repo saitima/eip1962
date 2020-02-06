@@ -362,6 +362,9 @@ func decodeLoopParameters(in []byte, limit int) (*big.Int, []byte, error) {
 	if err != nil {
 		return nil, nil, errors.New("Input is not long enough to get loop parameter")
 	}
+	if paramBuf[0] == 0 {
+		return nil, nil, errors.New("Encoded loop parameter has zero top byte")
+	}
 	param := new(big.Int).SetBytes(paramBuf)
 	if param.BitLen() > limit {
 		return nil, nil, errors.New("Scalar is too large for bit length")
