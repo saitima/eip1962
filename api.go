@@ -5,26 +5,26 @@ import (
 	"math/big"
 )
 
-const (
-	USE_4LIMBS_FOR_LOWER_LIMBS = true
-)
-
 var (
 	zero                         = []byte{0x00}
 	pairingError, pairingSuccess = []byte{0x00}, []byte{0x01}
-	TWIST_M, TWIST_D             = 0x01, 0x02
-	NEGATIVE_EXP, POSITIVE_EXP   = 0x01, 0x00
-	BOOLEAN_FALSE, BOOLEAN_TRUE  = 0x00, 0x01
-	OPERATION_G1_ADD             = 0x01
-	OPERATION_G1_MUL             = 0x02
-	OPERATION_G1_MULTIEXP        = 0x03
-	OPERATION_G2_ADD             = 0x04
-	OPERATION_G2_MUL             = 0x05
-	OPERATION_G2_MULTIEXP        = 0x06
-	OPERATION_BLS12PAIR          = 0x07
-	OPERATION_BNPAIR             = 0x08
-	OPERATION_MNT4PAIR           = 0x09
-	OPERATION_MNT6PAIR           = 0x0a
+)
+
+const (
+	USE_4LIMBS_FOR_LOWER_LIMBS  = true
+	TWIST_M, TWIST_D            = 0x01, 0x02
+	NEGATIVE_EXP, POSITIVE_EXP  = 0x01, 0x00
+	BOOLEAN_FALSE, BOOLEAN_TRUE = 0x00, 0x01
+	OPERATION_G1_ADD            = 0x01
+	OPERATION_G1_MUL            = 0x02
+	OPERATION_G1_MULTIEXP       = 0x03
+	OPERATION_G2_ADD            = 0x04
+	OPERATION_G2_MUL            = 0x05
+	OPERATION_G2_MULTIEXP       = 0x06
+	OPERATION_BLS12PAIR         = 0x07
+	OPERATION_BNPAIR            = 0x08
+	OPERATION_MNT4PAIR          = 0x09
+	OPERATION_MNT6PAIR          = 0x0a
 )
 
 type API struct{}
@@ -170,6 +170,7 @@ func (api *g2Api) run(opType int, in []byte) ([]byte, error) {
 		return nil, errors.New("cant decode extension degree length")
 	}
 	degree := int(degreeBuf[0])
+	// fmt.Printf("ext degree %d\n", degree)
 	switch degree {
 	case EXTENSION_TWO_DEGREE:
 		return new(g22Api).run(opType, field, modulusLen, rest)
@@ -293,7 +294,6 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 	} else {
 		g2.multiExp(q, bases, scalars)
 	}
-
 	out := make([]byte, 4*modulusLen)
 	encodeG22Point(out, g2.toBytes(q))
 	return out, nil

@@ -370,7 +370,7 @@ func (f *field) sub(c, a, b fieldElement) {
 
 func (f *field) neg(c, a fieldElement) {
 	if f.equal(a, f.zero) {
-		f.copy(a, f.zero)
+		f.copy(c, f.zero)
 		return
 	}
 	f._neg(c, a, f.p)

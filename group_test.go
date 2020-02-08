@@ -2054,6 +2054,112 @@ func TestMNT4320Pairing(t *testing.T) {
 	})
 
 }
+func BenchmarkMNT4320Pairing(t *testing.B) {
+	byteLen := 40
+	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
+	groupBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// G1
+	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x02"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x03545a27639415585ea4d523234fc3edd2a2070a085c7b980f4e9cd21a515d4b0ef528ec0fd5"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	order := new(big.Int).SetBytes(groupBytes)
+	g1, err := newG1(f, a, b, order)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fq2, err := newFq2(f, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nonResidue, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x011")) // decimal 17
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.copy(fq2.nonResidue, nonResidue)
+	fq2.calculateFrobeniusCoeffs()
+
+	fq4, err := newFq4(fq2, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fq4.nonResidue = fq2.zero()
+	fq4.f.f.copy(fq4.nonResidue[0], fq2.nonResidue)
+	fq4.calculateFrobeniusCoeffs()
+
+	// y^2 = x^3 + b/(9+u)
+	twist, twist2, twist3 := fq2.newElement(), fq2.newElement(), fq2.newElement()
+	f.copy(twist[0], f.zero)
+	f.copy(twist[1], f.one)
+	fq2.square(twist2, twist)
+	fq2.mul(twist3, twist2, twist)
+
+	a2, b2 := fq2.newElement(), fq2.newElement()
+	fq2.mulByFq(a2, twist2, a)
+	fq2.mulByFq(b2, twist3, b)
+
+	// G2
+	g2, err := newG22(fq2, a2, b2, order)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mnt4 instance)
+	z, ok := new(big.Int).SetString("689871209842287392837045615510547309923794944", 10)
+	if !ok {
+		t.Fatal("invalid value")
+	}
+
+	expW0, ok := new(big.Int).SetString("689871209842287392837045615510547309923794945", 10)
+	if !ok {
+		t.Fatal("invalid expW0")
+	}
+	expW1 := big.NewInt(1)
+
+	mnt4 := newMnt4Instance(z, false, expW0, expW1, false, fq4, g1, g2, twist)
+	generatorBytes := bytes_(byteLen,
+		"0x7a2caf82a1ba85213fe6ca3875aee86aba8f73d69060c4079492b948dea216b5b9c8d2af46",
+		"0x2db619461cc82672f7f159fec2e89d0148dcc9862d36778c1afd96a71e29cba48e710a48ab2",
+	)
+	g1One, err := mnt4.g1.fromBytes(generatorBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !mnt4.g1.isOnCurve(g1One) {
+		t.Fatal("p is not on curve\n")
+	}
+	generatorBytes = bytes_(byteLen,
+		"0x371780491c5660571ff542f2ef89001f205151e12a72cb14f01a931e72dba7903df6c09a9a4",
+		"0x4ba59a3f72da165def838081af697c851f002f576303302bb6c02c712c968be32c0ae0a989",
+		"0x4b471f33ffaad868a1c47d6605d31e5c4b3b2e0b60ec98f0f610a5aafd0d9522bca4e79f22",
+		"0x355d05a1c69a5031f3f81a5c100cb7d982f78ec9cfc3b5168ed8d75c7c484fb61a3cbf0e0f1",
+	)
+
+	g2One, err := mnt4.g2.fromBytes(generatorBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !mnt4.g2.isOnCurve(g2One) {
+		t.Fatal("q is not on curve\n")
+	}
+	t.ResetTimer()
+	for i := 0; i < t.N; i++ {
+		mnt4.pair(g1One, g2One)
+	}
+
+}
 
 func TestMNT4753Pairing(t *testing.T) {
 	byteLen := 96
@@ -2235,6 +2341,113 @@ func TestMNT4753Pairing(t *testing.T) {
 		})
 	})
 
+}
+func BenchmarkMNT4753Pairing(t *testing.B) {
+	byteLen := 96
+	modulusBytes := bytes_(byteLen, "0x1c4c62d92c41110229022eee2cdadb7f997505b8fafed5eb7e8f96c97d87307fdb925e8a0ed8d99d124d9a15af79db117e776f218059db80f0da5cb537e38685acce9767254a4638810719ac425f0e39d54522cdd119f5e9063de245e8001")
+	groupBytes := bytes_(byteLen, "0x1c4c62d92c41110229022eee2cdadb7f997505b8fafed5eb7e8f96c97d87307fdb925e8a0ed8d99d124d9a15af79db26c5c28c859a99b3eebca9429212636b9dff97634993aa4d6c381bc3f0057974ea099170fa13a4fd90776e240000001")
+	var err error
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// G1
+	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x02"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x1373684a8c9dcae7a016ac5d7748d3313cd8e39051c596560835df0c9e50a5b59b882a92c78dc537e51a16703ec9855c77fc3d8bb21c8d68bb8cfb9db4b8c8fba773111c36c8b1b4e8f1ece940ef9eaad265458e06372009c9a0491678ef4"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	order := new(big.Int).SetBytes(groupBytes)
+	g1, err := newG1(f, a, b, order)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fq2, err := newFq2(f, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nonResidue, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x0d")) // decimal 13
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.copy(fq2.nonResidue, nonResidue)
+	fq2.calculateFrobeniusCoeffs()
+
+	fq4, err := newFq4(fq2, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fq4.nonResidue = fq2.zero()
+	// fq4.f.f.copy(fq4.nonResidue[0], fq2.nonResidue)
+	fq4.calculateFrobeniusCoeffs()
+
+	// y^2 = x^3 + b/(9+u)
+	a2, b2 := fq2.newElement(), fq2.newElement()
+	twist, twist2, twist3 := fq2.newElement(), fq2.newElement(), fq2.newElement()
+	f.copy(twist[0], f.zero)
+	f.copy(twist[1], f.one)
+	fq2.square(twist2, twist)
+	fq2.mul(twist3, twist2, twist)
+	fq2.mulByFq(a2, twist2, a)
+	fq2.mulByFq(b2, twist3, b)
+
+	// G2
+	g2, err := newG22(fq2, a2, b2, order)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mnt4 instance)
+	z, ok := new(big.Int).SetString("15474b1d641a3fd86dcbcee5dcda7fe51852c8cbe26e600733b714aa43c31a66b0344c4e2c428b07a7713041ba18000", 16)
+	if !ok {
+		t.Fatal("bad exp")
+	}
+	expW0, ok := new(big.Int).SetString("15474b1d641a3fd86dcbcee5dcda7fe51852c8cbe26e600733b714aa43c31a66b0344c4e2c428b07a7713041ba17fff", 16)
+	if !ok {
+		t.Fatal("bad exp w0")
+	}
+	expW1 := big.NewInt(1)
+
+	mnt4 := newMnt4Instance(z, true, expW0, expW1, true, fq4, g1, g2, twist)
+	generatorBytes := bytes_(byteLen,
+		"0x1013b42397c8b004d06f0e98fbc12e8ee65adefcdba683c5630e6b58fb69610b02eab1d43484ddfab28213098b562d799243fb14330903aa64878cfeb34a45d1285da665f5c3f37eb76b86209dcd081ccaef03e65f33d490de480bfee06db",
+		"0xe3eb479d308664381e7942d6c522c0833f674296169420f1dd90680d0ba6686fc27549d52e4292ea5d611cb6b0df32545b07f281032d0a71f8d485e6907766462e17e8dd55a875bd36fe4cd42cac31c0629fb26c333fe091211d0561d10e",
+	)
+	g1One, err := mnt4.g1.fromBytes(generatorBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !mnt4.g1.isOnCurve(g1One) {
+		t.Fatalf("p is not on curve\n")
+	}
+	generatorBytes = bytes_(byteLen,
+		"0xf1b7155ed4e903332835a5de0f327aa11b2d74eb8627e3a7b833be42c11d044b5cf0ae49850eeb07d90c77c67256474b2febf924aca0bfa2e4dacb821c91a04fd0165ac8debb2fc1e763a5c32c2c9f572caa85a91c5243ec4b2981af8904",
+		"0xd49c264ec663e731713182a88907b8e979ced82ca592777ad052ec5f4b95dc78dc2010d74f82b9e6d066813ed67f3af1de0d5d425da7a19916cf103f102adf5f95b6b62c24c7d186d60b4a103e157e5667038bb2e828a3374d6439526272",
+		"0x4b0e2fef08096ebbaddd2d7f288c4acf17b2267e21dc5ce0f925cd5d02209e34d8b69cc94aef5d90af34d3cd98287ace8f1162079cd2d3d7e6c6c2c073c24a359437e75638a1458f4b2face11f8d2a5200b14d6f9dd0fdd407f04be620ee",
+		"0xbc1925e7fcb64f6f8697cd5e45fae22f5688e51b30bd984c0acdc67d2962520e80d31966e3ec477909ecca358be2eee53c75f55a6f7d9660dd6f3d4336ad50e8bfa5375791d73b863d59c422c3ea006b013e7afb186f2eaa9df68f4d6098",
+	)
+
+	g2One, err := mnt4.g2.fromBytes(generatorBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !mnt4.g2.isOnCurve(g2One) {
+		t.Fatalf("g2 one is not on the curve")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.ResetTimer()
+	for i := 0; i < t.N; i++ {
+		mnt4.pair(g1One, g2One)
+	}
 }
 
 func TestBN254Pairing(t *testing.T) {
@@ -2604,5 +2817,111 @@ func TestMNT6320Pairing(t *testing.T) {
 			}
 		})
 	})
+
+}
+func BenchmarkMNT6320Pairing(t *testing.B) {
+	byteLen := 40
+	modulusBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635cf44194fb494c07925d6ad3bb4334a400000001")
+	groupBytes := bytes_(byteLen, "0x3bcf7bcd473a266249da7b0548ecaeec9635d1330ea41a9e35e51200e12c90cd65a71660001")
+	var err error
+	f, err := newField(modulusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// G1
+	a, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := f.newFieldElementFromBytes(bytes_(byteLen, "0xd68c7b1dc5dd042e957b71c44d3d6c24e683fc09b420b1a2d263fde47ddba59463d0c65282"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	order := new(big.Int).SetBytes(groupBytes)
+	g1, err := newG1(f, a, b, order)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fq3, err := newFq3(f, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nonResidue, err := f.newFieldElementFromBytes(bytes_(byteLen, "0x05"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.copy(fq3.nonResidue, nonResidue)
+	fq3.calculateFrobeniusCoeffs()
+
+	fq6, err := newFq6Quadratic(fq3, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fq6.nonResidue = fq3.zero()
+	fq6.f.f.copy(fq6.nonResidue[0], fq3.nonResidue)
+	fq6.calculateFrobeniusCoeffs()
+
+	a3, b3 := fq3.newElement(), fq3.newElement()
+	twist, twist2, twist3 := fq3.newElement(), fq3.newElement(), fq3.newElement()
+	f.copy(twist[0], f.zero)
+	f.copy(twist[1], f.one)
+	fq3.square(twist2, twist)
+	fq3.mul(twist3, twist2, twist)
+	fq3.mulByFq(a3, twist2, a)
+	fq3.mulByFq(b3, twist3, b)
+
+	// G2
+	g2, err := newG23(fq3, a3, b3, order)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mnt6 instance)
+	z, ok := new(big.Int).SetString("1eef5546609756bec2a33f0dc9a1b671660000", 16)
+	if !ok {
+		t.Fatal("invalid value")
+	}
+
+	expW0, ok := new(big.Int).SetString("1eef5546609756bec2a33f0dc9a1b671660000", 16)
+	if !ok {
+		t.Fatal("invalid expW0")
+	}
+	expW1 := big.NewInt(1)
+
+	mnt6 := newMNT6Instance(z, true, expW0, expW1, true, fq6, g1, g2, twist)
+
+	generatorBytes := bytes_(byteLen,
+		"0x2a4feee24fd2c69d1d90471b2ba61ed56f9bad79b57e0b4c671392584bdadebc01abbc0447d",
+		"0x32986c245f6db2f82f4e037bf7afd69cbfcbff07fc25d71e9c75e1b97208a333d73d91d3028",
+	)
+	g1One, err := mnt6.g1.fromBytes(generatorBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !mnt6.g1.isOnCurve(g1One) {
+		t.Fatal("p is not on curve\n")
+	}
+	generatorBytes = bytes_(byteLen,
+		"0x34f7320a12b56ce532bccb3b44902cbaa723cd60035ada7404b743ad2e644ad76257e4c6813",
+		"0xcf41620baa52eec50e61a70ab5b45f681952e0109340fec84f1b2890aba9b15cac5a0c80fa",
+		"0x11f99170e10e326433cccb8032fb48007ca3c4e105cf31b056ac767e2cb01258391bd4917ce",
+		"0x3a65968f03cc64d62ad05c79c415e07ebd38b363ec48309487c0b83e1717a582c1b60fecc91",
+		"0xca5e8427e5db1506c1a24cefc2451ab3accaea5db82dcb0c7117cc74402faa5b2c37685c6e",
+		"0xf75d2dd88302c9a4ef941307629a1b3e197277d83abb715f647c2e55a27baf782f5c60e7f7",
+	)
+	g2One, err := mnt6.g2.fromBytes(generatorBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !mnt6.g2.isOnCurve(g2One) {
+		t.Fatal("q is not on curve\n")
+	}
+	t.ResetTimer()
+	for i := 0; i < t.N; i++ {
+		mnt6.pair(g1One, g2One)
+	}
 
 }
