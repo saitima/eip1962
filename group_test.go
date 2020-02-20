@@ -742,6 +742,7 @@ func TestFq6Quadratic(t *testing.T) {
 			t.Fatalf("bad add")
 		}
 	})
+
 	t.Run("Substraction", func(t *testing.T) {
 		fq6.sub(actual, zero, zero)
 		if !fq6.equal(actual, zero) {
@@ -844,7 +845,8 @@ func TestFq6Quadratic(t *testing.T) {
 }
 
 func TestFq12(t *testing.T) {
-	modulusBytes := bytes_(48, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
+	byteLen := 48
+	modulusBytes := bytes_(byteLen, "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab")
 	f, err := newField(modulusBytes)
 	if err != nil {
 		t.Fatal(err)
@@ -908,6 +910,7 @@ func TestFq12(t *testing.T) {
 			t.Fatalf("bad add")
 		}
 	})
+
 	t.Run("Substraction", func(t *testing.T) {
 		fq12.sub(actual, zero, zero)
 		if !fq12.equal(actual, zero) {
@@ -930,6 +933,7 @@ func TestFq12(t *testing.T) {
 			t.Fatalf("bad negation")
 		}
 	})
+
 	t.Run("Multiplication", func(t *testing.T) {
 		fq12.mul(actual, zero, zero)
 		if !fq12.equal(actual, zero) {
@@ -1007,6 +1011,35 @@ func TestFq12(t *testing.T) {
 			t.Fatalf("bad exponentiation 4")
 		}
 	})
+
+	t.Run("RootsOfUnity", func(t *testing.T) {
+		subgroupOrder := new(big.Int).SetBytes(bytes_(byteLen, "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001"))
+		elementInRthTorisonBytes := bytes_(byteLen,
+			"0x1250ebd871fc0a92a7b2d83168d0d727272d441befa15c503dd8e90ce98db3e7b6d194f60839c508a84305aaca1789b6",
+			"0x089a1c5b46e5110b86750ec6a532348868a84045483c92b7af5af689452eafabf1a8943e50439f1d59882a98eaa0170f",
+			"0x1368bb445c7c2d209703f239689ce34c0378a68e72a6b3b216da0e22a5031b54ddff57309396b38c881c4c849ec23e87",
+			"0x193502b86edb8857c273fa075a50512937e0794e1e65a7617c90d8bd66065b1fffe51d7a579973b1315021ec3c19934f",
+			"0x01b2f522473d171391125ba84dc4007cfbf2f8da752f7c74185203fcca589ac719c34dffbbaad8431dad1c1fb597aaa5",
+			"0x018107154f25a764bd3c79937a45b84546da634b8f6be14a8061e55cceba478b23f7dacaa35c8ca78beae9624045b4b6",
+			"0x19f26337d205fb469cd6bd15c3d5a04dc88784fbb3d0b2dbdea54d43b2b73f2cbb12d58386a8703e0f948226e47ee89d",
+			"0x06fba23eb7c5af0d9f80940ca771b6ffd5857baaf222eb95a7d2809d61bfe02e1bfd1b68ff02f0b8102ae1c2d5d5ab1a",
+			"0x11b8b424cd48bf38fcef68083b0b0ec5c81a93b330ee1a677d0d15ff7b984e8978ef48881e32fac91b93b47333e2ba57",
+			"0x03350f55a7aefcd3c31b4fcb6ce5771cc6a0e9786ab5973320c806ad360829107ba810c5a09ffdd9be2291a0c25a99a2",
+			"0x04c581234d086a9902249b64728ffd21a189e87935a954051c7cdba7b3872629a4fafc05066245cb9108f0242d0fe3ef",
+			"0x0f41e58663bf08cf068672cbd01a7ec73baca4d72ca93544deff686bfd6df543d48eaa24afe47e1efde449383b676631",
+		)
+		elementInRthTorison, err := fq12.fromBytes(elementInRthTorisonBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fq12.exp(actual, elementInRthTorison, subgroupOrder)
+		if !fq12.equal(actual, one) {
+			t.Logf("actual: %s\n", fq12.toString(actual))
+			t.Logf("expected: %s\n", fq12.toString(one))
+			t.Fatalf("2 invalid Rth roots of unity\n")
+		}
+	})
+
 }
 
 func TestG1(t *testing.T) {
@@ -1719,8 +1752,11 @@ func TestBLS12384Pairing(t *testing.T) {
 		if !bls.fq12.equal(expected, actual) {
 			t.Fatalf("bad pairing-1")
 		}
+		if !bls.fq12.equal(expected, actual) {
+			t.Logf("invalid multiplicative group")
+			t.Logf("expected: %s\n", bls.fq12.toString(actual))
+		}
 	})
-
 	t.Run("Bilinearity", func(t *testing.T) {
 		a, _ := rand.Int(rand.Reader, big.NewInt(100))
 		b, _ := rand.Int(rand.Reader, big.NewInt(100))
@@ -1779,7 +1815,35 @@ func TestBLS12384Pairing(t *testing.T) {
 			}
 		})
 	})
-
+	t.Run("NonDegenerancy", func(t *testing.T) {
+		// e(a*G1, b*G2) != 1
+		result, hasValue := bls.pair(g1One, g2One)
+		if !hasValue {
+			t.Fatal("Pairing engine returned no value")
+		}
+		if fq12.equal(result, fq12.one()) {
+			t.Logf("result: %s\n", fq12.toString(result))
+			t.Logf("result: %s\n", fq12.toString(fq12.one()))
+		}
+		// e(a*G1, 0*G2) == 1
+		result, hasValue = bls.pair(g1One, g2.inf)
+		if !hasValue {
+			t.Fatal("Pairing engine returned no value")
+		}
+		if !fq12.equal(result, fq12.one()) {
+			t.Logf("result: %s\n", fq12.toString(result))
+			t.Logf("result: %s\n", fq12.toString(fq12.one()))
+		}
+		// e(0*G1, 0*G2) == 1
+		result, hasValue = bls.pair(g1.inf, g2.inf)
+		if !hasValue {
+			t.Fatal("Pairing engine returned no value")
+		}
+		if !fq12.equal(result, fq12.one()) {
+			t.Logf("result: %s\n", fq12.toString(result))
+			t.Logf("result: %s\n", fq12.toString(fq12.one()))
+		}
+	})
 }
 
 func BenchmarkBLS(t *testing.B) {
@@ -2633,7 +2697,26 @@ func TestBN254Pairing(t *testing.T) {
 			}
 		})
 	})
-
+	t.Run("NonDegenerancy", func(t *testing.T) {
+		// e(a*G1, b*G2) != 1
+		result, hasValue := bn.pair(g1One, g2One)
+		if !hasValue {
+			t.Fatal("Pairing engine returned no value")
+		}
+		if fq12.equal(result, fq12.one()) {
+			t.Logf("result: %s\n", fq12.toString(result))
+			t.Logf("expected: %s\n", fq12.toString(fq12.one()))
+		}
+		// e(0*G1, 0*G2) == 1
+		result, hasValue = bn.pair(g1.inf, g2.inf)
+		if !hasValue {
+			t.Fatal("Pairing engine returned no value")
+		}
+		if !fq12.equal(result, fq12.one()) {
+			t.Logf("result: %s\n", fq12.toString(result))
+			t.Logf("expected: %s\n", fq12.toString(fq12.one()))
+		}
+	})
 }
 
 func TestMNT6320Pairing(t *testing.T) {
@@ -2816,6 +2899,35 @@ func TestMNT6320Pairing(t *testing.T) {
 				t.Errorf("bad pairing")
 			}
 		})
+	})
+	t.Run("NonDegenerancy", func(t *testing.T) {
+		// e(a*G1, b*G2) != 1
+		result, hasValue := mnt6.pair(g1One, g2One)
+		if !hasValue {
+			t.Fatal("Pairing engine returned no value")
+		}
+		if fq6.equal(result, fq6.one()) {
+			t.Logf("result: %s\n", fq6.toString(result))
+			t.Logf("expected: %s\n", fq6.toString(fq6.one()))
+		}
+		// e(a*G1, 0*G2) == 1
+		result, hasValue = mnt6.pair(g1One, g2.inf)
+		if !hasValue {
+			t.Fatal("Pairing engine returned no value")
+		}
+		if !fq6.equal(result, fq6.one()) {
+			t.Logf("result: %s\n", fq6.toString(result))
+			t.Logf("expected: %s\n", fq6.toString(fq6.one()))
+		}
+		// e(0*G1, 0*G2) == 1
+		result, hasValue = mnt6.pair(g1.inf, g2.inf)
+		if !hasValue {
+			t.Fatal("Pairing engine returned no value")
+		}
+		if !fq6.equal(result, fq6.one()) {
+			t.Logf("result: %s\n", fq6.toString(result))
+			t.Logf("expected: %s\n", fq6.toString(fq6.one()))
+		}
 	})
 
 }
