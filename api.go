@@ -1,7 +1,6 @@
 package eip
 
 import (
-	"errors"
 	"math/big"
 )
 
@@ -48,7 +47,7 @@ func (api *API) Run(opType int, in []byte) ([]byte, error) {
 	case OPERATION_MNT6PAIR:
 		return pairMNT6(in)
 	default:
-		return zero, errors.New("Unknown operation type")
+		return apiDecodingErr(ERR_UNKNOWN_OPERATION)
 	}
 }
 
@@ -57,24 +56,28 @@ type g1Api struct{}
 func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 	g1, modulusLen, _, _, rest, err := decodeG1(in)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	p0, rest, err := decodeG1Point(rest, modulusLen, g1)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	p1, rest, err := decodeG1Point(rest, modulusLen, g1)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	if len(rest) != 0 {
-		return nil, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 	if !g1.isOnCurve(p0) {
-		return nil, errors.New("point 0 isn't on the curve")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_POINT0_NOT_ON_CURVE)
+		}
 	}
 	if !g1.isOnCurve(p1) {
-		return nil, errors.New("point 1 isn't on the curve")
+		if GAS_METERING_MODE {
+			return apiExecErr(ERR_POINT1_NOT_ON_CURVE)
+		}
 	}
 	g1.add(p0, p0, p1)
 
@@ -86,21 +89,23 @@ func (api *g1Api) addPoints(in []byte) ([]byte, error) {
 func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
 	g1, modulusLen, order, orderLen, rest, err := decodeG1(in)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	p, rest, err := decodeG1Point(rest, modulusLen, g1)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	scalar, rest, err := decodeScalar(rest, orderLen, order)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	if len(rest) != 0 {
-		return nil, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 	if !g1.isOnCurve(p) {
-		return nil, errors.New("point isn't on the curve")
+		if GAS_METERING_MODE {
+			return apiExecErr(ERR_POINT_NOT_ON_CURVE)
+		}
 	}
 	g1.mulScalar(p, p, scalar)
 	out := make([]byte, 2*modulusLen)
@@ -111,32 +116,34 @@ func (api *g1Api) mulPoint(in []byte) ([]byte, error) {
 func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 	g1, modulusLen, order, orderLen, rest, err := decodeG1(in)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return pairingError, errors.New("Input is not long enough to get number of pairs")
+		return apiDecodingErr(ERR_MULTIEXP_NUM_PAIRS_NOT_ENOUGH_BYTE)
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {
-		return pairingError, errors.New("Invalid number of pairs")
+		return apiDecodingErr(ERR_MULTIEXP_NUM_PAIR_LENGTH)
 	}
 	if len(rest) != (2*modulusLen+orderLen)*numPairs {
-		return nil, errors.New("Input length is invalid for number of pairs")
+		return apiDecodingErr(ERR_MULTIEXP_NUM_PAIR_INPUT_LENGTH_NOT_MATCH)
 	}
 	bases := make([]*pointG1, numPairs)
 	scalars := make([]*big.Int, numPairs)
 	for i := 0; i < numPairs; i++ {
 		p, localRest, err := decodeG1Point(rest, modulusLen, g1)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		if !g1.isOnCurve(p) {
-			return nil, errors.New("point isn't on the curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_POINT_NOT_ON_CURVE)
+			}
 		}
 		scalar, localRest, err := decodeScalar(localRest, orderLen, order)
 		if err != nil {
-			return nil, err
+			return apiDecodingErr(err)
 		}
 		bases[i], scalars[i] = g1.newPoint(), new(big.Int)
 		g1.copy(bases[i], p)
@@ -144,16 +151,20 @@ func (api *g1Api) multiExp(in []byte) ([]byte, error) {
 		rest = localRest
 	}
 	if len(rest) != 0 {
-		return pairingError, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 
 	p := g1.newPoint()
-	if len(bases) != len(scalars) || len(bases) == 0 {
-		g1.copy(p, g1.inf)
-	} else {
-		g1.multiExp(p, bases, scalars)
-	}
 	out := make([]byte, 2*modulusLen)
+	if len(bases) != len(scalars) || len(bases) == 0 {
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_MULTIEXP_EMPTY_INPUT_PAIRS)
+		}
+		g1.copy(p, g1.inf)
+		encodeG1Point(out, g1.toBytes(p))
+		return out, nil
+	}
+	g1.multiExp(p, bases, scalars)
 	encodeG1Point(out, g1.toBytes(p))
 	return out, nil
 }
@@ -163,11 +174,11 @@ type g2Api struct{}
 func (api *g2Api) run(opType int, in []byte) ([]byte, error) {
 	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	degreeBuf, rest, err := split(rest, EXTENSION_DEGREE_LENGTH_ENCODING)
 	if err != nil {
-		return nil, errors.New("cant decode extension degree length")
+		return apiDecodingErr(ERR_G2_CANT_DECODE_EXT_DEGREE_LENGTH)
 	}
 	degree := int(degreeBuf[0])
 	// fmt.Printf("ext degree %d\n", degree)
@@ -177,7 +188,7 @@ func (api *g2Api) run(opType int, in []byte) ([]byte, error) {
 	case EXTENSION_THREE_DEGREE:
 		return new(g23Api).run(opType, field, modulusLen, rest)
 	default:
-		return nil, errors.New("Extension degree expected to be 2 or 3")
+		return apiDecodingErr(ERR_G2_UNEXPECTED_EXT_DEGREE)
 	}
 }
 
@@ -192,31 +203,35 @@ func (api *g22Api) run(opType int, field *field, modulusLen int, in []byte) ([]b
 	case 0x06:
 		return api.multiExp(field, modulusLen, in)
 	default:
-		return nil, errors.New("Unknown g22 operation")
+		return apiDecodingErr(ERR_G2_UNKNOWN_OPERATION) // TODO: need?
 	}
 }
 
 func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, error) {
 	g2, _, _, rest, err := decodeG22(in, field, modulusLen)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	q0, rest, err := decodeG22Point(rest, modulusLen, g2)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	q1, rest, err := decodeG22Point(rest, modulusLen, g2)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	if len(rest) != 0 {
-		return nil, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 	if !g2.isOnCurve(q0) {
-		return nil, errors.New("point 0 isn't on the curve")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_POINT0_NOT_ON_CURVE)
+		}
 	}
 	if !g2.isOnCurve(q1) {
-		return nil, errors.New("point 1 isn't on the curve")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_POINT1_NOT_ON_CURVE)
+		}
 	}
 	g2.add(q0, q0, q1)
 	out := make([]byte, 4*modulusLen)
@@ -227,21 +242,23 @@ func (api *g22Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, error) {
 	g2, order, orderLen, rest, err := decodeG22(in, field, modulusLen)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	q, rest, err := decodeG22Point(rest, modulusLen, g2)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	scalar, rest, err := decodeScalar(rest, orderLen, order)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	if len(rest) != 0 {
-		return nil, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 	if !g2.isOnCurve(q) {
-		return nil, errors.New("q1 isn't on the curve")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_POINT_NOT_ON_CURVE)
+		}
 	}
 	g2.mulScalar(q, q, scalar)
 	out := make([]byte, 4*modulusLen)
@@ -252,32 +269,34 @@ func (api *g22Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, error) {
 	g2, order, orderLen, rest, err := decodeG22(in, field, modulusLen)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return pairingError, errors.New("Invalid number of pairs")
+		return apiDecodingErr(ERR_MULTIEXP_NUM_PAIR_LENGTH)
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {
-		return pairingError, errors.New("Invalid number of pairs")
+		return apiDecodingErr(ERR_MULTIEXP_NUM_PAIR_LENGTH)
 	}
 	if len(rest) != (4*modulusLen+orderLen)*numPairs {
-		return nil, errors.New("Input length is invalid for number of pairs")
+		return apiDecodingErr(ERR_MULTIEXP_NUM_PAIR_INPUT_LENGTH_NOT_MATCH)
 	}
 	bases := make([]*pointG22, numPairs)
 	scalars := make([]*big.Int, numPairs)
 	for i := 0; i < numPairs; i++ {
 		q, localRest, err := decodeG22Point(rest, modulusLen, g2)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		if !g2.isOnCurve(q) {
-			return nil, errors.New("point isn't on the curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_POINT_NOT_ON_CURVE)
+			}
 		}
 		scalar, localRest, err := decodeScalar(localRest, orderLen, order)
 		if err != nil {
-			return nil, err
+			return apiDecodingErr(err)
 		}
 		bases[i], scalars[i] = g2.newPoint(), new(big.Int)
 		g2.copy(bases[i], q)
@@ -285,16 +304,20 @@ func (api *g22Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 		rest = localRest
 	}
 	if len(rest) != 0 {
-		return pairingError, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 
 	q := g2.newPoint()
-	if len(bases) != len(scalars) || len(bases) == 0 {
-		g2.copy(q, g2.inf)
-	} else {
-		g2.multiExp(q, bases, scalars)
-	}
 	out := make([]byte, 4*modulusLen)
+	if len(bases) != len(scalars) || len(bases) == 0 {
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_MULTIEXP_EMPTY_INPUT_PAIRS)
+		}
+		g2.copy(q, g2.inf)
+		encodeG22Point(out, g2.toBytes(q))
+		return out, nil
+	}
+	g2.multiExp(q, bases, scalars)
 	encodeG22Point(out, g2.toBytes(q))
 	return out, nil
 }
@@ -310,31 +333,35 @@ func (api *g23Api) run(opType int, field *field, modulusLen int, in []byte) ([]b
 	case 0x06:
 		return api.multiExp(field, modulusLen, in)
 	default:
-		return nil, errors.New("Unknown g23 operation")
+		return apiDecodingErr(ERR_G2_UNKNOWN_OPERATION)
 	}
 }
 
 func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, error) {
 	g2, _, _, rest, err := decodeG23(in, field, modulusLen)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	q0, rest, err := decodeG23Point(rest, modulusLen, g2)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	q1, rest, err := decodeG23Point(rest, modulusLen, g2)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	if len(rest) != 0 {
-		return nil, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 	if !g2.isOnCurve(q0) {
-		return nil, errors.New("point 0 isn't on the curve")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_POINT0_NOT_ON_CURVE)
+		}
 	}
 	if !g2.isOnCurve(q1) {
-		return nil, errors.New("point 1 isn't on the curve")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_POINT1_NOT_ON_CURVE)
+		}
 	}
 	g2.add(q0, q0, q1)
 	out := make([]byte, 6*modulusLen)
@@ -345,21 +372,23 @@ func (api *g23Api) addPoints(field *field, modulusLen int, in []byte) ([]byte, e
 func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, error) {
 	g2, order, orderLen, rest, err := decodeG23(in, field, modulusLen)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	q, rest, err := decodeG23Point(rest, modulusLen, g2)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	s, rest, err := decodeScalar(rest, orderLen, order)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	if len(rest) != 0 {
-		return nil, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 	if !g2.isOnCurve(q) {
-		return nil, errors.New("point isn't on the curve")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_POINT_NOT_ON_CURVE)
+		}
 	}
 	g2.mulScalar(q, q, s)
 	out := make([]byte, 6*modulusLen)
@@ -370,33 +399,35 @@ func (api *g23Api) mulPoint(field *field, modulusLen int, in []byte) ([]byte, er
 func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, error) {
 	g2, order, orderLen, rest, err := decodeG23(in, field, modulusLen)
 	if err != nil {
-		return nil, err
+		return apiDecodingErr(err)
 	}
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return pairingError, errors.New("Input is not long enough to get number of pairs")
+		return apiDecodingErr(ERR_MULTIEXP_NUM_PAIRS_NOT_ENOUGH_BYTE)
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {
-		return pairingError, errors.New("zero pairs encoded")
+		return apiDecodingErr(ERR_MULTIEXP_NUM_PAIR_LENGTH)
 	}
 
 	if len(rest) != (6*modulusLen+orderLen)*numPairs {
-		return nil, errors.New("Input length is invalid for number of pairs")
+		return apiDecodingErr(ERR_MULTIEXP_NUM_PAIR_INPUT_LENGTH_NOT_MATCH)
 	}
 	bases := make([]*pointG23, numPairs)
 	scalars := make([]*big.Int, numPairs)
 	for i := 0; i < numPairs; i++ {
 		q, localRest, err := decodeG23Point(rest, modulusLen, g2)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		if !g2.isOnCurve(q) {
-			return nil, errors.New("point isn't on the curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_POINT_NOT_ON_CURVE)
+			}
 		}
 		scalar, localRest, err := decodeScalar(localRest, orderLen, order)
 		if err != nil {
-			return nil, err
+			return apiDecodingErr(err)
 		}
 		bases[i], scalars[i] = g2.newPoint(), new(big.Int)
 		g2.copy(bases[i], q)
@@ -404,16 +435,21 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 		rest = localRest
 	}
 	if len(rest) != 0 {
-		return pairingError, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 
 	q := g2.newPoint()
-	if len(bases) != len(scalars) || len(bases) == 0 {
-		g2.copy(q, g2.inf)
-	} else {
-		g2.multiExp(q, bases, scalars)
-	}
 	out := make([]byte, 6*modulusLen)
+	if len(bases) != len(scalars) || len(bases) == 0 {
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_MULTIEXP_EMPTY_INPUT_PAIRS)
+		}
+		g2.copy(q, g2.inf)
+		encodeG23Point(out, g2.toBytes(q))
+		return out, nil
+	}
+
+	g2.multiExp(q, bases, scalars)
 	encodeG23Point(out, g2.toBytes(q))
 	return out, nil
 }
@@ -421,63 +457,65 @@ func (api *g23Api) multiExp(field *field, modulusLen int, in []byte) ([]byte, er
 func pairBN(in []byte) ([]byte, error) {
 	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if !field.isZero(a) {
-		return pairingError, errors.New("A parameter must be zero for BN curve")
+		return apiDecodingErr(ERR_BN_PAIRING_A_PARAMETER_NOT_ZERO)
 	}
 	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	g1, err := newG1(field, a, b, order)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, 2, true)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if fq2.isZero(fq2NonResidue) {
-		return pairingError, errors.New("Non-residue for Fp6 is zero")
+		return apiDecodingErr(ERR_EXT_FIELD_NON_RESIDUE_FP6_ZERO)
 	}
 	if !isNonNThRootFp2(fq2, fq2NonResidue, 6) {
-		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_EXT_FIELD_NON_RESIDUE_FP6_RESIDUE)
+		}
 	}
 	twistType, rest, err := decodeTwistType(rest)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	f1, f2, err := constructBaseForFq6AndFq12(fq2, fq2NonResidue)
 	if err != nil {
-		return pairingError, errors.New("Can not make base precomputations for Fp6/Fp12 frobenius")
+		return apiDecodingErr(ERR_EXT_FIELD_BASE_FROBENIUS_FOR_FP612)
 	}
 	fq6, err := newFq6(fq2, nil)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq2.copy(fq6.nonResidue, fq2NonResidue)
 	if ok := fq6.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
-		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp6")
+		return apiDecodingErr(ERR_EXT_FIELD_FROBENIUS_FOR_FP6)
 	}
 	fq12, err := newFq12(fq6, nil)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if ok := fq12.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
-		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp12")
+		return apiDecodingErr(ERR_EXT_FIELD_FROBENIUS_FOR_FP12)
 	}
 	fq2NonResidueInv := fq2.newElement()
 	if hasInverse := fq2.inverse(fq2NonResidueInv, fq2NonResidue); !hasInverse {
-		return pairingError, errors.New("Fp2 non-residue must be invertible")
+		return apiDecodingErr(ERR_PAIRING_FP2_NON_RESIDUE_NOT_INVERTIBLE)
 	}
 	b2 := fq2.newElement()
 	if twistType == TWIST_M {
@@ -487,18 +525,18 @@ func pairBN(in []byte) ([]byte, error) {
 	}
 	g2, err := newG22(fq2, fq2.zero(), b2, order)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	u, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if isBigZero(u) {
-		return pairingError, errors.New("Loop count parameters can not be zero")
+		return apiDecodingErr(ERR_PAIRING_LOOP_COUNT_PARAM_ZERO)
 	}
 	uIsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	var sixUPlus2 *big.Int
 	six, two := big.NewInt(6), big.NewInt(2)
@@ -510,7 +548,7 @@ func pairBN(in []byte) ([]byte, error) {
 		sixUPlus2 = new(big.Int).Add(sixUPlus2, two)
 	}
 	if weight := calculateHammingWeight(sixUPlus2); weight > MAX_BN_SIX_U_PLUS_TWO_HAMMING {
-		return pairingError, errors.New("|6*U + 2| has too large hamming weight")
+		return apiDecodingErr(ERR_BN_PAIRING_LOW_HAMMING_WEIGHT)
 	}
 	minus2Inv := new(big.Int).ModInverse(big.NewInt(-2), field.pbig)
 	nonResidueInPMinus1Over2 := fq2.newElement()
@@ -518,45 +556,55 @@ func pairBN(in []byte) ([]byte, error) {
 
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return pairingError, errors.New("Input is not long enough to get number of pairs")
+		return apiDecodingErr(ERR_PAIRING_NUM_PAIRS_NOT_ENOUGH_BYTE)
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {
-		return pairingError, errors.New("zero pairs encoded")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_PAIRING_NUM_PAIRS_ZERO)
+		}
 	}
 	var g1Points []*pointG1
 	var g2Points []*pointG22
 	for i := 0; i < numPairs; i++ {
 		needG1SubGroupCheck, localRest, err := decodeBoolean(rest)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		g1Point, localRest, err := decodeG1Point(localRest, modulusLen, g1)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		needG2SubGroupCheck, localRest, err := decodeBoolean(localRest)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		g2Point, localRest, err := decodeG22Point(localRest, modulusLen, g2)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		if !g1.isOnCurve(g1Point) {
-			return pairingError, errors.New("G1 point is not on curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_PAIRING_POINTG1_NOT_ON_CURVE)
+			}
 		}
 		if !g2.isOnCurve(g2Point) {
-			return pairingError, errors.New("G2 point is not on curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_PAIRING_POINTG2_NOT_ON_CURVE)
+			}
 		}
 		if needG1SubGroupCheck {
 			if ok := g1.checkCorrectSubGroup(g1Point); !ok {
-				return pairingError, errors.New("G1 point is not in the expected subgroup")
+				if !GAS_METERING_MODE {
+					return apiExecErr(ERR_PAIRING_POINTG1_NOT_IN_SUBGROUP)
+				}
 			}
 		}
 		if needG2SubGroupCheck {
 			if ok := g2.checkCorrectSubGroup(g2Point); !ok {
-				return pairingError, errors.New("G2 point is not in the expected subgroup")
+				if !GAS_METERING_MODE {
+					return apiExecErr(ERR_PAIRING_POINTG2_NOT_IN_SUBGROUP)
+				}
 			}
 		}
 		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
@@ -566,10 +614,10 @@ func pairBN(in []byte) ([]byte, error) {
 		rest = localRest
 	}
 	if len(rest) != 0 {
-		return pairingError, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 	if len(g1Points) == 0 {
-		return pairingError, nil
+		return pairingSuccess, nil
 	}
 
 	engine := newBNInstance(
@@ -585,7 +633,7 @@ func pairBN(in []byte) ([]byte, error) {
 	)
 	result, hasValue := engine.multiPair(g1Points, g2Points)
 	if !hasValue {
-		return pairingError, errors.New("Pairing engine returned no value")
+		return apiDecodingErr(ERR_PAIRING_NO_RETURN_VALUE)
 	}
 	if !fq12.equal(result, fq12.one()) {
 		return pairingError, nil
@@ -596,63 +644,65 @@ func pairBN(in []byte) ([]byte, error) {
 func pairBLS(in []byte) ([]byte, error) {
 	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if !field.isZero(a) {
-		return pairingError, errors.New("A parameter must be zero for BLS12 curve")
+		return apiDecodingErr(ERR_BLS_PAIRING_A_PARAMETER_NOT_ZERO)
 	}
 	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	g1, err := newG1(field, a, b, order)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, 2, true)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq2NonResidue, rest, err := decodeFp2(rest, modulusLen, fq2)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if fq2.isZero(fq2NonResidue) {
-		return pairingError, errors.New("Non-residue for Fp6 is zero")
+		return apiDecodingErr(ERR_EXT_FIELD_NON_RESIDUE_FP6_ZERO)
 	}
 	if !isNonNThRootFp2(fq2, fq2NonResidue, 6) {
-		return pairingError, errors.New("Non-residue for Fp6 is actually a residue")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_EXT_FIELD_NON_RESIDUE_FP6_RESIDUE)
+		}
 	}
 	twistType, rest, err := decodeTwistType(rest)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	f1, f2, err := constructBaseForFq6AndFq12(fq2, fq2NonResidue)
 	if err != nil {
-		return pairingError, errors.New("Can not make base precomputations for Fp6/Fp12 frobenius")
+		return apiDecodingErr(ERR_EXT_FIELD_BASE_FROBENIUS_FOR_FP612)
 	}
 	fq6, err := newFq6(fq2, nil)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq2.copy(fq6.nonResidue, fq2NonResidue)
 	if ok := fq6.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
-		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp6")
+		return apiDecodingErr(ERR_EXT_FIELD_FROBENIUS_FOR_FP6)
 	}
 	fq12, err := newFq12(fq6, nil)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if ok := fq12.calculateFrobeniusCoeffsWithPrecomputation(f1, f2); !ok {
-		return pairingError, errors.New("Can not calculate Frobenius coefficients for Fp12")
+		return apiDecodingErr(ERR_EXT_FIELD_FROBENIUS_FOR_FP12)
 	}
 	fq2NonResidueInv := fq2.newElement()
 	if hasInverse := fq2.inverse(fq2NonResidueInv, fq2NonResidue); !hasInverse {
-		return pairingError, errors.New("Fp2 non-residue must be invertible")
+		return apiDecodingErr(ERR_PAIRING_FP2_NON_RESIDUE_NOT_INVERTIBLE)
 	}
 	b2 := fq2.newElement()
 	if twistType == TWIST_M {
@@ -662,65 +712,75 @@ func pairBLS(in []byte) ([]byte, error) {
 	}
 	g2, err := newG22(fq2, fq2.zero(), b2, order)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	z, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if z.Cmp(big.NewInt(0)) == 0 {
-		return pairingError, errors.New("Loop count parameters can not be zero")
+		return apiDecodingErr(ERR_PAIRING_LOOP_COUNT_PARAM_ZERO)
 	}
 
 	if weight := calculateHammingWeight(z); weight > MAX_BLS12_X_HAMMING {
-		return pairingError, errors.New("z has too large hamming weight")
+		return apiDecodingErr(ERR_BLS_PAIRING_LOW_HAMMING_WEIGHT)
 	}
 	zIsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return pairingError, errors.New("Input is not long enough to get number of pairs")
+		return apiDecodingErr(ERR_PAIRING_NUM_PAIRS_NOT_ENOUGH_BYTE)
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {
-		return pairingError, errors.New("zero pairs encoded")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_PAIRING_NUM_PAIRS_ZERO)
+		}
 	}
 	var g1Points []*pointG1
 	var g2Points []*pointG22
 	for i := 0; i < numPairs; i++ {
 		needG1SubGroupCheck, localRest, err := decodeBoolean(rest)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		g1Point, localRest, err := decodeG1Point(localRest, modulusLen, g1)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		needG2SubGroupCheck, localRest, err := decodeBoolean(localRest)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		g2Point, localRest, err := decodeG22Point(localRest, modulusLen, g2)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		if !g1.isOnCurve(g1Point) {
-			return pairingError, errors.New("G1 point is not on curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_PAIRING_POINTG1_NOT_ON_CURVE)
+			}
 		}
 		if !g2.isOnCurve(g2Point) {
-			return pairingError, errors.New("G2 point is not on curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_PAIRING_POINTG2_NOT_ON_CURVE)
+			}
 		}
 
 		if needG1SubGroupCheck {
 			if ok := g1.checkCorrectSubGroup(g1Point); !ok {
-				return pairingError, errors.New("G1 point is not in the expected subgroup")
+				if !GAS_METERING_MODE {
+					return apiExecErr(ERR_PAIRING_POINTG1_NOT_IN_SUBGROUP)
+				}
 			}
 		}
 		if needG2SubGroupCheck {
 			if ok := g2.checkCorrectSubGroup(g2Point); !ok {
-				return pairingError, errors.New("G2 point is not in the expected subgroup")
+				if !GAS_METERING_MODE {
+					return apiExecErr(ERR_PAIRING_POINTG2_NOT_IN_SUBGROUP)
+				}
 			}
 		}
 		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
@@ -730,10 +790,10 @@ func pairBLS(in []byte) ([]byte, error) {
 		rest = localRest
 	}
 	if len(rest) != 0 {
-		return pairingError, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 	if len(g1Points) == 0 {
-		return pairingError, nil
+		return pairingSuccess, nil
 	}
 	engine := newBLSInstance(
 		z,
@@ -746,7 +806,7 @@ func pairBLS(in []byte) ([]byte, error) {
 	)
 	result, hasValue := engine.multiPair(g1Points, g2Points)
 	if !hasValue {
-		return pairingError, errors.New("Pairing engine returned no value")
+		return apiDecodingErr(ERR_PAIRING_NO_RETURN_VALUE)
 	}
 	if !fq12.equal(result, fq12.one()) {
 		return pairingError, nil
@@ -757,29 +817,29 @@ func pairBLS(in []byte) ([]byte, error) {
 func pairMNT4(in []byte) ([]byte, error) {
 	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	g1, err := newG1(field, a, b, order)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq2, rest, err := createExtension2FieldParams(rest, modulusLen, field, 4, false)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	f1 := constructBaseForFq2AndFq4(field, fq2.nonResidue)
 	fq2.calculateFrobeniusCoeffsWithPrecomputation(f1)
 	fq4, err := newFq4(fq2, nil)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq4.calculateFrobeniusCoeffsWithPrecomputation(f1)
 
@@ -792,48 +852,50 @@ func pairMNT4(in []byte) ([]byte, error) {
 	fq2.mulByFq(b2, twist3, g1.b)
 	g2, err := newG22(fq2, a2, b2, order)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	x, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if isBigZero(x) {
-		return pairingError, errors.New("Ate pairing loop count parameters can not be zero")
+		return apiDecodingErr(ERR_PAIRING_LOOP_COUNT_PARAM_ZERO)
 	}
 
 	if weight := calculateHammingWeight(x); weight > MAX_ATE_PAIRING_ATE_LOOP_COUNT_HAMMING {
-		return pairingError, errors.New("X has too large hamming weight")
+		return apiDecodingErr(ERR_MNT_PAIRING_LOW_HAMMING_WEIGHT)
 	}
 	xIsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	expW0, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_FINAL_EXP_W0_BIT_LENGTH)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if isBigZero(expW0) {
-		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
+		return apiDecodingErr(ERR_MNT_EXPW0_NOT_ZERO)
 	}
 	expW1, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_FINAL_EXP_W1_BIT_LENGTH)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if isBigZero(expW1) {
-		return pairingError, errors.New("Final exp w1 loop count parameters can not be zero")
+		return apiDecodingErr(ERR_MNT_EXPW1_NOT_ZERO)
 	}
 	expW0IsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
-		return pairingError, errors.New("Exp_w0 sign is not encoded properly")
+		return apiDecodingErr(ERR_MNT_INVALID_EXPW0)
 	}
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return pairingError, errors.New("Input is not long enough to get number of pairs")
+		return apiDecodingErr(ERR_PAIRING_NUM_PAIRS_NOT_ENOUGH_BYTE)
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {
-		return pairingError, errors.New("Zero pairs encoded")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_PAIRING_NUM_PAIRS_ZERO)
+		}
 	}
 
 	var g1Points []*pointG1
@@ -841,34 +903,42 @@ func pairMNT4(in []byte) ([]byte, error) {
 	for i := 0; i < numPairs; i++ {
 		needG1SubGroupCheck, localRest, err := decodeBoolean(rest)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		g1Point, localRest, err := decodeG1Point(localRest, modulusLen, g1)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		needG2SubGroupCheck, localRest, err := decodeBoolean(localRest)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		g2Point, localRest, err := decodeG22Point(localRest, modulusLen, g2)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		if !g1.isOnCurve(g1Point) {
-			return pairingError, errors.New("G1 point is not on curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_PAIRING_POINTG1_NOT_ON_CURVE)
+			}
 		}
 		if !g2.isOnCurve(g2Point) {
-			return pairingError, errors.New("G2 point is not on curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_PAIRING_POINTG2_NOT_ON_CURVE)
+			}
 		}
 		if needG1SubGroupCheck {
 			if ok := g1.checkCorrectSubGroup(g1Point); !ok {
-				return pairingError, errors.New("G1 point is not in the expected subgroup")
+				if !GAS_METERING_MODE {
+					return apiExecErr(ERR_PAIRING_POINTG1_NOT_IN_SUBGROUP)
+				}
 			}
 		}
 		if needG2SubGroupCheck {
 			if ok := g2.checkCorrectSubGroup(g2Point); !ok {
-				return pairingError, errors.New("G2 point is not in the expected subgroup")
+				if !GAS_METERING_MODE {
+					return apiExecErr(ERR_PAIRING_POINTG2_NOT_IN_SUBGROUP)
+				}
 			}
 		}
 		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
@@ -878,10 +948,10 @@ func pairMNT4(in []byte) ([]byte, error) {
 		rest = localRest
 	}
 	if len(rest) != 0 {
-		return pairingError, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 	if len(g1Points) == 0 {
-		return pairingError, nil
+		return pairingSuccess, nil
 	}
 
 	engine := newMnt4Instance(
@@ -897,7 +967,7 @@ func pairMNT4(in []byte) ([]byte, error) {
 	)
 	result, hasValue := engine.multiPair(g1Points, g2Points)
 	if !hasValue {
-		return pairingError, errors.New("Pairing engine returned no value")
+		return apiDecodingErr(ERR_PAIRING_NO_RETURN_VALUE)
 	}
 	if !fq4.equal(result, fq4.one()) {
 		return pairingError, nil
@@ -908,32 +978,32 @@ func pairMNT4(in []byte) ([]byte, error) {
 func pairMNT6(in []byte) ([]byte, error) {
 	field, _, modulusLen, rest, err := decodeBaseFieldFromEncoding(in)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	a, b, rest, err := decodeBAInBaseFieldFromEncoding(rest, modulusLen, field)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	_, order, rest, err := decodeGroupOrder(rest)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	g1, err := newG1(field, a, b, order)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq3, rest, err := createExtension3FieldParams(rest, modulusLen, field, 6, false)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	f1, err := constructBaseForFq3AndFq6(field, fq3.nonResidue)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq3.calculateFrobeniusCoeffsWithPrecomputation(f1)
 	fq6, err := newFq6Quadratic(fq3, nil)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	fq6.calculateFrobeniusCoeffsWithPrecomputation(f1)
 
@@ -946,47 +1016,49 @@ func pairMNT6(in []byte) ([]byte, error) {
 	fq3.mulByFq(b3, twist3, g1.b)
 	g2, err := newG23(fq3, a3, b3, order)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	x, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if isBigZero(x) {
-		return pairingError, errors.New("Ate pairing loop count parameters can not be zero")
+		return apiDecodingErr(ERR_PAIRING_LOOP_COUNT_PARAM_ZERO)
 	}
 	if weight := calculateHammingWeight(x); weight > MAX_ATE_PAIRING_ATE_LOOP_COUNT_HAMMING {
-		return pairingError, errors.New("x has too large hamming weight")
+		return apiDecodingErr(ERR_MNT_PAIRING_LOW_HAMMING_WEIGHT)
 	}
 	xIsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	expW0, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if isBigZero(expW0) {
-		return pairingError, errors.New("Final exp w0 loop count parameters can not be zero")
+		return apiDecodingErr(ERR_MNT_EXPW0_NOT_ZERO)
 	}
 	expW1, rest, err := decodeLoopParameters(rest, MAX_ATE_PAIRING_ATE_LOOP_COUNT)
 	if err != nil {
-		return pairingError, err
+		return apiDecodingErr(err)
 	}
 	if isBigZero(expW1) {
-		return pairingError, errors.New("Final exp w1 loop count parameters can not be zero")
+		return apiDecodingErr(ERR_MNT_EXPW1_NOT_ZERO)
 	}
 	expW0IsNegative, rest, err := decodePairingExpSign(rest)
 	if err != nil {
-		return pairingError, errors.New("Exp_w0 sign is not encoded properly")
+		return apiDecodingErr(ERR_MNT_INVALID_EXPW0)
 	}
 	numPairsBuf, rest, err := split(rest, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return pairingError, errors.New("Input is not long enough to get number of pairs")
+		return apiDecodingErr(ERR_PAIRING_NUM_PAIRS_NOT_ENOUGH_BYTE)
 	}
 	numPairs := int(numPairsBuf[0])
 	if numPairs == 0 {
-		return pairingError, errors.New("zero pairs encoded")
+		if !GAS_METERING_MODE {
+			return apiExecErr(ERR_PAIRING_NUM_PAIRS_ZERO)
+		}
 	}
 
 	var g1Points []*pointG1
@@ -994,34 +1066,42 @@ func pairMNT6(in []byte) ([]byte, error) {
 	for i := 0; i < numPairs; i++ {
 		needG1SubGroupCheck, localRest, err := decodeBoolean(rest)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		g1Point, localRest, err := decodeG1Point(localRest, modulusLen, g1)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		needG2SubGroupCheck, localRest, err := decodeBoolean(localRest)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		g2Point, localRest, err := decodeG23Point(localRest, modulusLen, g2)
 		if err != nil {
-			return pairingError, err
+			return apiDecodingErr(err)
 		}
 		if !g1.isOnCurve(g1Point) {
-			return pairingError, errors.New("G1 point is not on curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_PAIRING_POINTG1_NOT_ON_CURVE)
+			}
 		}
 		if !g2.isOnCurve(g2Point) {
-			return pairingError, errors.New("G2 point is not on curve")
+			if !GAS_METERING_MODE {
+				return apiExecErr(ERR_PAIRING_POINTG2_NOT_ON_CURVE)
+			}
 		}
 		if needG1SubGroupCheck {
 			if ok := g1.checkCorrectSubGroup(g1Point); !ok {
-				return pairingError, errors.New("G1 point is not in the expected subgroup")
+				if !GAS_METERING_MODE {
+					return apiExecErr(ERR_PAIRING_POINTG1_NOT_IN_SUBGROUP)
+				}
 			}
 		}
 		if needG2SubGroupCheck {
 			if ok := g2.checkCorrectSubGroup(g2Point); !ok {
-				return pairingError, errors.New("G2 point is not in the expected subgroup")
+				if !GAS_METERING_MODE {
+					return apiExecErr(ERR_PAIRING_POINTG2_NOT_IN_SUBGROUP)
+				}
 			}
 		}
 		if !g1.isZero(g1Point) && !g2.isZero(g2Point) {
@@ -1031,10 +1111,10 @@ func pairMNT6(in []byte) ([]byte, error) {
 		rest = localRest
 	}
 	if len(rest) != 0 {
-		return pairingError, errors.New("Input contains garbage at the end")
+		return apiDecodingErr(ERR_GARBAGE_INPUT)
 	}
 	if len(g1Points) == 0 {
-		return pairingError, nil
+		return pairingSuccess, nil
 	}
 
 	engine := newMNT6Instance(
@@ -1050,7 +1130,7 @@ func pairMNT6(in []byte) ([]byte, error) {
 	)
 	result, hasValue := engine.multiPair(g1Points, g2Points)
 	if !hasValue {
-		return pairingError, errors.New("Pairing engine returned no value")
+		return apiDecodingErr(ERR_PAIRING_NO_RETURN_VALUE)
 	}
 	if !fq6.equal(result, fq6.one()) {
 		return pairingError, nil

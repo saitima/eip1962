@@ -1,7 +1,6 @@
 package eip
 
 import (
-	"errors"
 	"math/big"
 )
 
@@ -27,7 +26,7 @@ const (
 
 func split(in []byte, offset int) ([]byte, []byte, error) {
 	if len(in) < offset {
-		return nil, nil, errors.New("cant split at given offset")
+		return nil, nil, _err("cant split at given offset")
 	}
 	return in[:offset], in[offset:], nil
 }
@@ -35,33 +34,33 @@ func split(in []byte, offset int) ([]byte, []byte, error) {
 func parseBaseFieldParams(in []byte) ([]byte, int, []byte, error) {
 	modulusLenBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return nil, 0, nil, errors.New("Input is not long enough to get modulus length")
+		return nil, 0, nil, _err(ERR_BASE_FIELD_MODULUS_LENGTH_NOT_ENOUGH_BYTE)
 	}
 	modulusLen := int(modulusLenBuf[0])
 	if modulusLen == 0 {
-		return nil, 0, nil, errors.New("Modulus length is zero")
+		return nil, 0, nil, _err(ERR_MODULUS_LENGTH_ZERO)
 	}
 	if modulusLen > MAX_MODULUS_BYTE_LEN {
-		return nil, 0, nil, errors.New("Encoded modulus length is too large")
+		return nil, 0, nil, _err(ERR_MODULUS_LENGTH_LARGE)
 	}
 	modulusBuf, rest, err := split(rest, modulusLen)
 	if err != nil {
-		return nil, 0, nil, errors.New("Input is not long enough to get modulus")
+		return nil, 0, nil, _err(ERR_MODULUS_NOT_ENOUGH_BYTE)
 	}
 	if int(modulusBuf[0]) == 0 {
-		return nil, 0, nil, errors.New("In modulus encoding highest byte is zero")
+		return nil, 0, nil, _err(ERR_MODULUS_HIGHEST_BYTE)
 	}
 	modulusBuf = padHex(modulusBuf)
 	modulus := new(big.Int).SetBytes(modulusBuf)
 	if isBigZero(modulus) {
-		return nil, 0, nil, errors.New("Modulus can not be zero")
+		return nil, 0, nil, _err(ERR_MODULUS_ZERO)
 	}
 	if isBigEven(modulus) {
-		return nil, 0, nil, errors.New("Modulus is even")
+		return nil, 0, nil, _err(ERR_MODULUS_EVEN)
 	}
 
 	if isBigLowerThan(modulus, 3) {
-		return nil, 0, nil, errors.New("Modulus is less than 3")
+		return nil, 0, nil, _err(ERR_MODULUS_LESS_THREE)
 	}
 	return modulusBuf, modulusLen, rest, nil
 }
@@ -79,10 +78,10 @@ func decodeBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, erro
 		field, err = newField(modulusBuf)
 	}
 	if err != nil {
-		return nil, nil, 0, nil, errors.New("Failed to create prime field from modulus")
+		return nil, nil, 0, nil, _err(ERR_BASE_FIELD_CONSTRUCTION)
 	}
 	if len(rest) < modulusLen {
-		return nil, nil, 0, nil, errors.New("FInput is not long enough")
+		return nil, nil, 0, nil, _err(ERR_INPUT_NOT_ENOUGH_FOR_FIELD_ELEMS)
 	}
 	modulus := new(big.Int).Set(field.pbig)
 	return field, modulus, modulusLen, rest, nil
@@ -91,7 +90,7 @@ func decodeBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, erro
 func decodeFp(in []byte, modulusLen int, field *field) (fieldElement, []byte, error) {
 	xBuf, rest, err := split(in, modulusLen)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, _err(ERR_INPUT_NOT_ENOUGH_FOR_FIELD_ELEMS)
 	}
 	x, err := field.newFieldElementFromBytes(padHex(xBuf))
 	if err != nil {
@@ -100,58 +99,38 @@ func decodeFp(in []byte, modulusLen int, field *field) (fieldElement, []byte, er
 	return x, rest, nil
 }
 
-func decodeFp2(in []byte, modulusLen int, field *fq2) (*fe2, []byte, error) {
-	c0Buf, rest, err := split(in, modulusLen)
+func decodeFp2(in []byte, modulusLen int, fq2 *fq2) (*fe2, []byte, error) {
+	c0, rest, err := decodeFp(in, modulusLen, fq2.f)
 	if err != nil {
 		return nil, nil, err
 	}
-	c0, err := field.f.newFieldElementFromBytes(padHex(c0Buf))
+	c1, rest, err := decodeFp(rest, modulusLen, fq2.f)
 	if err != nil {
 		return nil, nil, err
 	}
-	c1Buf, rest, err := split(rest, modulusLen)
-	if err != nil {
-		return nil, nil, err
-	}
-	c1, err := field.f.newFieldElementFromBytes(padHex(c1Buf))
-	if err != nil {
-		return nil, nil, err
-	}
-	elem := field.newElement()
-	field.f.copy(elem[0], c0)
-	field.f.copy(elem[1], c1)
+	elem := fq2.newElement()
+	fq2.f.copy(elem[0], c0)
+	fq2.f.copy(elem[1], c1)
 	return elem, rest, nil
 }
 
-func decodeFp3(in []byte, modulusLen int, field *fq3) (*fe3, []byte, error) {
-	c0Buf, rest, err := split(in, modulusLen)
+func decodeFp3(in []byte, modulusLen int, fq3 *fq3) (*fe3, []byte, error) {
+	c0, rest, err := decodeFp(in, modulusLen, fq3.f)
 	if err != nil {
 		return nil, nil, err
 	}
-	c0, err := field.f.newFieldElementFromBytes(padHex(c0Buf))
+	c1, rest, err := decodeFp(rest, modulusLen, fq3.f)
 	if err != nil {
 		return nil, nil, err
 	}
-	c1Buf, rest, err := split(rest, modulusLen)
+	c2, rest, err := decodeFp(rest, modulusLen, fq3.f)
 	if err != nil {
 		return nil, nil, err
 	}
-	c1, err := field.f.newFieldElementFromBytes(padHex(c1Buf))
-	if err != nil {
-		return nil, nil, err
-	}
-	c2Buf, rest, err := split(rest, modulusLen)
-	if err != nil {
-		return nil, nil, err
-	}
-	c2, err := field.f.newFieldElementFromBytes(padHex(c2Buf))
-	if err != nil {
-		return nil, nil, err
-	}
-	elem := field.newElement()
-	field.f.copy(elem[0], c0)
-	field.f.copy(elem[1], c1)
-	field.f.copy(elem[2], c2)
+	elem := fq3.newElement()
+	fq3.f.copy(elem[0], c0)
+	fq3.f.copy(elem[1], c1)
+	fq3.f.copy(elem[2], c2)
 	return elem, rest, nil
 }
 
@@ -197,22 +176,22 @@ func decodeBAInExtField3FromEncoding(in []byte, modulusLen int, field *fq3) (*fe
 func decodeGroupOrder(in []byte) (int, *big.Int, []byte, error) {
 	orderLenBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return 0, nil, nil, errors.New("Input is not long enough to get group order length")
+		return 0, nil, nil, _err(ERR_GROUP_ORDER_LENGTH_NOT_ENOUGH_BYTE)
 	}
 	orderLen := int(orderLenBuf[0])
 	if orderLen == 0 {
-		return 0, nil, nil, errors.New("Encoded group length is zero")
+		return 0, nil, nil, _err(ERR_GROUP_ORDER_LENGTH_ZERO)
 	}
 	if orderLen > MAX_GROUP_BYTE_LEN {
-		return 0, nil, nil, errors.New("Encoded group length is too large")
+		return 0, nil, nil, _err(ERR_GROUP_ORDER_LENGTH_LARGE)
 	}
 	orderBuf, rest, err := split(rest, orderLen)
 	if err != nil {
-		return 0, nil, nil, errors.New("Input is not long enough to get group order")
+		return 0, nil, nil, _err(ERR_GROUP_ORDER_NOT_ENOUGH_BYTE)
 	}
 	order := new(big.Int).SetBytes(padBytes(orderBuf, orderLen))
 	if isBigZero(order) {
-		return 0, nil, nil, errors.New("Group order is zero")
+		return 0, nil, nil, _err(ERR_GROUP_ORDER_ZERO)
 	}
 	return orderLen, order, rest, nil
 }
@@ -259,7 +238,7 @@ func decodeG23Point(in []byte, modulusLen int, g2 *g23) (*pointG23, []byte, erro
 func decodeScalar(in []byte, orderLen int, order *big.Int) (*big.Int, []byte, error) {
 	buf, rest, err := split(in, orderLen)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, _err(ERR_INPUT_NOT_ENOUGH_FOR_SCAKAR)
 	}
 	s := new(big.Int).SetBytes(buf)
 	return s, rest, nil
@@ -271,10 +250,12 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, degree
 		return nil, nil, err
 	}
 	if field.isZero(nonResidue) {
-		return nil, nil, errors.New("Non-residue for Fp2 is zero")
+		return nil, nil, _err(ERR_EXT_FIELD_NON_RESIDUE_FP2_ZERO)
 	}
 	if notSquare := isNonNThRoot(field, nonResidue, degree); !notSquare {
-		return nil, nil, errors.New("Non-residue for Fp2 is actually a residue")
+		if !GAS_METERING_MODE {
+			return nil, nil, _err(ERR_EXT_FIELD_NON_RESIDUE_FP2_RESIDUE)
+		}
 	}
 
 	fq2, err := newFq2(field, nil)
@@ -284,7 +265,7 @@ func createExtension2FieldParams(in []byte, modulusLen int, field *field, degree
 	}
 	if needFrobenius {
 		if ok := fq2.calculateFrobeniusCoeffs(); !ok {
-			return nil, nil, errors.New("Can not calculate Frobenius coefficients for Fp2")
+			return nil, nil, _err(ERR_EXT_FIELD_FROBENIUS_FOR_FP2)
 		}
 	}
 	return fq2, rest, nil
@@ -296,10 +277,12 @@ func createExtension3FieldParams(in []byte, modulusLen int, field *field, degree
 		return nil, nil, err
 	}
 	if field.isZero(nonResidue) {
-		return nil, nil, errors.New("Non-residue for Fp3 is zero")
+		return nil, nil, _err(ERR_EXT_FIELD_NON_RESIDUE_FP3_ZERO)
 	}
 	if ok := isNonNThRoot(field, nonResidue, degree); !ok {
-		return nil, nil, errors.New("Non-residue for Fp3 is actually a residue")
+		if !GAS_METERING_MODE {
+			return nil, nil, _err(ERR_EXT_FIELD_NON_RESIDUE_FP3_RESIDUE)
+		}
 	}
 
 	fq3, err := newFq3(field, nil)
@@ -309,7 +292,7 @@ func createExtension3FieldParams(in []byte, modulusLen int, field *field, degree
 	}
 	if needFrobenius {
 		if ok := fq3.calculateFrobeniusCoeffs(); !ok {
-			return nil, nil, errors.New("Can not calculate Frobenius coefficients for Fp3")
+			return nil, nil, _err(ERR_EXT_FIELD_FROBENIUS_FOR_FP3)
 		}
 	}
 	return fq3, rest, nil
@@ -347,27 +330,27 @@ func isNonNThRootFp2(fq2 *fq2, nonResidue *fe2, power int) bool {
 func decodeLoopParameters(in []byte, limit int) (*big.Int, []byte, error) {
 	lengthBuf, rest, err := split(in, BYTES_FOR_LENGTH_ENCODING)
 	if err != nil {
-		return nil, nil, errors.New("cant decode modulus length")
+		return nil, nil, _err(ERR_PAIRING_LOOP_PARAM_LENGTH)
 	}
 	maxLength := (limit + 7) / 8
 	length := int(lengthBuf[0])
 	if length == 0 {
-		return nil, nil, errors.New("Loop parameter scalar has zero length")
+		return nil, nil, _err(ERR_PAIRING_LOOP_PARAM_LENGTH_ZERO)
 	}
 
 	if length > maxLength {
-		return nil, nil, errors.New("Scalar is too large for bit length")
+		return nil, nil, _err(ERR_PAIRING_LOOP_PARAM_LENGTH_LARGE)
 	}
 	paramBuf, rest, err := split(rest, length)
 	if err != nil {
-		return nil, nil, errors.New("Input is not long enough to get loop parameter")
+		return nil, nil, _err(ERR_PAIRING_LOOP_PARAM_NOT_ENOUGH_BYTE)
 	}
 	if paramBuf[0] == 0 {
-		return nil, nil, errors.New("Encoded loop parameter has zero top byte")
+		return nil, nil, _err(ERR_PAIRING_LOOP_PARAM_TOP_BYTE_ZERO)
 	}
 	param := new(big.Int).SetBytes(paramBuf)
 	if param.BitLen() > limit {
-		return nil, nil, errors.New("Scalar is too large for bit length")
+		return nil, nil, _err(ERR_PAIRING_LOOP_PARAM_LARGE)
 	}
 	return param, rest, nil
 }
@@ -375,11 +358,11 @@ func decodeLoopParameters(in []byte, limit int) (*big.Int, []byte, error) {
 func decodeTwistType(in []byte) (int, []byte, error) {
 	twistTypeBuf, rest, err := split(in, TWIST_TYPE_LENGTH)
 	if err != nil {
-		return 0, nil, errors.New("Input is not long enough to get twist type")
+		return 0, nil, _err(ERR_PAIRING_TWIST_TYPE_NOT_ENOUGH_BYTE)
 	}
 	twistType := int(twistTypeBuf[0])
 	if twistType != TWIST_M && twistType != TWIST_D {
-		return 0, nil, errors.New("Unknown twist type supplied")
+		return 0, nil, _err(ERR_PAIRING_TWIST_TYPE_UNKNOWN)
 	}
 	return twistType, rest, nil
 }
@@ -387,7 +370,7 @@ func decodeTwistType(in []byte) (int, []byte, error) {
 func decodePairingExpSign(in []byte) (bool, []byte, error) {
 	expIsNegativeBuf, rest, err := split(in, SIGN_ENCODING_LENGTH)
 	if err != nil {
-		return false, nil, errors.New("exp is not encoded properly")
+		return false, nil, _err(ERR_PAIRING_EXP_SIGN_INVALID)
 	}
 	switch int(expIsNegativeBuf[0]) {
 	case NEGATIVE_EXP:
@@ -395,14 +378,14 @@ func decodePairingExpSign(in []byte) (bool, []byte, error) {
 	case POSITIVE_EXP:
 		return false, rest, nil
 	default:
-		return false, nil, errors.New("Unknown parameter exp sign")
+		return false, nil, _err(ERR_PAIRING_EXP_SIGN_UNKNWON)
 	}
 }
 
 func decodeBoolean(in []byte) (bool, []byte, error) {
 	booleanBuf, rest, err := split(in, BOOLEAN_ENCODING_LENGTH)
 	if err != nil {
-		return false, nil, errors.New("Input is not long enough to get boolean")
+		return false, nil, _err(ERR_PAIRING_BOOL_NOT_ENOUGH_BYTE)
 	}
 	switch int(booleanBuf[0]) {
 	case BOOLEAN_FALSE:
@@ -410,7 +393,7 @@ func decodeBoolean(in []byte) (bool, []byte, error) {
 	case BOOLEAN_TRUE:
 		return true, rest, nil
 	default:
-		return false, nil, errors.New("Boolean is not encoded properly")
+		return false, nil, _err(ERR_PAIRING_BOOL_INVALID)
 	}
 }
 
