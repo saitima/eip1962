@@ -13,11 +13,11 @@ func _err(msg string) error {
 func _e(msgOrErr interface{}) ([]byte, error) {
 	switch val := msgOrErr.(type) {
 	case string:
-		return nil, errors.New(val)
+		return zero, errors.New(val)
 	case error:
-		return nil, val
+		return zero, val
 	default:
-		return nil, errors.New(ERR_UNKNOWN)
+		return zero, errors.New(ERR_UNKNOWN)
 	}
 }
 
