@@ -159,8 +159,6 @@ func (g *g23) isZero(p *pointG23) bool {
 }
 
 func (g *g23) equal(p1, p2 *pointG23) bool {
-	// TODO: Affine equality ?
-	// TODO: P and -P equals why?
 	if g.isZero(p1) {
 		return g.isZero(p2)
 	}

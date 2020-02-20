@@ -167,8 +167,6 @@ func (g *g1) isZero(p *pointG1) bool {
 }
 
 func (g *g1) equal(p1, p2 *pointG1) bool {
-	// TODO: Affine equality ?
-	// TODO: P and -P equals why?
 	if g.isZero(p1) {
 		return g.isZero(p2)
 	}
@@ -195,7 +193,7 @@ func (g *g1) isOnCurve(p *pointG1) bool {
 		return true
 	}
 	t := g.t
-	// Y^2 = X^3 + a Z^4 + b Z^6
+	// Y^2 = X^3 + aXZ^4 + b Z^6
 	g.f.square(t[0], p[1])    // Y2
 	g.f.square(t[1], p[0])    // X2
 	g.f.mul(t[1], t[1], p[0]) // X3

@@ -180,7 +180,6 @@ func (bls *blsInstance) additionStep(coeff *fe6, r *pointG22, q *pointG22) {
 }
 
 func (bls *blsInstance) ell(f *fe12, coeffs *fe6, p *pointG1) {
-	// TODO: p needs to be affine/normalized
 	fq2 := bls.fq12.f.f
 	switch bls.twistType {
 	case 1: // M
@@ -255,13 +254,11 @@ func (bls *blsInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*poi
 			return false
 		}
 	}
-
 	if bls.preferNaf {
 		bls.millerLoopWithNaf(f, coeffs, g1Points)
 	} else {
 		bls.millerLoopWithoutNaf(f, coeffs, g1Points)
 	}
-
 	if bls.zIsnegative {
 		bls.fq12.conjugate(f, f)
 	}
@@ -272,12 +269,10 @@ func (bls *blsInstance) millerLoopWithNaf(f *fe12, coeffs [][]fe6, g1Points []*p
 	j := 0
 	for i := len(bls.zNaf) - 1; i >= 0; i-- {
 		bls.fq12.square(f, f)
-		// doubling coeffs
 		for k, point := range g1Points {
 			bls.ell(f, &(coeffs[k])[j], point)
 		}
 		j++
-		// addition coeffs
 		if bls.zNaf[i] != 0 {
 			for k, point := range g1Points {
 				bls.ell(f, &(coeffs)[k][j], point)
@@ -293,12 +288,10 @@ func (bls *blsInstance) millerLoopWithoutNaf(f *fe12, coeffs [][]fe6, g1Points [
 		if j > 0 {
 			bls.fq12.square(f, f)
 		}
-		// doubling coeffs
 		for k, point := range g1Points {
 			bls.ell(f, &(coeffs[k])[j], point)
 		}
 		j++
-		// addition coeffs
 		if bls.z.Bit(int(i)) != 0 {
 			for k, point := range g1Points {
 				bls.ell(f, &(coeffs)[k][j], point)
@@ -375,9 +368,12 @@ func (bls *blsInstance) finalExp(f *fe12) bool {
 	return true
 }
 
-func (bls *blsInstance) pair(point *pointG1, twistPoint *pointG22) (*fe12, bool) {
+func (bls *blsInstance) pair(g1Point *pointG1, g2Point *pointG22) (*fe12, bool) {
 	f := bls.fq12.one()
-	if ok := bls.millerLoop(f, []*pointG1{point}, []*pointG22{twistPoint}); !ok {
+	if bls.g1.isZero(g1Point) || bls.g2.isZero(g2Point) {
+		return f, true
+	}
+	if ok := bls.millerLoop(f, []*pointG1{g1Point}, []*pointG22{g2Point}); !ok {
 		return nil, false
 	}
 	if ok := bls.finalExp(f); !ok {
@@ -386,9 +382,29 @@ func (bls *blsInstance) pair(point *pointG1, twistPoint *pointG22) (*fe12, bool)
 	return f, true
 }
 
-func (bls *blsInstance) multiPair(points []*pointG1, twistPoints []*pointG22) (*fe12, bool) {
+func (bls *blsInstance) multiPair(g1Points []*pointG1, g2Points []*pointG22) (*fe12, bool) {
+	if len(g1Points) != len(g2Points) {
+		return nil, false
+	}
+	// TODO:
+	if !GAS_METERING_MODE {
+		if len(g1Points) == 0 {
+			return nil, false
+		}
+	}
+	var _g1Points []*pointG1
+	var _g2Points []*pointG22
+	for i := 0; i < len(g1Points); i++ {
+		if !bls.g1.isZero(g1Points[i]) && bls.g2.isZero(g2Points[i]) {
+			_g1Points = append(_g1Points, g1Points[i])
+			_g2Points = append(_g2Points, g2Points[i])
+		}
+	}
 	f := bls.fq12.one()
-	if ok := bls.millerLoop(f, points, twistPoints); !ok {
+	if len(_g1Points) == 0 {
+		return f, true
+	}
+	if ok := bls.millerLoop(f, _g1Points, _g2Points); !ok {
 		return nil, false
 	}
 	if ok := bls.finalExp(f); !ok {

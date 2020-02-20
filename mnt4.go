@@ -403,6 +403,9 @@ func (mnt4 *mnt4Instance) calculateCoeffSize() (int, int) {
 
 func (mnt4 *mnt4Instance) pair(g1Point *pointG1, g2Point *pointG22) (*fe4, bool) {
 	f := mnt4.fq4.one()
+	if mnt4.g1.isZero(g1Point) || mnt4.g2.isZero(g2Point) {
+		return f, true
+	}
 	if ok := mnt4.millerLoop(f, []*pointG1{g1Point}, []*pointG22{g2Point}); !ok {
 		return nil, false
 	}
@@ -413,8 +416,27 @@ func (mnt4 *mnt4Instance) pair(g1Point *pointG1, g2Point *pointG22) (*fe4, bool)
 }
 
 func (mnt4 *mnt4Instance) multiPair(g1Points []*pointG1, g2Points []*pointG22) (*fe4, bool) {
+	if len(g1Points) != len(g2Points) {
+		return nil, false
+	}
+	if !GAS_METERING_MODE {
+		if len(g1Points) == 0 {
+			return nil, false
+		}
+	}
+	var _g1Points []*pointG1
+	var _g2Points []*pointG22
+	for i := 0; i < len(g1Points); i++ {
+		if !mnt4.g1.isZero(g1Points[i]) && mnt4.g2.isZero(g2Points[i]) {
+			_g1Points = append(_g1Points, g1Points[i])
+			_g2Points = append(_g2Points, g2Points[i])
+		}
+	}
 	f := mnt4.fq4.one()
-	if ok := mnt4.millerLoop(f, g1Points, g2Points); !ok {
+	if len(_g1Points) == 0 {
+		return f, true
+	}
+	if ok := mnt4.millerLoop(f, _g1Points, _g2Points); !ok {
 		return nil, false
 	}
 	if ok := mnt4.finalexp(f); !ok {

@@ -403,6 +403,9 @@ func (mnt6 *mnt6Instance) calculateCoeffSize() (int, int) {
 
 func (mnt6 *mnt6Instance) pair(g1Point *pointG1, g2Point *pointG23) (*fe6q, bool) {
 	f := mnt6.fq6.one()
+	if mnt6.g1.isZero(g1Point) || mnt6.g2.isZero(g2Point) {
+		return f, true
+	}
 	if ok := mnt6.millerLoop(f, []*pointG1{g1Point}, []*pointG23{g2Point}); !ok {
 		return nil, false
 	}
@@ -413,8 +416,27 @@ func (mnt6 *mnt6Instance) pair(g1Point *pointG1, g2Point *pointG23) (*fe6q, bool
 }
 
 func (mnt6 *mnt6Instance) multiPair(g1Points []*pointG1, g2Points []*pointG23) (*fe6q, bool) {
+	if len(g1Points) != len(g2Points) {
+		return nil, false
+	}
+	if !GAS_METERING_MODE {
+		if len(g1Points) == 0 {
+			return nil, false
+		}
+	}
+	var _g1Points []*pointG1
+	var _g2Points []*pointG23
+	for i := 0; i < len(g1Points); i++ {
+		if !mnt6.g1.isZero(g1Points[i]) && mnt6.g2.isZero(g2Points[i]) {
+			_g1Points = append(_g1Points, g1Points[i])
+			_g2Points = append(_g2Points, g2Points[i])
+		}
+	}
 	f := mnt6.fq6.one()
-	if ok := mnt6.millerLoop(f, g1Points, g2Points); !ok {
+	if len(_g1Points) == 0 {
+		return f, true
+	}
+	if ok := mnt6.millerLoop(f, _g1Points, _g2Points); !ok {
 		return nil, false
 	}
 	if ok := mnt6.finalexp(f); !ok {

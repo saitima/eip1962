@@ -271,7 +271,6 @@ func (bn *bnInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*point
 			return false
 		}
 	}
-
 	if bn.preferNaf {
 		bn.millerLoopWithNaf(f, coeffs, g1Points)
 	} else {
@@ -436,9 +435,12 @@ func (bn *bnInstance) finalExp(f *fe12) bool {
 	return true
 }
 
-func (bn *bnInstance) pair(point *pointG1, twistPoint *pointG22) (*fe12, bool) {
+func (bn *bnInstance) pair(g1Point *pointG1, g2Point *pointG22) (*fe12, bool) {
 	f := bn.fq12.one()
-	if ok := bn.millerLoop(f, []*pointG1{point}, []*pointG22{twistPoint}); !ok {
+	if bn.g1.isZero(g1Point) || bn.g2.isZero(g2Point) {
+		return f, true
+	}
+	if ok := bn.millerLoop(f, []*pointG1{g1Point}, []*pointG22{g2Point}); !ok {
 		return nil, false
 	}
 	if ok := bn.finalExp(f); !ok {
@@ -447,9 +449,28 @@ func (bn *bnInstance) pair(point *pointG1, twistPoint *pointG22) (*fe12, bool) {
 	return f, true
 }
 
-func (bn *bnInstance) multiPair(points []*pointG1, twistPoints []*pointG22) (*fe12, bool) {
+func (bn *bnInstance) multiPair(g1Points []*pointG1, g2Points []*pointG22) (*fe12, bool) {
+	if len(g1Points) != len(g2Points) {
+		return nil, false
+	}
+	if !GAS_METERING_MODE {
+		if len(g1Points) == 0 {
+			return nil, false
+		}
+	}
+	var _g1Points []*pointG1
+	var _g2Points []*pointG22
+	for i := 0; i < len(g1Points); i++ {
+		if !bn.g1.isZero(g1Points[i]) && bn.g2.isZero(g2Points[i]) {
+			_g1Points = append(_g1Points, g1Points[i])
+			_g2Points = append(_g2Points, g2Points[i])
+		}
+	}
 	f := bn.fq12.one()
-	if ok := bn.millerLoop(f, points, twistPoints); !ok {
+	if len(_g1Points) == 0 {
+		return f, true
+	}
+	if ok := bn.millerLoop(f, _g1Points, _g2Points); !ok {
 		return nil, false
 	}
 	if ok := bn.finalExp(f); !ok {
