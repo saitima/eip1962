@@ -70,7 +70,6 @@ func decodeBaseFieldFromEncoding(in []byte) (*field, *big.Int, int, []byte, erro
 	if err != nil {
 		return nil, nil, 0, nil, err
 	}
-	// TODO: remove after for fuzz testing
 	var field *field
 	if USE_4LIMBS_FOR_LOWER_LIMBS && modulusLen <= 32 {
 		field, err = newField(padBytes(modulusBuf, 32))

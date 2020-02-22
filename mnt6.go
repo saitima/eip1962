@@ -241,14 +241,13 @@ func (mnt6 *mnt6Instance) precomputeG2(precomputedG2 *precomputedG2_6, g2Point *
 		fq6.f.mul(minusRxAffine, rzInv2, r.x)
 		fq6.f.mul(minusRyAffine, rzInv3, r.y)
 		fq6.f.neg(minusRyAffine, minusRyAffine)
-		a = len(precomputedG2.additionCoeffs) - 1 // hack
+		a = len(precomputedG2.additionCoeffs) - 1
 		mnt6.additionStep(precomputedG2.additionCoeffs[a], minusRxAffine, minusRyAffine, r)
 	}
 	return true
 }
 
 func (mnt6 *mnt6Instance) atePairingLoop(f *fe6q, g1Point *pointG1, g2Point *pointG23) bool {
-	// TODO: check that points are in affine form
 	fq6 := mnt6.fq6
 	twistInv := mnt6.fq6.f.newElement()
 	if ok := fq6.f.inverse(twistInv, mnt6.twist); !ok {

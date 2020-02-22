@@ -203,7 +203,7 @@ func (api *g22Api) run(opType int, field *field, modulusLen int, in []byte) ([]b
 	case 0x06:
 		return api.multiExp(field, modulusLen, in)
 	default:
-		return apiDecodingErr(ERR_G2_UNKNOWN_OPERATION) // TODO: need?
+		return apiDecodingErr(ERR_G2_UNKNOWN_OPERATION)
 	}
 }
 

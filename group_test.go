@@ -1219,7 +1219,6 @@ func TestG1(t *testing.T) {
 		// prepare bases
 		// bases: S[0]*G, S[1]*G ... S[n-1]*G
 		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
-			// TODO : make sure that s is unique
 			scalars[j] = new(big.Int)
 			s, _ := rand.Int(rand.Reader, big.NewInt(10000))
 			scalars[j].Set(s)
@@ -1408,7 +1407,6 @@ func TestG22(t *testing.T) {
 		// prepare bases
 		// bases: S[0]*G, S[1]*G ... S[n-1]*G
 		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
-			// TODO : make sure that s is unique
 			scalars[j] = new(big.Int)
 			s, _ := rand.Int(rand.Reader, big.NewInt(10000))
 			scalars[j].Set(s)
@@ -1614,7 +1612,6 @@ func TestG23(t *testing.T) {
 		// prepare bases
 		// bases: S[0]*G, S[1]*G ... S[n-1]*G
 		for i, j := 0, count-1; i < count; i, j = i+1, j-1 {
-			// TODO : make sure that s is unique
 			scalars[j] = new(big.Int)
 			s, _ := rand.Int(rand.Reader, big.NewInt(10000))
 			scalars[j].Set(s)
