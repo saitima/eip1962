@@ -1349,39 +1349,37 @@ func TestFqExponentiation(t *testing.T) {
 }
 
 func TestFqInversion(t *testing.T) {
-	// for _, ext := range fields {
-	for limbSize := from; limbSize < to+1; limbSize++ {
-		// t.Run(fmt.Sprintf("%d_%s", limbSize*64, ext), func(t *testing.T) {
-		t.Run(fmt.Sprintf("%d_%s", limbSize*64, "FQ"), func(t *testing.T) {
-			for i := 0; i < fuz; i++ {
-				// field := randField(ext, limbSize)
-				field := randField("FQ", limbSize)
-				u := field.new()
-				zero := field.zero()
-				one := field.one()
-				field.inverse(u, zero)
-				if !field.equal(u, zero) {
-					t.Fatalf("(0^-1) == 0)")
+	for _, ext := range fields {
+		for limbSize := from; limbSize < to+1; limbSize++ {
+			t.Run(fmt.Sprintf("%d_%s", limbSize*64, ext), func(t *testing.T) {
+				for i := 0; i < fuz; i++ {
+					field := randField(ext, limbSize)
+					u := field.new()
+					zero := field.zero()
+					one := field.one()
+					field.inverse(u, zero)
+					if !field.equal(u, zero) {
+						t.Fatalf("(0^-1) == 0)")
+					}
+					field.inverse(u, one)
+					if !field.equal(u, one) {
+						t.Fatalf("(1^-1) == 1)")
+					}
+					a := field.rand(rand.Reader)
+					field.inverse(u, a)
+					field.mul(u, u, a)
+					if !field.equal(u, one) {
+						t.Fatalf("(r*a) * r*(a^-1) == r)")
+					}
+					v := field.new()
+					p := new(big.Int).Set(field.p())
+					field.exp(u, a, p.Sub(p, big.NewInt(2)))
+					field.inverse(v, a)
+					if !field.equal(v, u) {
+						t.Fatalf("a^(p-2) == a^-1")
+					}
 				}
-				field.inverse(u, one)
-				if !field.equal(u, one) {
-					t.Fatalf("(1^-1) == 1)")
-				}
-				a := field.rand(rand.Reader)
-				field.inverse(u, a)
-				field.mul(u, u, a)
-				if !field.equal(u, one) {
-					t.Fatalf("(r*a) * r*(a^-1) == r)")
-				}
-				v := field.new()
-				p := new(big.Int).Set(field.p())
-				field.exp(u, a, p.Sub(p, big.NewInt(2)))
-				field.inverse(v, a)
-				if !field.equal(v, u) {
-					t.Fatalf("a^(p-2) == a^-1")
-				}
-			}
-		})
-		// }
+			})
+		}
 	}
 }
