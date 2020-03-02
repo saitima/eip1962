@@ -20,7 +20,7 @@ var nonADXBMI2 = !(cpu.X86.HasADX && cpu.X86.HasBMI2) || forceNonADXBMI2()
 
 type fq struct {
 	limbSize       int
-	bitLen         uint64
+	modulusBitLen  int
 	modulusByteLen int
 	p              fe
 	inp            uint64
@@ -50,7 +50,7 @@ func newField(p []byte) (*fq, error) {
 	f := new(fq)
 	pbig := new(big.Int).SetBytes(p)
 	f.modulusByteLen = len(pbig.Bytes())
-	f.bitLen = uint64(pbig.BitLen())
+	f.modulusBitLen = pbig.BitLen()
 	f.pbig = pbig
 	f.p, f.limbSize, err = newFieldElementFromBytes(p)
 	if err != nil {
@@ -731,7 +731,7 @@ func (f *fq) inverse(inv, e fe) bool {
 	f.copy(v, e)
 	f.copy(r, f.zero)
 	f.copy(s, f._one)
-	var k uint64
+	var k int
 	var found = false
 	byteSize := f.byteSize()
 	bitSize := byteSize * 8
@@ -770,9 +770,9 @@ func (f *fq) inverse(inv, e fe) bool {
 	}
 	f.copy(u, f.p)
 	f.subn(u, r)
-
-	montPower := uint64(f.limbSize * 64)
-	modulusBitsCeil := f.bitLen
+	// phase 2
+	montPower := f.limbSize * 64
+	modulusBitsCeil := f.modulusBitLen
 	kInRange := modulusBitsCeil <= k && k <= montPower+modulusBitsCeil
 	if !kInRange {
 		f.copy(inv, zero)

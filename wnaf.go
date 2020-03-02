@@ -9,7 +9,7 @@ import (
 type scalar []uint64
 
 func newRepr(b *big.Int) scalar {
-	if isBigZero(b) {
+	if b.Cmp(new(big.Int)) == 0 {
 		return []uint64{0x00}
 	}
 	byteArr := b.Bytes()
@@ -97,7 +97,7 @@ func onesCount(s *big.Int) int {
 }
 
 func calculateHammingWeight(s *big.Int) int {
-	if isBigZero(s) {
+	if s.Cmp(new(big.Int)) == 0 {
 		return 0
 	}
 	return newRepr(s).onesCount()

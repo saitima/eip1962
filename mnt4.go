@@ -31,8 +31,8 @@ type (
 	}
 
 	precomputedG1 struct {
-		x  fieldElement
-		y  fieldElement
+		x  fe
+		y  fe
 		xx *fe2 // twist of x
 		yy *fe2 // twist of y
 	}
@@ -45,6 +45,7 @@ type (
 		doubleCoeffs   []*doublingCoeffs
 		additionCoeffs []*additionCoeffs
 	}
+
 	extendedCoordinates struct {
 		x *fe2
 		y *fe2
@@ -53,7 +54,7 @@ type (
 	}
 )
 
-func newMnt4Instance(z *big.Int, zIsnegative bool, expW0, expW1 *big.Int, expW0Isnegative bool, fq4 *fq4, g1 *g1, g2 *g22, twist *fe2) *mnt4Instance {
+func newMNT4Instance(z *big.Int, zIsnegative bool, expW0, expW1 *big.Int, expW0Isnegative bool, fq4 *fq4, g1 *g1, g2 *g22, twist *fe2) *mnt4Instance {
 	mnt4 := &mnt4Instance{
 		z:               z,
 		zIsnegative:     zIsnegative,
@@ -67,9 +68,13 @@ func newMnt4Instance(z *big.Int, zIsnegative bool, expW0, expW1 *big.Int, expW0I
 		t:               new([13]*fe2),
 	}
 	for i := 0; i < 13; i++ {
-		mnt4.t[i] = mnt4.fq4.f.newElement()
+		mnt4.t[i] = mnt4.fq4.f.new()
 	}
 	return mnt4
+}
+
+func (mnt4 *mnt4Instance) gt() *fq4 {
+	return mnt4.fq4
 }
 
 func (mnt4 *mnt4Instance) precomputeG1(precomputedG1 *precomputedG1, g1Point *pointG1) {
@@ -197,7 +202,7 @@ func (mnt4 *mnt4Instance) additionStep(coeffs *additionCoeffs, x, y *fe2, r *ext
 func (mnt4 *mnt4Instance) precomputeG2(precomputedG2 *precomputedG2, g2Point *pointG22, twistInv *fe2) bool {
 	fq4 := mnt4.fq4
 
-	xTwist, yTwist := mnt4.fq4.f.newElement(), mnt4.fq4.f.newElement()
+	xTwist, yTwist := mnt4.fq4.f.new(), mnt4.fq4.f.new()
 
 	fq4.f.mul(xTwist, g2Point[0], twistInv)
 	fq4.f.mul(yTwist, g2Point[1], twistInv)
@@ -208,10 +213,10 @@ func (mnt4 *mnt4Instance) precomputeG2(precomputedG2 *precomputedG2, g2Point *po
 	fq4.f.copy(precomputedG2.yy, yTwist)
 
 	r := &extendedCoordinates{
-		fq4.f.newElement(),
-		fq4.f.newElement(),
-		fq4.f.newElement(),
-		fq4.f.newElement(),
+		fq4.f.new(),
+		fq4.f.new(),
+		fq4.f.new(),
+		fq4.f.new(),
 	}
 
 	fq4.f.copy(r.x, g2Point[0])
@@ -229,7 +234,7 @@ func (mnt4 *mnt4Instance) precomputeG2(precomputedG2 *precomputedG2, g2Point *po
 	}
 
 	if mnt4.zIsnegative {
-		rzInv, rzInv2, rzInv3 := mnt4.fq4.f.newElement(), mnt4.fq4.f.newElement(), mnt4.fq4.f.newElement()
+		rzInv, rzInv2, rzInv3 := mnt4.fq4.f.new(), mnt4.fq4.f.new(), mnt4.fq4.f.new()
 		if ok := fq4.f.inverse(rzInv, r.z); !ok {
 			return false
 		}
@@ -237,7 +242,7 @@ func (mnt4 *mnt4Instance) precomputeG2(precomputedG2 *precomputedG2, g2Point *po
 		fq4.f.mul(rzInv3, rzInv2, rzInv)
 
 		// affine forms
-		minusRxAffine, minusRyAffine := mnt4.fq4.f.newElement(), mnt4.fq4.f.newElement()
+		minusRxAffine, minusRyAffine := mnt4.fq4.f.new(), mnt4.fq4.f.new()
 		fq4.f.mul(minusRxAffine, rzInv2, r.x)
 		fq4.f.mul(minusRyAffine, rzInv3, r.y)
 		fq4.f.neg(minusRyAffine, minusRyAffine)
@@ -250,40 +255,40 @@ func (mnt4 *mnt4Instance) precomputeG2(precomputedG2 *precomputedG2, g2Point *po
 func (mnt4 *mnt4Instance) atePairingLoop(f *fe4, g1Point *pointG1, g2Point *pointG22) bool {
 	// TODO: check that points are in affine form
 	fq4 := mnt4.fq4
-	twistInv := mnt4.fq4.f.newElement()
+	twistInv := mnt4.fq4.f.new()
 	if ok := fq4.f.inverse(twistInv, mnt4.twist); !ok {
 		return false
 	}
 
 	p := &precomputedG1{
-		fq4.f.f.newFieldElement(),
-		fq4.f.f.newFieldElement(),
-		fq4.f.newElement(),
-		fq4.f.newElement(),
+		fq4.f.f.new(),
+		fq4.f.f.new(),
+		fq4.f.new(),
+		fq4.f.new(),
 	}
 	mnt4.precomputeG1(p, g1Point)
 
 	doubleCount, addCount := mnt4.calculateCoeffSize()
 	q := &precomputedG2{
-		x:              fq4.f.newElement(),
-		y:              fq4.f.newElement(),
-		xx:             fq4.f.newElement(),
-		yy:             fq4.f.newElement(),
+		x:              fq4.f.new(),
+		y:              fq4.f.new(),
+		xx:             fq4.f.new(),
+		yy:             fq4.f.new(),
 		doubleCoeffs:   make([]*doublingCoeffs, doubleCount),
 		additionCoeffs: make([]*additionCoeffs, addCount),
 	}
 	for i := 0; i < doubleCount; i++ {
 		q.doubleCoeffs[i] = &doublingCoeffs{
-			fq4.f.newElement(),
-			fq4.f.newElement(),
-			fq4.f.newElement(),
-			fq4.f.newElement(),
+			fq4.f.new(),
+			fq4.f.new(),
+			fq4.f.new(),
+			fq4.f.new(),
 		}
 	}
 	for i := 0; i < addCount; i++ {
 		q.additionCoeffs[i] = &additionCoeffs{
-			fq4.f.newElement(),
-			fq4.f.newElement(),
+			fq4.f.new(),
+			fq4.f.new(),
 		}
 	}
 
@@ -298,25 +303,25 @@ func (mnt4 *mnt4Instance) atePairingLoop(f *fe4, g1Point *pointG1, g2Point *poin
 	ff := fq4.one()
 	d, a := 0, 0
 	dc, ac := &doublingCoeffs{
-		fq4.f.newElement(),
-		fq4.f.newElement(),
-		fq4.f.newElement(),
-		fq4.f.newElement(),
+		fq4.f.new(),
+		fq4.f.new(),
+		fq4.f.new(),
+		fq4.f.new(),
 	}, &additionCoeffs{
-		fq4.f.newElement(),
-		fq4.f.newElement(),
+		fq4.f.new(),
+		fq4.f.new(),
 	}
-	gRR, gRQ := mnt4.fq4.newElement(), mnt4.fq4.newElement()
-	t := mnt4.fq4.f.newElement()
+	gRR, gRQ := mnt4.fq4.new(), mnt4.fq4.new()
+	t := mnt4.fq4.f.new()
 	for i := mnt4.z.BitLen() - 2; i >= 0; i-- {
 		dc = q.doubleCoeffs[d]
 
 		d++
-		fq4.f.mul(gRR[0], dc.cj, p.xx)
-		fq4.f.neg(gRR[0], gRR[0])
-		fq4.f.add(gRR[0], gRR[0], dc.cl)
-		fq4.f.sub(gRR[0], gRR[0], dc.c4c)
-		fq4.f.mul(gRR[1], dc.ch, p.yy)
+		fq4.f.mul(&gRR[0], dc.cj, p.xx)
+		fq4.f.neg(&gRR[0], &gRR[0])
+		fq4.f.add(&gRR[0], &gRR[0], dc.cl)
+		fq4.f.sub(&gRR[0], &gRR[0], dc.c4c)
+		fq4.f.mul(&gRR[1], dc.ch, p.yy)
 		fq4.square(ff, ff)
 		fq4.mul(ff, ff, gRR)
 
@@ -324,10 +329,10 @@ func (mnt4 *mnt4Instance) atePairingLoop(f *fe4, g1Point *pointG1, g2Point *poin
 			ac = q.additionCoeffs[a]
 			a++
 			fq4.f.mul(t, l1Coeff, ac.cl1)
-			fq4.f.mul(gRQ[0], ac.crz, p.yy)
-			fq4.f.mul(gRQ[1], ac.crz, q.yy)
-			fq4.f.add(gRQ[1], gRQ[1], t)
-			fq4.f.neg(gRQ[1], gRQ[1])
+			fq4.f.mul(&gRQ[0], ac.crz, p.yy)
+			fq4.f.mul(&gRQ[1], ac.crz, q.yy)
+			fq4.f.add(&gRQ[1], &gRQ[1], t)
+			fq4.f.neg(&gRQ[1], &gRQ[1])
 			fq4.mul(ff, ff, gRQ)
 		}
 	}
@@ -335,10 +340,10 @@ func (mnt4 *mnt4Instance) atePairingLoop(f *fe4, g1Point *pointG1, g2Point *poin
 	if mnt4.zIsnegative {
 		ac = q.additionCoeffs[a]
 		fq4.f.mul(t, l1Coeff, ac.cl1)
-		fq4.f.mul(gRQ[0], ac.crz, p.yy)
-		fq4.f.mul(gRQ[1], ac.crz, q.yy)
-		fq4.f.add(gRQ[1], gRQ[1], t)
-		fq4.f.neg(gRQ[1], gRQ[1])
+		fq4.f.mul(&gRQ[0], ac.crz, p.yy)
+		fq4.f.mul(&gRQ[1], ac.crz, q.yy)
+		fq4.f.add(&gRQ[1], &gRQ[1], t)
+		fq4.f.neg(&gRQ[1], &gRQ[1])
 		fq4.mul(ff, ff, gRQ)
 		if ok := fq4.inverse(ff, ff); !ok {
 			return false
@@ -359,7 +364,7 @@ func (mnt4 *mnt4Instance) millerLoop(f *fe4, g1Points []*pointG1, g2Points []*po
 }
 
 func (mnt4 *mnt4Instance) finalexp(f *fe4) bool {
-	fInv, first, firstInv := mnt4.fq4.newElement(), mnt4.fq4.newElement(), mnt4.fq4.newElement()
+	fInv, first, firstInv := mnt4.fq4.new(), mnt4.fq4.new(), mnt4.fq4.new()
 	if ok := mnt4.fq4.inverse(fInv, f); !ok {
 		return false
 	}
@@ -376,7 +381,7 @@ func (mnt4 *mnt4Instance) finalexpPart1(f, elt, eltInv *fe4) {
 }
 
 func (mnt4 *mnt4Instance) finalexpPart2(f, elt, eltInv *fe4) {
-	w0Part, w1Part := mnt4.fq4.newElement(), mnt4.fq4.newElement()
+	w0Part, w1Part := mnt4.fq4.new(), mnt4.fq4.new()
 	mnt4.fq4.frobeniusMap(w1Part, elt, 1)
 	mnt4.fq4.exp(w1Part, w1Part, mnt4.expW1)
 	if mnt4.zIsnegative {
@@ -427,7 +432,7 @@ func (mnt4 *mnt4Instance) multiPair(g1Points []*pointG1, g2Points []*pointG22) (
 	var _g1Points []*pointG1
 	var _g2Points []*pointG22
 	for i := 0; i < len(g1Points); i++ {
-		if !mnt4.g1.isZero(g1Points[i]) && mnt4.g2.isZero(g2Points[i]) {
+		if !mnt4.g1.isZero(g1Points[i]) && !mnt4.g2.isZero(g2Points[i]) {
 			_g1Points = append(_g1Points, g1Points[i])
 			_g2Points = append(_g2Points, g2Points[i])
 		}

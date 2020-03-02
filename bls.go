@@ -44,13 +44,17 @@ func newBLSInstance(z *big.Int, zIsnegative bool, twistType int, g1 *g1, g2 *g22
 	bls.t2 = make([]*fe2, 17)
 	bls.t12 = make([]*fe12, 17)
 	for i := 0; i < 17; i++ {
-		bls.t2[i] = bls.fq12.f.f.newElement()
-		bls.t12[i] = bls.fq12.newElement()
+		bls.t2[i] = bls.fq12.f.f.new()
+		bls.t12[i] = bls.fq12.new()
 	}
 	return bls
 }
 
-func (bls *blsInstance) doublingStep(coeff *fe6, r *pointG22, twoInv fieldElement) {
+func (bls *blsInstance) gt() *fq12 {
+	return bls.fq12
+}
+
+func (bls *blsInstance) doublingStep(coeff *fe6C, r *pointG22, twoInv fe) {
 	fq2 := bls.fq12.f.f
 	t := bls.t2
 	// X*Y/2
@@ -103,9 +107,9 @@ func (bls *blsInstance) doublingStep(coeff *fe6, r *pointG22, twoInv fieldElemen
 	// -2*Y*Z
 	fq2.neg(t[15], t[9])
 
-	coeff[0] = *fq2.newElement()
-	coeff[1] = *fq2.newElement()
-	coeff[2] = *fq2.newElement()
+	coeff[0] = *fq2.new()
+	coeff[1] = *fq2.new()
+	coeff[2] = *fq2.new()
 	switch bls.twistType {
 	case 1: // M
 		fq2.copy(&coeff[0], t[10]) // 3*b*Z^2 - Y^2
@@ -121,7 +125,7 @@ func (bls *blsInstance) doublingStep(coeff *fe6, r *pointG22, twoInv fieldElemen
 
 }
 
-func (bls *blsInstance) additionStep(coeff *fe6, r *pointG22, q *pointG22) {
+func (bls *blsInstance) additionStep(coeff *fe6C, r *pointG22, q *pointG22) {
 	fq2 := bls.fq12.f.f
 	t := bls.t2
 	// theta = Y - y*Z
@@ -161,9 +165,9 @@ func (bls *blsInstance) additionStep(coeff *fe6, r *pointG22, q *pointG22) {
 	fq2.sub(t[11], t[11], t[10])
 	// -theta
 	fq2.neg(t[0], t[0])
-	coeff[0] = *fq2.newElement()
-	coeff[1] = *fq2.newElement()
-	coeff[2] = *fq2.newElement()
+	coeff[0] = *fq2.new()
+	coeff[1] = *fq2.new()
+	coeff[2] = *fq2.new()
 	switch bls.twistType {
 	case 1: // M
 		fq2.copy(&coeff[0], t[11]) // theata*x - lambda*y
@@ -179,7 +183,7 @@ func (bls *blsInstance) additionStep(coeff *fe6, r *pointG22, q *pointG22) {
 
 }
 
-func (bls *blsInstance) ell(f *fe12, coeffs *fe6, p *pointG1) {
+func (bls *blsInstance) ell(f *fe12, coeffs *fe6C, p *pointG1) {
 	fq2 := bls.fq12.f.f
 	switch bls.twistType {
 	case 1: // M
@@ -193,9 +197,9 @@ func (bls *blsInstance) ell(f *fe12, coeffs *fe6, p *pointG1) {
 	}
 }
 
-func (bls *blsInstance) prepare(coeffs *[]fe6, Q *pointG22) bool {
+func (bls *blsInstance) prepare(coeffs *[]fe6C, Q *pointG22) bool {
 	f := bls.fq12.f.f.f
-	twoInv := f.newFieldElement()
+	twoInv := f.new()
 	f.double(twoInv, f.one)
 	if ok := f.inverse(twoInv, twoInv); !ok {
 		return false
@@ -220,7 +224,7 @@ func (bls *blsInstance) prepare(coeffs *[]fe6, Q *pointG22) bool {
 	return true
 }
 
-func (bls *blsInstance) prepareWithNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fieldElement) {
+func (bls *blsInstance) prepareWithNaf(coeffs *[]fe6C, T, Q *pointG22, twoInv fe) {
 	j := 0
 	for i := len(bls.zNaf) - 1; i >= 0; i-- {
 		bls.doublingStep(&(*coeffs)[j], T, twoInv)
@@ -232,7 +236,7 @@ func (bls *blsInstance) prepareWithNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fie
 	}
 }
 
-func (bls *blsInstance) prepareWithoutNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fieldElement) {
+func (bls *blsInstance) prepareWithoutNaf(coeffs *[]fe6C, T, Q *pointG22, twoInv fe) {
 	j := 0
 	//  skip first msb bit
 	for i := bls.z.BitLen() - 2; i >= 0; i-- {
@@ -246,10 +250,10 @@ func (bls *blsInstance) prepareWithoutNaf(coeffs *[]fe6, T, Q *pointG22, twoInv 
 }
 
 func (bls *blsInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*pointG22) bool {
-	coeffs := make([][]fe6, len(g1Points))
+	coeffs := make([][]fe6C, len(g1Points))
 	coeffsLen := bls.calculateCoeffLength()
 	for i := 0; i < len(g1Points); i++ {
-		coeffs[i] = make([]fe6, coeffsLen)
+		coeffs[i] = make([]fe6C, coeffsLen)
 		if ok := bls.prepare(&coeffs[i], g2Points[i]); !ok {
 			return false
 		}
@@ -265,7 +269,7 @@ func (bls *blsInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*poi
 	return true
 }
 
-func (bls *blsInstance) millerLoopWithNaf(f *fe12, coeffs [][]fe6, g1Points []*pointG1) {
+func (bls *blsInstance) millerLoopWithNaf(f *fe12, coeffs [][]fe6C, g1Points []*pointG1) {
 	j := 0
 	for i := len(bls.zNaf) - 1; i >= 0; i-- {
 		bls.fq12.square(f, f)
@@ -282,7 +286,7 @@ func (bls *blsInstance) millerLoopWithNaf(f *fe12, coeffs [][]fe6, g1Points []*p
 	}
 }
 
-func (bls *blsInstance) millerLoopWithoutNaf(f *fe12, coeffs [][]fe6, g1Points []*pointG1) {
+func (bls *blsInstance) millerLoopWithoutNaf(f *fe12, coeffs [][]fe6C, g1Points []*pointG1) {
 	j := 0
 	for i := bls.z.BitLen() - 2; i >= 0; i-- {
 		if j > 0 {
@@ -311,36 +315,37 @@ func (bls *blsInstance) expByZ(c, a *fe12) {
 func (bls *blsInstance) finalExp(f *fe12) bool {
 	fq := bls.fq12
 
-	f1 := fq.newElement()
+	f1 := fq.new()
 	fq.frobeniusMap(f1, f, 6)
-	f2 := fq.newElement()
+	f2 := fq.new()
 	if ok := fq.inverse(f2, f); !ok {
 		return false
 	}
-	r := fq.newElement()
+
+	r := fq.new()
 	fq.mul(r, f1, f2)
 	fq.frobeniusMap(f2, r, 2)
 	fq.mul(r, r, f2)
 
 	// hard part
-	y0 := fq.newElement()
+	y0 := fq.new()
 	fq.cyclotomicSquare(y0, r)
 	fq.conjugate(y0, y0)
 
-	y5 := fq.newElement()
+	y5 := fq.new()
 	bls.expByZ(y5, r)
 
-	y1 := fq.newElement()
+	y1 := fq.new()
 	fq.cyclotomicSquare(y1, y5)
 
-	y3 := fq.newElement()
+	y3 := fq.new()
 	fq.mul(y3, y0, y5)
 
-	y2 := fq.newElement()
+	y2 := fq.new()
 	bls.expByZ(y0, y3)
 	bls.expByZ(y2, y0)
 
-	y4 := fq.newElement()
+	y4 := fq.new()
 	bls.expByZ(y4, y2)
 	fq.mul(y4, y4, y1)
 
@@ -395,7 +400,7 @@ func (bls *blsInstance) multiPair(g1Points []*pointG1, g2Points []*pointG22) (*f
 	var _g1Points []*pointG1
 	var _g2Points []*pointG22
 	for i := 0; i < len(g1Points); i++ {
-		if !bls.g1.isZero(g1Points[i]) && bls.g2.isZero(g2Points[i]) {
+		if !bls.g1.isZero(g1Points[i]) && !bls.g2.isZero(g2Points[i]) {
 			_g1Points = append(_g1Points, g1Points[i])
 			_g2Points = append(_g2Points, g2Points[i])
 		}

@@ -19,10 +19,23 @@ type bnInstance struct {
 	sixUPlus2Naf             []int8
 }
 
-func newBNInstance(u, sixUplus2 *big.Int, uIsnegative bool, twistType int, g1 *g1, g2 *g22, fq12 *fq12, nonResidue *fe2, forceNoNaf bool) bnInstance {
-	naf := ternaryWnaf(sixUplus2)
-	originalBits := sixUplus2.BitLen()
-	originalHamming := calculateHammingWeight(sixUplus2)
+func newBNInstance(u *big.Int, uIsNegative bool, twistType int, g1 *g1, g2 *g22, fq12 *fq12, forceNoNaf bool) *bnInstance {
+	six, two := big.NewInt(6), big.NewInt(2)
+	sixUPlus2 := new(big.Int).Mul(six, u)
+	if uIsNegative {
+		sixUPlus2.Sub(sixUPlus2, two)
+	} else {
+		sixUPlus2.Add(sixUPlus2, two)
+	}
+
+	fq2, fq6 := fq12.fq2(), fq12.fq6()
+	minus2Inv := new(big.Int).ModInverse(big.NewInt(-2), fq12.modulus())
+	nonResidue := fq2.new()
+	fq2.exp(nonResidue, fq6.nonResidue, minus2Inv)
+
+	naf := ternaryWnaf(sixUPlus2)
+	originalBits := sixUPlus2.BitLen()
+	originalHamming := calculateHammingWeight(sixUPlus2)
 	nafHamming := calculateNafHammingWeight(naf)
 	var preferNaf bool
 	if len(naf)+nafHamming < originalBits+originalHamming {
@@ -33,10 +46,10 @@ func newBNInstance(u, sixUplus2 *big.Int, uIsnegative bool, twistType int, g1 *g
 	} else {
 		preferNaf = false
 	}
-	bn := bnInstance{
+	bn := &bnInstance{
 		u:                        u,
-		sixUPlus2:                sixUplus2,
-		uIsnegative:              uIsnegative,
+		sixUPlus2:                sixUPlus2,
+		uIsnegative:              uIsNegative,
 		twistType:                twistType,
 		g1:                       g1,
 		g2:                       g2,
@@ -46,13 +59,17 @@ func newBNInstance(u, sixUplus2 *big.Int, uIsnegative bool, twistType int, g1 *g
 		sixUPlus2Naf:             naf,
 	}
 	for i := 0; i < 16; i++ {
-		bn.t2[i] = bn.fq12.f.f.newElement()
-		bn.t12[i] = bn.fq12.newElement()
+		bn.t2[i] = fq2.new()
+		bn.t12[i] = fq12.new()
 	}
 	return bn
 }
 
-func (bn *bnInstance) doublingStep(coeff *fe6, r *pointG22, twoInv fieldElement) {
+func (bn *bnInstance) gt() *fq12 {
+	return bn.fq12
+}
+
+func (bn *bnInstance) doublingStep(coeff *fe6C, r *pointG22, twoInv fe) {
 	fq2 := bn.fq12.f.f
 	t := bn.t2
 	// X*Y/2
@@ -104,9 +121,9 @@ func (bn *bnInstance) doublingStep(coeff *fe6, r *pointG22, twoInv fieldElement)
 	fq2.add(t[14], t[14], t[11])
 	// -2*Y*Z
 	fq2.neg(t[15], t[9])
-	coeff[0] = *fq2.newElement()
-	coeff[1] = *fq2.newElement()
-	coeff[2] = *fq2.newElement()
+	coeff[0] = *fq2.new()
+	coeff[1] = *fq2.new()
+	coeff[2] = *fq2.new()
 	switch bn.twistType {
 	case 1: // M
 		fq2.copy(&coeff[0], t[10]) // 3*b*Z^2 - Y^2
@@ -122,7 +139,7 @@ func (bn *bnInstance) doublingStep(coeff *fe6, r *pointG22, twoInv fieldElement)
 
 }
 
-func (bn *bnInstance) additionStep(coeff *fe6, r *pointG22, q *pointG22) {
+func (bn *bnInstance) additionStep(coeff *fe6C, r *pointG22, q *pointG22) {
 	fq2 := bn.fq12.f.f
 	t := bn.t2
 	// theta = Y - y*Z
@@ -162,9 +179,9 @@ func (bn *bnInstance) additionStep(coeff *fe6, r *pointG22, q *pointG22) {
 	fq2.sub(t[11], t[11], t[10])
 	// -theta
 	fq2.neg(t[0], t[0])
-	coeff[0] = *fq2.newElement()
-	coeff[1] = *fq2.newElement()
-	coeff[2] = *fq2.newElement()
+	coeff[0] = *fq2.new()
+	coeff[1] = *fq2.new()
+	coeff[2] = *fq2.new()
 	switch bn.twistType {
 	case 1: // M
 		fq2.copy(&coeff[0], t[11]) // theata*x - lambda*y
@@ -180,7 +197,7 @@ func (bn *bnInstance) additionStep(coeff *fe6, r *pointG22, q *pointG22) {
 
 }
 
-func (bn *bnInstance) ell(f *fe12, coeffs *fe6, p *pointG1) {
+func (bn *bnInstance) ell(f *fe12, coeffs *fe6C, p *pointG1) {
 	fq2 := bn.fq12.f.f
 	switch bn.twistType {
 	case 1: // M
@@ -194,9 +211,9 @@ func (bn *bnInstance) ell(f *fe12, coeffs *fe6, p *pointG1) {
 	}
 }
 
-func (bn *bnInstance) prepare(coeffs *[]fe6, Q *pointG22) bool {
+func (bn *bnInstance) prepare(coeffs *[]fe6C, Q *pointG22) bool {
 	f := bn.fq12.f.f.f
-	twoInv := f.newFieldElement()
+	twoInv := f.new()
 	f.double(twoInv, f.one)
 	if ok := f.inverse(twoInv, twoInv); !ok {
 		return false
@@ -237,7 +254,7 @@ func (bn *bnInstance) prepare(coeffs *[]fe6, Q *pointG22) bool {
 	return true
 }
 
-func (bn *bnInstance) prepareWithNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fieldElement) {
+func (bn *bnInstance) prepareWithNaf(coeffs *[]fe6C, T, Q *pointG22, twoInv fe) {
 	j := 0
 	for i := len(bn.sixUPlus2Naf) - 1; i >= 0; i-- {
 		bn.doublingStep(&(*coeffs)[j], T, twoInv)
@@ -249,7 +266,7 @@ func (bn *bnInstance) prepareWithNaf(coeffs *[]fe6, T, Q *pointG22, twoInv field
 	}
 }
 
-func (bn *bnInstance) prepareWithoutNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fieldElement) {
+func (bn *bnInstance) prepareWithoutNaf(coeffs *[]fe6C, T, Q *pointG22, twoInv fe) {
 	j := 0
 	//  skip first msb bit
 	for i := bn.sixUPlus2.BitLen() - 2; i >= 0; i-- {
@@ -263,10 +280,10 @@ func (bn *bnInstance) prepareWithoutNaf(coeffs *[]fe6, T, Q *pointG22, twoInv fi
 }
 
 func (bn *bnInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*pointG22) bool {
-	coeffs := make([][]fe6, len(g1Points))
+	coeffs := make([][]fe6C, len(g1Points))
 	coeffLength := bn.calculateCoeffLength()
 	for i, _ := range g1Points {
-		coeffs[i] = make([]fe6, coeffLength)
+		coeffs[i] = make([]fe6C, coeffLength)
 		if ok := bn.prepare(&coeffs[i], g2Points[i]); !ok {
 			return false
 		}
@@ -293,7 +310,7 @@ func (bn *bnInstance) millerLoop(f *fe12, g1Points []*pointG1, g2Points []*point
 	return true
 }
 
-func (bn *bnInstance) millerLoopWithNaf(f *fe12, coeffs [][]fe6, g1Points []*pointG1) {
+func (bn *bnInstance) millerLoopWithNaf(f *fe12, coeffs [][]fe6C, g1Points []*pointG1) {
 	j := 0
 	for i := len(bn.sixUPlus2Naf) - 1; i >= 0; i-- {
 		bn.fq12.square(f, f)
@@ -312,7 +329,7 @@ func (bn *bnInstance) millerLoopWithNaf(f *fe12, coeffs [][]fe6, g1Points []*poi
 	}
 }
 
-func (bn *bnInstance) millerLoopWithoutNaf(f *fe12, coeffs [][]fe6, g1Points []*pointG1) {
+func (bn *bnInstance) millerLoopWithoutNaf(f *fe12, coeffs [][]fe6C, g1Points []*pointG1) {
 	j := 0
 	for i := bn.sixUPlus2.BitLen() - 2; i >= 0; i-- {
 		if j > 0 {
@@ -335,7 +352,7 @@ func (bn *bnInstance) millerLoopWithoutNaf(f *fe12, coeffs [][]fe6, g1Points []*
 }
 
 func (bn *bnInstance) expByU(c, a *fe12) {
-	bn.fq12.cyclotomicExp2(c, a, bn.u)
+	bn.fq12.cyclotomicExp(c, a, bn.u)
 	if bn.uIsnegative {
 		bn.fq12.conjugate(c, c)
 	}
@@ -344,68 +361,68 @@ func (bn *bnInstance) expByU(c, a *fe12) {
 func (bn *bnInstance) finalExp(f *fe12) bool {
 	fq12 := bn.fq12
 
-	f1 := fq12.newElement()
+	f1 := fq12.new()
 	fq12.frobeniusMap(f1, f, 6)
 
-	f2 := fq12.newElement()
+	f2 := fq12.new()
 	if ok := fq12.inverse(f2, f); !ok {
 		return false
 	}
 
-	r := fq12.newElement()
+	r := fq12.new()
 	fq12.mul(r, f1, f2)
 
 	fq12.copy(f2, r)
 	fq12.frobeniusMap(r, r, 2)
 	fq12.mul(r, r, f2)
 
-	fp := fq12.newElement()
+	fp := fq12.new()
 	fq12.frobeniusMap(fp, r, 1)
 
-	fp2 := fq12.newElement()
+	fp2 := fq12.new()
 	fq12.frobeniusMap(fp2, r, 2)
 
-	fp3 := fq12.newElement()
+	fp3 := fq12.new()
 	fq12.frobeniusMap(fp3, fp2, 1)
 
-	fu := fq12.newElement()
+	fu := fq12.new()
 	bn.expByU(fu, r)
 
-	fu2 := fq12.newElement()
+	fu2 := fq12.new()
 	bn.expByU(fu2, fu)
 
-	fu3 := fq12.newElement()
+	fu3 := fq12.new()
 	bn.expByU(fu3, fu2)
 
-	y3 := fq12.newElement()
+	y3 := fq12.new()
 	fq12.frobeniusMap(y3, fu, 1)
 
-	fu2p := fq12.newElement()
+	fu2p := fq12.new()
 	fq12.frobeniusMap(fu2p, fu2, 1)
 
-	fu3p := fq12.newElement()
+	fu3p := fq12.new()
 	fq12.frobeniusMap(fu3p, fu3, 1)
 
-	y2 := fq12.newElement()
+	y2 := fq12.new()
 	fq12.frobeniusMap(y2, fu2, 2)
 
-	y0 := fq12.newElement()
+	y0 := fq12.new()
 	fq12.mul(y0, fp, fp2)
 	fq12.mul(y0, y0, fp3)
 
-	y1 := fq12.newElement()
+	y1 := fq12.new()
 	fq12.conjugate(y1, r)
 
-	y5 := fq12.newElement()
+	y5 := fq12.new()
 	fq12.conjugate(y5, fu2)
 
 	fq12.conjugate(y3, y3)
 
-	y4 := fq12.newElement()
+	y4 := fq12.new()
 	fq12.mul(y4, fu, fu2p)
 	fq12.conjugate(y4, y4)
 
-	y6 := fq12.newElement()
+	y6 := fq12.new()
 	fq12.mul(y6, fu3, fu3p)
 	fq12.conjugate(y6, y6)
 
@@ -413,7 +430,7 @@ func (bn *bnInstance) finalExp(f *fe12) bool {
 	fq12.mul(y6, y6, y4)
 	fq12.mul(y6, y6, y5)
 
-	t1 := fq12.newElement()
+	t1 := fq12.new()
 	fq12.mul(t1, y3, y5)
 	fq12.mul(t1, t1, y6)
 
@@ -423,7 +440,7 @@ func (bn *bnInstance) finalExp(f *fe12) bool {
 	fq12.mul(t1, t1, y6)
 	fq12.square(t1, t1)
 
-	t0 := fq12.newElement()
+	t0 := fq12.new()
 	fq12.mul(t0, t1, y1)
 
 	fq12.mul(t1, t1, y0)
@@ -461,7 +478,7 @@ func (bn *bnInstance) multiPair(g1Points []*pointG1, g2Points []*pointG22) (*fe1
 	var _g1Points []*pointG1
 	var _g2Points []*pointG22
 	for i := 0; i < len(g1Points); i++ {
-		if !bn.g1.isZero(g1Points[i]) && bn.g2.isZero(g2Points[i]) {
+		if !bn.g1.isZero(g1Points[i]) && !bn.g2.isZero(g2Points[i]) {
 			_g1Points = append(_g1Points, g1Points[i])
 			_g2Points = append(_g2Points, g2Points[i])
 		}

@@ -10,7 +10,7 @@ type mnt6Instance struct {
 	expW0Isnegative bool
 	expW0           *big.Int
 	expW1           *big.Int
-	fq6             *fq6q
+	fq6             *fq6Q
 	g1              *g1
 	g2              *g23
 	twist           *fe3
@@ -31,8 +31,8 @@ type (
 	}
 
 	precomputedG1_6 struct {
-		x  fieldElement
-		y  fieldElement
+		x  fe
+		y  fe
 		xx *fe3 // twist of x
 		yy *fe3 // twist of y
 	}
@@ -45,6 +45,7 @@ type (
 		doubleCoeffs   []*doublingCoeffs_6
 		additionCoeffs []*additionCoeffs_6
 	}
+
 	extendedCoordinates6 struct {
 		x *fe3
 		y *fe3
@@ -53,7 +54,7 @@ type (
 	}
 )
 
-func newMNT6Instance(z *big.Int, zIsnegative bool, expW0, expW1 *big.Int, expW0Isnegative bool, fq6 *fq6q, g1 *g1, g2 *g23, twist *fe3) *mnt6Instance {
+func newMNT6Instance(z *big.Int, zIsnegative bool, expW0, expW1 *big.Int, expW0Isnegative bool, fq6 *fq6Q, g1 *g1, g2 *g23, twist *fe3) *mnt6Instance {
 	mnt6 := &mnt6Instance{
 		z:               z,
 		zIsnegative:     zIsnegative,
@@ -67,9 +68,13 @@ func newMNT6Instance(z *big.Int, zIsnegative bool, expW0, expW1 *big.Int, expW0I
 		t:               new([13]*fe3),
 	}
 	for i := 0; i < 13; i++ {
-		mnt6.t[i] = mnt6.fq6.f.newElement()
+		mnt6.t[i] = mnt6.fq6.f.new()
 	}
 	return mnt6
+}
+
+func (mnt6 *mnt6Instance) gt() *fq6Q {
+	return mnt6.fq6
 }
 
 func (mnt6 *mnt6Instance) precomputeG1(precomputedG1_6 *precomputedG1_6, g1Point *pointG1) {
@@ -197,7 +202,7 @@ func (mnt6 *mnt6Instance) additionStep(coeffs *additionCoeffs_6, x, y *fe3, r *e
 func (mnt6 *mnt6Instance) precomputeG2(precomputedG2 *precomputedG2_6, g2Point *pointG23, twistInv *fe3) bool {
 	fq6 := mnt6.fq6
 
-	xTwist, yTwist := mnt6.fq6.f.newElement(), mnt6.fq6.f.newElement()
+	xTwist, yTwist := mnt6.fq6.f.new(), mnt6.fq6.f.new()
 
 	fq6.f.mul(xTwist, g2Point[0], twistInv)
 	fq6.f.mul(yTwist, g2Point[1], twistInv)
@@ -208,10 +213,10 @@ func (mnt6 *mnt6Instance) precomputeG2(precomputedG2 *precomputedG2_6, g2Point *
 	fq6.f.copy(precomputedG2.yy, yTwist)
 
 	r := &extendedCoordinates6{
-		fq6.f.newElement(),
-		fq6.f.newElement(),
-		fq6.f.newElement(),
-		fq6.f.newElement(),
+		fq6.f.new(),
+		fq6.f.new(),
+		fq6.f.new(),
+		fq6.f.new(),
 	}
 
 	fq6.f.copy(r.x, g2Point[0])
@@ -229,7 +234,7 @@ func (mnt6 *mnt6Instance) precomputeG2(precomputedG2 *precomputedG2_6, g2Point *
 	}
 
 	if mnt6.zIsnegative {
-		rzInv, rzInv2, rzInv3 := mnt6.fq6.f.newElement(), mnt6.fq6.f.newElement(), mnt6.fq6.f.newElement()
+		rzInv, rzInv2, rzInv3 := mnt6.fq6.f.new(), mnt6.fq6.f.new(), mnt6.fq6.f.new()
 		if ok := fq6.f.inverse(rzInv, r.z); !ok {
 			return false
 		}
@@ -237,7 +242,7 @@ func (mnt6 *mnt6Instance) precomputeG2(precomputedG2 *precomputedG2_6, g2Point *
 		fq6.f.mul(rzInv3, rzInv2, rzInv)
 
 		// affine forms
-		minusRxAffine, minusRyAffine := mnt6.fq6.f.newElement(), mnt6.fq6.f.newElement()
+		minusRxAffine, minusRyAffine := mnt6.fq6.f.new(), mnt6.fq6.f.new()
 		fq6.f.mul(minusRxAffine, rzInv2, r.x)
 		fq6.f.mul(minusRyAffine, rzInv3, r.y)
 		fq6.f.neg(minusRyAffine, minusRyAffine)
@@ -247,43 +252,43 @@ func (mnt6 *mnt6Instance) precomputeG2(precomputedG2 *precomputedG2_6, g2Point *
 	return true
 }
 
-func (mnt6 *mnt6Instance) atePairingLoop(f *fe6q, g1Point *pointG1, g2Point *pointG23) bool {
+func (mnt6 *mnt6Instance) atePairingLoop(f *fe6Q, g1Point *pointG1, g2Point *pointG23) bool {
 	// TODO: check that points are in affine form
 	fq6 := mnt6.fq6
-	twistInv := mnt6.fq6.f.newElement()
+	twistInv := mnt6.fq6.f.new()
 	if ok := fq6.f.inverse(twistInv, mnt6.twist); !ok {
 		return false
 	}
 
 	p := &precomputedG1_6{
-		fq6.f.f.newFieldElement(),
-		fq6.f.f.newFieldElement(),
-		fq6.f.newElement(),
-		fq6.f.newElement(),
+		fq6.f.f.new(),
+		fq6.f.f.new(),
+		fq6.f.new(),
+		fq6.f.new(),
 	}
 	mnt6.precomputeG1(p, g1Point)
 
 	doubleCount, addCount := mnt6.calculateCoeffSize()
 	q := &precomputedG2_6{
-		x:              fq6.f.newElement(),
-		y:              fq6.f.newElement(),
-		xx:             fq6.f.newElement(),
-		yy:             fq6.f.newElement(),
+		x:              fq6.f.new(),
+		y:              fq6.f.new(),
+		xx:             fq6.f.new(),
+		yy:             fq6.f.new(),
 		doubleCoeffs:   make([]*doublingCoeffs_6, doubleCount),
 		additionCoeffs: make([]*additionCoeffs_6, addCount),
 	}
 	for i := 0; i < doubleCount; i++ {
 		q.doubleCoeffs[i] = &doublingCoeffs_6{
-			fq6.f.newElement(),
-			fq6.f.newElement(),
-			fq6.f.newElement(),
-			fq6.f.newElement(),
+			fq6.f.new(),
+			fq6.f.new(),
+			fq6.f.new(),
+			fq6.f.new(),
 		}
 	}
 	for i := 0; i < addCount; i++ {
 		q.additionCoeffs[i] = &additionCoeffs_6{
-			fq6.f.newElement(),
-			fq6.f.newElement(),
+			fq6.f.new(),
+			fq6.f.new(),
 		}
 	}
 
@@ -298,34 +303,34 @@ func (mnt6 *mnt6Instance) atePairingLoop(f *fe6q, g1Point *pointG1, g2Point *poi
 	ff := fq6.one()
 	d, a := 0, 0
 	dc, ac := &doublingCoeffs_6{
-		fq6.f.newElement(),
-		fq6.f.newElement(),
-		fq6.f.newElement(),
-		fq6.f.newElement(),
+		fq6.f.new(),
+		fq6.f.new(),
+		fq6.f.new(),
+		fq6.f.new(),
 	}, &additionCoeffs_6{
-		fq6.f.newElement(),
-		fq6.f.newElement(),
+		fq6.f.new(),
+		fq6.f.new(),
 	}
-	gRR, gRQ := mnt6.fq6.newElement(), mnt6.fq6.newElement()
-	t := mnt6.fq6.f.newElement()
+	gRR, gRQ := mnt6.fq6.new(), mnt6.fq6.new()
+	t := mnt6.fq6.f.new()
 	for i := mnt6.z.BitLen() - 2; i >= 0; i-- {
 		dc = q.doubleCoeffs[d]
 		d++
-		fq6.f.mul(gRR[0], dc.cj, p.xx)
-		fq6.f.neg(gRR[0], gRR[0])
-		fq6.f.add(gRR[0], gRR[0], dc.cl)
-		fq6.f.sub(gRR[0], gRR[0], dc.c4c)
-		fq6.f.mul(gRR[1], dc.ch, p.yy)
+		fq6.f.mul(&gRR[0], dc.cj, p.xx)
+		fq6.f.neg(&gRR[0], &gRR[0])
+		fq6.f.add(&gRR[0], &gRR[0], dc.cl)
+		fq6.f.sub(&gRR[0], &gRR[0], dc.c4c)
+		fq6.f.mul(&gRR[1], dc.ch, p.yy)
 		fq6.square(ff, ff)
 		fq6.mul(ff, ff, gRR)
 		if mnt6.z.Bit(i) != 0 {
 			ac = q.additionCoeffs[a]
 			a++
 			fq6.f.mul(t, l1Coeff, ac.cl1)
-			fq6.f.mul(gRQ[0], ac.crz, p.yy)
-			fq6.f.mul(gRQ[1], ac.crz, q.yy)
-			fq6.f.add(gRQ[1], gRQ[1], t)
-			fq6.f.neg(gRQ[1], gRQ[1])
+			fq6.f.mul(&gRQ[0], ac.crz, p.yy)
+			fq6.f.mul(&gRQ[1], ac.crz, q.yy)
+			fq6.f.add(&gRQ[1], &gRQ[1], t)
+			fq6.f.neg(&gRQ[1], &gRQ[1])
 			fq6.mul(ff, ff, gRQ)
 		}
 	}
@@ -333,10 +338,10 @@ func (mnt6 *mnt6Instance) atePairingLoop(f *fe6q, g1Point *pointG1, g2Point *poi
 	if mnt6.zIsnegative {
 		ac = q.additionCoeffs[a]
 		fq6.f.mul(t, l1Coeff, ac.cl1)
-		fq6.f.mul(gRQ[0], ac.crz, p.yy)
-		fq6.f.mul(gRQ[1], ac.crz, q.yy)
-		fq6.f.add(gRQ[1], gRQ[1], t)
-		fq6.f.neg(gRQ[1], gRQ[1])
+		fq6.f.mul(&gRQ[0], ac.crz, p.yy)
+		fq6.f.mul(&gRQ[1], ac.crz, q.yy)
+		fq6.f.add(&gRQ[1], &gRQ[1], t)
+		fq6.f.neg(&gRQ[1], &gRQ[1])
 		fq6.mul(ff, ff, gRQ)
 		if ok := fq6.inverse(ff, ff); !ok {
 			return false
@@ -347,7 +352,7 @@ func (mnt6 *mnt6Instance) atePairingLoop(f *fe6q, g1Point *pointG1, g2Point *poi
 	return true
 }
 
-func (mnt6 *mnt6Instance) millerLoop(f *fe6q, g1Points []*pointG1, g2Points []*pointG23) bool {
+func (mnt6 *mnt6Instance) millerLoop(f *fe6Q, g1Points []*pointG1, g2Points []*pointG23) bool {
 	for i := 0; i < len(g1Points); i++ {
 		if ok := mnt6.atePairingLoop(f, g1Points[i], g2Points[i]); !ok {
 			return false
@@ -356,8 +361,8 @@ func (mnt6 *mnt6Instance) millerLoop(f *fe6q, g1Points []*pointG1, g2Points []*p
 	return true
 }
 
-func (mnt6 *mnt6Instance) finalexp(f *fe6q) bool {
-	fInv, first, firstInv := mnt6.fq6.newElement(), mnt6.fq6.newElement(), mnt6.fq6.newElement()
+func (mnt6 *mnt6Instance) finalexp(f *fe6Q) bool {
+	fInv, first, firstInv := mnt6.fq6.new(), mnt6.fq6.new(), mnt6.fq6.new()
 	if ok := mnt6.fq6.inverse(fInv, f); !ok {
 		return false
 	}
@@ -367,16 +372,16 @@ func (mnt6 *mnt6Instance) finalexp(f *fe6q) bool {
 	return true
 }
 
-func (mnt6 *mnt6Instance) finalexpPart1(f, elt, eltInv *fe6q) {
-	t := mnt6.fq6.newElement()
+func (mnt6 *mnt6Instance) finalexpPart1(f, elt, eltInv *fe6Q) {
+	t := mnt6.fq6.new()
 	mnt6.fq6.frobeniusMap(f, elt, 3)
 	mnt6.fq6.mul(t, f, eltInv)
 	mnt6.fq6.frobeniusMap(f, t, 1)
 	mnt6.fq6.mul(f, f, t)
 }
 
-func (mnt6 *mnt6Instance) finalexpPart2(f, elt, eltInv *fe6q) {
-	w0Part, w1Part := mnt6.fq6.newElement(), mnt6.fq6.newElement()
+func (mnt6 *mnt6Instance) finalexpPart2(f, elt, eltInv *fe6Q) {
+	w0Part, w1Part := mnt6.fq6.new(), mnt6.fq6.new()
 	mnt6.fq6.frobeniusMap(w1Part, elt, 1)
 	mnt6.fq6.exp(w1Part, w1Part, mnt6.expW1)
 	if mnt6.zIsnegative {
@@ -401,7 +406,7 @@ func (mnt6 *mnt6Instance) calculateCoeffSize() (int, int) {
 	return d, a
 }
 
-func (mnt6 *mnt6Instance) pair(g1Point *pointG1, g2Point *pointG23) (*fe6q, bool) {
+func (mnt6 *mnt6Instance) pair(g1Point *pointG1, g2Point *pointG23) (*fe6Q, bool) {
 	f := mnt6.fq6.one()
 	if mnt6.g1.isZero(g1Point) || mnt6.g2.isZero(g2Point) {
 		return f, true
@@ -415,7 +420,7 @@ func (mnt6 *mnt6Instance) pair(g1Point *pointG1, g2Point *pointG23) (*fe6q, bool
 	return f, true
 }
 
-func (mnt6 *mnt6Instance) multiPair(g1Points []*pointG1, g2Points []*pointG23) (*fe6q, bool) {
+func (mnt6 *mnt6Instance) multiPair(g1Points []*pointG1, g2Points []*pointG23) (*fe6Q, bool) {
 	if len(g1Points) != len(g2Points) {
 		return nil, false
 	}
@@ -427,7 +432,7 @@ func (mnt6 *mnt6Instance) multiPair(g1Points []*pointG1, g2Points []*pointG23) (
 	var _g1Points []*pointG1
 	var _g2Points []*pointG23
 	for i := 0; i < len(g1Points); i++ {
-		if !mnt6.g1.isZero(g1Points[i]) && mnt6.g2.isZero(g2Points[i]) {
+		if !mnt6.g1.isZero(g1Points[i]) && !mnt6.g2.isZero(g2Points[i]) {
 			_g1Points = append(_g1Points, g1Points[i])
 			_g2Points = append(_g2Points, g2Points[i])
 		}
