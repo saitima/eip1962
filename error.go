@@ -1,34 +1,5 @@
 package eip
 
-import "errors"
-
-var (
-	GAS_METERING_MODE = false
-)
-
-func _err(msg string) error {
-	return errors.New(msg)
-}
-
-func _e(msgOrErr interface{}) ([]byte, error) {
-	switch val := msgOrErr.(type) {
-	case string:
-		return zero, errors.New(val)
-	case error:
-		return zero, val
-	default:
-		return zero, errors.New(ERR_UNKNOWN)
-	}
-}
-
-func apiDecodingErr(msgOrErr interface{}) ([]byte, error) {
-	return _e(msgOrErr)
-}
-
-func apiExecErr(msgOrErr interface{}) ([]byte, error) {
-	return _e(msgOrErr)
-}
-
 const (
 	// base field
 	ERR_BASE_FIELD_MODULUS_LENGTH_NOT_ENOUGH_BYTE = "Input is not long enough to get modulus length"
