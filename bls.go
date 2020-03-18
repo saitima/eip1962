@@ -204,11 +204,6 @@ func (bls *blsInstance) prepare(coeffs *[]fe6C, Q *pointG22) bool {
 	if ok := f.inverse(twoInv, twoInv); !ok {
 		return false
 	}
-	if bls.g2.isZero(Q) {
-		// TODO: mark this point as infinity
-		return true
-	}
-
 	T := bls.g2.newPoint()
 	bls.g2.copy(T, Q)
 
@@ -391,7 +386,6 @@ func (bls *blsInstance) multiPair(g1Points []*pointG1, g2Points []*pointG22) (*f
 	if len(g1Points) != len(g2Points) {
 		return nil, false
 	}
-	// TODO:
 	if !GAS_METERING_MODE {
 		if len(g1Points) == 0 {
 			return nil, false

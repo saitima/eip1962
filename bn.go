@@ -218,11 +218,6 @@ func (bn *bnInstance) prepare(coeffs *[]fe6C, Q *pointG22) bool {
 	if ok := f.inverse(twoInv, twoInv); !ok {
 		return false
 	}
-	if bn.g2.isZero(Q) {
-		// TODO: mark this point as infinity
-		return true
-	}
-
 	T := bn.g2.newPoint()
 	bn.g2.copy(T, Q)
 
