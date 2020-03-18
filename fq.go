@@ -443,9 +443,16 @@ func (f *fq) modulus() *big.Int {
 }
 
 func (f *fq) rand(r io.Reader) fe {
-	bi, err := rand.Int(r, f.pbig)
-	if err != nil {
-		panic(err)
+	bi := new(big.Int)
+	var err error
+	for {
+		bi, err = rand.Int(r, f.pbig)
+		if err != nil {
+			panic(err)
+		}
+		if bi.Cmp(new(big.Int)) != 0 {
+			break
+		}
 	}
 	return newFieldElementFromBigUnchecked(f.limbSize, bi)
 }
