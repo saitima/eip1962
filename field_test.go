@@ -696,8 +696,8 @@ func randFq(limbSize int) *fq {
 	offset = int(t.Uint64())
 	byteLen := limbSize * 8
 	bitLen := (limbSize-1)*64 + offset
-	if bitLen < 3 {
-		bitLen = 3
+	if bitLen < 32 {
+		bitLen = 32
 	}
 	pbig, err := rand.Prime(rand.Reader, bitLen)
 	if err != nil {
