@@ -25,8 +25,8 @@ func newG23(f *fq3, a, b *fe3, q *big.Int) (*g23, error) {
 	}
 	g := &g23{
 		f:   f,
-		a:   f.newElement(),
-		b:   f.newElement(),
+		a:   f.new(),
+		b:   f.new(),
 		q:   new(big.Int).Set(q),
 		t:   t,
 		inf: &pointG23{f.zero(), f.one(), f.zero()},
@@ -43,11 +43,11 @@ func newG23(f *fq3, a, b *fe3, q *big.Int) (*g23, error) {
 }
 
 func (g *g23) newPoint() *pointG23 {
-	return &pointG23{g.f.newElement(), g.f.newElement(), g.f.newElement()}
+	return &pointG23{g.f.new(), g.f.new(), g.f.new()}
 }
 
 func (g *g23) fromBytes(in []byte) (*pointG23, error) {
-	byteLen := g.f.f.limbSize * 8 * 3
+	byteLen := g.f.byteSize()
 	if len(in) < 2*byteLen {
 		return nil, fmt.Errorf("input string should be equal or larger than 96")
 	}
@@ -66,17 +66,6 @@ func (g *g23) fromBytes(in []byte) (*pointG23, error) {
 	return p, nil
 }
 
-func (g *g23) fromXY(x, y *fe3) *pointG23 {
-	if g.f.isZero(x) && g.f.isZero(y) {
-		return g.zero()
-	}
-	p := g.zero()
-	g.f.copy(p[0], x)
-	g.f.copy(p[1], y)
-	g.f.copy(p[2], g.f.one())
-	return p
-}
-
 func (g *g23) toBytes(p *pointG23) []byte {
 	l := g.f.f.limbSize * 8 * 3
 	out := make([]byte, 2*l)
@@ -87,11 +76,15 @@ func (g *g23) toBytes(p *pointG23) []byte {
 	return out
 }
 
-func (g *g23) toBytesAllocated(out []byte, p *pointG23) []byte {
+func (g *g23) toBytesDense(p *pointG23) []byte {
 	a := g.newPoint()
 	g.affine(a, p)
-	copy(out[:len(out)/2], g.f.toBytes(a[0]))
-	copy(out[len(out)/2:], g.f.toBytes(a[1]))
+	a0 := g.f.toBytesDense(a[0])
+	a1 := g.f.toBytesDense(a[1])
+	byteLen := len(a0)
+	out := make([]byte, 2*byteLen)
+	copy(out[:byteLen], a0)
+	copy(out[byteLen:], a1)
 	return out
 }
 
@@ -131,21 +124,11 @@ func (g *g23) affine(r, p *pointG23) *pointG23 {
 }
 
 func (g *g23) toString(p *pointG23) string {
-	return fmt.Sprintf(
-		"x: %s y: %s, z: %s",
-		g.f.toString(p[0]),
-		g.f.toString(p[1]),
-		g.f.toString(p[2]),
-	)
+	return fmt.Sprintf("%s\n%s\n%s", g.f.toString(p[0]), g.f.toString(p[1]), g.f.toString(p[2]))
 }
 
 func (g *g23) toStringNoTransform(p *pointG23) string {
-	return fmt.Sprintf(
-		"x: %s y: %s, z: %s",
-		g.f.toStringNoTransform(p[0]),
-		g.f.toStringNoTransform(p[1]),
-		g.f.toStringNoTransform(p[2]),
-	)
+	return fmt.Sprintf("%s\n%s\n%s", g.f.toStringNoTransform(p[0]), g.f.toStringNoTransform(p[1]), g.f.toStringNoTransform(p[2]))
 }
 
 func (g *g23) zero() *pointG23 {
@@ -367,7 +350,7 @@ func (g *g23) mulScalar(c, p *pointG23, e *big.Int) *pointG23 {
 	return c
 }
 
-func (g *g23) checkCorrectSubGroup(p *pointG23) bool {
+func (g *g23) checkCorrectSubgroup(p *pointG23) bool {
 	c := g.newPoint()
 	g.wnafMul(c, p, g.q)
 	if g.equal(c, g.zero()) {

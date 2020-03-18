@@ -1,7 +1,4 @@
-generated
-playground*.go
 fuzz_test.go
 scripts
 fuzz_vectors/
-todo
 fuzz_vectors*

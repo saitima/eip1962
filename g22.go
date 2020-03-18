@@ -25,8 +25,8 @@ func newG22(f *fq2, a, b *fe2, q *big.Int) (*g22, error) {
 	}
 	g := &g22{
 		f:   f,
-		a:   f.newElement(),
-		b:   f.newElement(),
+		a:   f.new(),
+		b:   f.new(),
 		q:   new(big.Int).Set(q),
 		t:   t,
 		inf: &pointG22{f.zero(), f.one(), f.zero()},
@@ -43,11 +43,11 @@ func newG22(f *fq2, a, b *fe2, q *big.Int) (*g22, error) {
 }
 
 func (g *g22) newPoint() *pointG22 {
-	return &pointG22{g.f.newElement(), g.f.newElement(), g.f.newElement()}
+	return &pointG22{g.f.new(), g.f.new(), g.f.new()}
 }
 
 func (g *g22) fromBytes(in []byte) (*pointG22, error) {
-	byteLen := g.f.f.limbSize * 8 * 2
+	byteLen := g.f.byteSize()
 	if len(in) < 2*byteLen {
 		return nil, fmt.Errorf("input string should be equal or larger than %d given %d", 2*byteLen, len(in))
 	}
@@ -66,17 +66,6 @@ func (g *g22) fromBytes(in []byte) (*pointG22, error) {
 	return p, nil
 }
 
-func (g *g22) fromXY(x, y *fe2) *pointG22 {
-	if g.f.isZero(x) && g.f.isZero(y) {
-		return g.zero()
-	}
-	p := g.newPoint()
-	g.f.copy(p[0], x)
-	g.f.copy(p[1], y)
-	g.f.copy(p[2], g.f.one())
-	return p
-}
-
 func (g *g22) toBytes(p *pointG22) []byte {
 	l := g.f.f.limbSize * 8 * 2
 	out := make([]byte, 2*l)
@@ -87,11 +76,15 @@ func (g *g22) toBytes(p *pointG22) []byte {
 	return out
 }
 
-func (g *g22) toBytesAllocated(out []byte, p *pointG22) []byte {
+func (g *g22) toBytesDense(p *pointG22) []byte {
 	a := g.newPoint()
 	g.affine(a, p)
-	copy(out[:len(out)/2], g.f.toBytes(a[0]))
-	copy(out[len(out)/2:], g.f.toBytes(a[1]))
+	a0 := g.f.toBytesDense(a[0])
+	a1 := g.f.toBytesDense(a[1])
+	byteLen := len(a0)
+	out := make([]byte, 2*byteLen)
+	copy(out[:byteLen], a0)
+	copy(out[byteLen:], a1)
 	return out
 }
 
@@ -131,21 +124,11 @@ func (g *g22) affine(r, p *pointG22) *pointG22 {
 }
 
 func (g *g22) toString(p *pointG22) string {
-	return fmt.Sprintf(
-		"x: (%s) y: (%s), z: (%s)",
-		g.f.toString(p[0]),
-		g.f.toString(p[1]),
-		g.f.toString(p[2]),
-	)
+	return fmt.Sprintf("%s\n%s\n%s", g.f.toString(p[0]), g.f.toString(p[1]), g.f.toString(p[2]))
 }
 
 func (g *g22) toStringNoTransform(p *pointG22) string {
-	return fmt.Sprintf(
-		"x: %s y: %s, z: %s",
-		g.f.toStringNoTransform(p[0]),
-		g.f.toStringNoTransform(p[1]),
-		g.f.toStringNoTransform(p[2]),
-	)
+	return fmt.Sprintf("%s\n%s\n%s", g.f.toStringNoTransform(p[0]), g.f.toStringNoTransform(p[1]), g.f.toStringNoTransform(p[2]))
 }
 
 func (g *g22) zero() *pointG22 {
@@ -374,7 +357,7 @@ func (g *g22) mulScalar(c, p *pointG22, e *big.Int) *pointG22 {
 	return c
 }
 
-func (g *g22) checkCorrectSubGroup(p *pointG22) bool {
+func (g *g22) checkCorrectSubgroup(p *pointG22) bool {
 	c := g.newPoint()
 	g.wnafMul(c, p, g.q)
 	if g.equal(c, g.inf) {

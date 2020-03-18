@@ -2,293 +2,356 @@ package eip
 
 import (
 	"fmt"
+	"io"
 	"math/big"
 )
 
-type fe3 [3]fieldElement
+type fe3 [3]fe
 
 type fq3 struct {
-	f               *field
-	nonResidue      fieldElement
-	t               []fieldElement
+	f               *fq
+	nonResidue      fe
+	t               []fe
 	frobeniusCoeffs *[2]*fe3
 }
 
-func newFq3(f *field, nonResidue []byte) (*fq3, error) {
-	nonResidue_ := f.newFieldElement()
-	if nonResidue != nil {
+func newFq3(fq *fq, nonResidueBuf []byte) (*fq3, error) {
+	nonResidue := fq.new()
+	if nonResidueBuf != nil {
 		var err error
-		nonResidue_, err = f.newFieldElementFromBytes(nonResidue)
+		nonResidue, err = fq.fromBytes(nonResidueBuf)
 		if err != nil {
 			return nil, err
 		}
 	}
-	t := make([]fieldElement, 6)
+	t := make([]fe, 6)
 	for i := 0; i < 6; i++ {
-		t[i] = f.newFieldElement()
-		f.copy(t[i], f.zero)
+		t[i] = fq.new()
 	}
-	return &fq3{f, nonResidue_, t, nil}, nil
+	return &fq3{fq, nonResidue, t, nil}, nil
 }
 
-func (fq *fq3) newElement() *fe3 {
-	fe := &fe3{fq.f.newFieldElement(), fq.f.newFieldElement(), fq.f.newFieldElement()}
-	fq.f.copy(fe[0], fq.f.zero)
-	fq.f.copy(fe[1], fq.f.zero)
-	fq.f.copy(fe[2], fq.f.zero)
-	return fe
+func (fq3 *fq3) byteSize() int {
+	fq := fq3.fq()
+	return fq.byteSize() * 3
 }
 
-func (fq *fq3) fromBytes(in []byte) (*fe3, error) {
-	byteLen := fq.f.limbSize * 8
-	totalLen := len(&fe3{}) * byteLen
-	if len(in) < totalLen {
-		return nil, fmt.Errorf("input string should be larger than %d bytes", totalLen)
+func (fq3 *fq3) new() *fe3 {
+	fq := fq3.fq()
+	return &fe3{fq.new(), fq.new(), fq.new()}
+}
+
+func (fq3 *fq3) modulus() *big.Int {
+	fq := fq3.fq()
+	return fq.modulus()
+}
+
+func (fq3 *fq3) rand(r io.Reader) *fe3 {
+	fq := fq3.fq()
+	return &fe3{fq.rand(r), fq.rand(r), fq.rand(r)}
+}
+
+func (fq3 *fq3) fromBytes(in []byte) (*fe3, error) {
+	fq := fq3.fq()
+	byteSize := fq.byteSize()
+	if len(in) != byteSize*3 {
+		return nil, fmt.Errorf("input string should be larger than %d bytes", byteSize)
 	}
-	c := fq.newElement()
 	var err error
-	for i := 0; i < len(&fe3{}); i++ {
-		c[i], err = fq.f.newFieldElementFromBytes(in[i*byteLen : (i+1)*byteLen])
-		if err != nil {
-			return nil, err
-		}
+	c0, err := fq.fromBytes(in[:byteSize])
+	if err != nil {
+		return nil, err
 	}
-	return c, nil
+	c1, err := fq.fromBytes(in[byteSize : byteSize*2])
+	if err != nil {
+		return nil, err
+	}
+	c2, err := fq.fromBytes(in[byteSize*2:])
+	if err != nil {
+		return nil, err
+	}
+	return &fe3{c0, c1, c2}, nil
 }
 
-func (fq *fq3) toBytes(a *fe3) []byte {
-	byteLen := fq.f.limbSize * 8
-	out := make([]byte, len(a)*byteLen)
-	for i := 0; i < len(a); i++ {
-		copy(out[i*byteLen:(i+1)*byteLen], fq.f.toBytes(a[i]))
-	}
+func (fq3 *fq3) toBytes(a *fe3) []byte {
+	fq := fq3.fq()
+	byteSize := fq.byteSize()
+	out := make([]byte, byteSize*3)
+	copy(out[:byteSize], fq.toBytes(a[0]))
+	copy(out[byteSize:byteSize*2], fq.toBytes(a[1]))
+	copy(out[byteSize*2:byteSize*3], fq.toBytes(a[2]))
 	return out
 }
 
-func (fq *fq3) toString(a *fe3) string {
-	return fmt.Sprintf(
-		"c0: %s c1: %s c2: %s \n",
-		fq.f.toString(a[0]),
-		fq.f.toString(a[1]),
-		fq.f.toString(a[2]),
-	)
+func (fq3 *fq3) toBytesDense(a *fe3) []byte {
+	fq := fq3.fq()
+	byteSize := fq.modulusByteLen
+	out := make([]byte, 3*byteSize)
+	copy(out[:byteSize], fq.toBytesDense(a[0]))
+	copy(out[byteSize:byteSize*2], fq.toBytesDense(a[1]))
+	copy(out[byteSize*2:byteSize*3], fq.toBytesDense(a[2]))
+	return out
 }
 
-func (fq *fq3) toStringNoTransform(a *fe3) string {
-	return fmt.Sprintf(
-		"c0: %s c1: %s c2: %s\n",
-		fq.f.toStringNoTransform(a[0]),
-		fq.f.toStringNoTransform(a[1]),
-		fq.f.toStringNoTransform(a[2]),
-	)
+func (fq3 *fq3) toString(a *fe3) string {
+	fq := fq3.fq()
+	return fmt.Sprintf("%s\n%s\n%s", fq.toString(a[0]), fq.toString(a[1]), fq.toString(a[2]))
 }
 
-func (fq *fq3) zero() *fe3 {
-	return fq.newElement()
+func (fq3 *fq3) toStringNoTransform(a *fe3) string {
+	fq := fq3.fq()
+	return fmt.Sprintf("%s\n%s\n%s", fq.toStringNoTransform(a[0]), fq.toStringNoTransform(a[1]), fq.toStringNoTransform(a[2]))
 }
 
-func (fq *fq3) one() *fe3 {
-	a := fq.newElement()
-	fq.f.copy(a[0], fq.f.one)
+func (fq3 *fq3) zero() *fe3 {
+	return fq3.new()
+}
+
+func (fq3 *fq3) one() *fe3 {
+	fq := fq3.fq()
+	a := fq3.new()
+	fq.copy(a[0], fq.one)
 	return a
 }
 
-func (fq *fq3) isZero(a *fe3) bool {
-	return fq.f.isZero(a[0]) && fq.f.isZero(a[1]) && fq.f.isZero(a[2])
+func (fq3 *fq3) twistOne() *fe3 {
+	fq := fq3.fq()
+	a := fq3.new()
+	fq.copy(a[1], fq.one)
+	return a
 }
 
-func (fq *fq3) equal(a, b *fe3) bool {
-	return fq.f.equal(a[0], b[0]) && fq.f.equal(a[1], b[1]) && fq.f.equal(a[2], b[2])
+func (fq3 *fq3) isZero(a *fe3) bool {
+	fq := fq3.fq()
+	return fq.isZero(a[0]) && fq.isZero(a[1]) && fq.isZero(a[2])
 }
 
-func (fq *fq3) copy(c, a *fe3) *fe3 {
-	fq.f.copy(c[0], a[0])
-	fq.f.copy(c[1], a[1])
-	fq.f.copy(c[2], a[2])
+func (fq3 *fq3) isOne(a *fe3) bool {
+	fq := fq3.fq()
+	return fq.isOne(a[0]) && fq.isZero(a[1]) && fq.isZero(a[2])
+}
+
+func (fq3 *fq3) equal(a, b *fe3) bool {
+	fq := fq3.fq()
+	return fq.equal(a[0], b[0]) && fq.equal(a[1], b[1]) && fq.equal(a[2], b[2])
+}
+
+func (fq3 *fq3) copy(c, a *fe3) *fe3 {
+	fq := fq3.fq()
+	fq.copy(c[0], a[0])
+	fq.copy(c[1], a[1])
+	fq.copy(c[2], a[2])
 	return c
 }
 
-func (fq *fq3) add(c, a, b *fe3) *fe3 {
-	fq.f.add(c[0], a[0], b[0])
-	fq.f.add(c[1], a[1], b[1])
-	fq.f.add(c[2], a[2], b[2])
-	return c
-}
-
-func (fq *fq3) double(c, a *fe3) *fe3 {
-	fq.f.double(c[0], a[0])
-	fq.f.double(c[1], a[1])
-	fq.f.double(c[2], a[2])
-	return c
-}
-
-func (fq *fq3) sub(c, a, b *fe3) *fe3 {
-	fq.f.sub(c[0], a[0], b[0])
-	fq.f.sub(c[1], a[1], b[1])
-	fq.f.sub(c[2], a[2], b[2])
-	return c
-}
-
-func (fq *fq3) neg(c, a *fe3) *fe3 {
-	fq.f.neg(c[0], a[0])
-	fq.f.neg(c[1], a[1])
-	fq.f.neg(c[2], a[2])
-	return c
-}
-
-func (fq *fq3) conjugate(c, a *fe3) *fe3 {
-	fq.copy(c, a)
-	fq.f.neg(c[1], a[1])
-	return c
-}
-
-func (fq *fq3) mulByNonResidue(c, a fieldElement) {
-	fq.f.mul(c, a, fq.nonResidue)
-}
-
-func (fq *fq3) mul(c, a, b *fe3) {
-	t := fq.t
-	fq.f.mul(t[0], a[0], b[0])
-	fq.f.mul(t[1], a[1], b[1])
-	fq.f.mul(t[2], a[2], b[2])
-	fq.f.add(t[3], a[1], a[2])
-	fq.f.add(t[4], b[1], b[2])
-	fq.f.mul(t[3], t[3], t[4])
-	fq.f.add(t[4], t[1], t[2])
-	fq.f.sub(t[3], t[3], t[4])
-	fq.mulByNonResidue(t[3], t[3])
-	fq.f.add(t[5], t[0], t[3])
-	fq.f.add(t[3], a[0], a[1])
-	fq.f.add(t[4], b[0], b[1])
-	fq.f.mul(t[3], t[3], t[4])
-	fq.f.add(t[4], t[0], t[1])
-	fq.f.sub(t[3], t[3], t[4])
-	fq.mulByNonResidue(t[4], t[2])
-	fq.f.add(c[1], t[3], t[4])
-	fq.f.add(t[3], a[0], a[2])
-	fq.f.add(t[4], b[0], b[2])
-	fq.f.mul(t[3], t[3], t[4])
-	fq.f.add(t[4], t[0], t[2])
-	fq.f.sub(t[3], t[3], t[4])
-	fq.f.add(c[2], t[1], t[3])
-	fq.f.copy(c[0], t[5])
-}
-
-func (fq *fq3) square(c, a *fe3) {
-	t := fq.t
-	fq.f.square(t[0], a[0])
-	fq.f.mul(t[1], a[0], a[1])
-	fq.f.add(t[1], t[1], t[1])
-	fq.f.sub(t[2], a[0], a[1])
-	fq.f.add(t[2], t[2], a[2])
-	fq.f.square(t[2], t[2])
-	fq.f.mul(t[3], a[1], a[2])
-	fq.f.add(t[3], t[3], t[3])
-	fq.f.square(t[4], a[2])
-	fq.mulByNonResidue(t[5], t[3])
-	fq.f.add(c[0], t[0], t[5])
-	fq.mulByNonResidue(t[5], t[4])
-	fq.f.add(c[1], t[1], t[5])
-	fq.f.add(t[1], t[1], t[2])
-	fq.f.add(t[1], t[1], t[3])
-	fq.f.add(t[0], t[0], t[4])
-	fq.f.sub(c[2], t[1], t[0])
-}
-
-func (fq *fq3) inverse(c, a *fe3) bool {
-	t := fq.t
-	fq.f.square(t[0], a[0])        // v0 = a0^2
-	fq.f.mul(t[1], a[1], a[2])     // v5 = a1 * a2
-	fq.mulByNonResidue(t[1], t[1]) // α * v5
-	fq.f.sub(t[0], t[0], t[1])     // A = v0 - α * v5
-	fq.f.square(t[1], a[1])        // v1 = a1^2
-	fq.f.mul(t[2], a[0], a[2])     // v4 = a0 * a2
-	fq.f.sub(t[1], t[1], t[2])     // C = v1 - v4
-	fq.f.square(t[2], a[2])        // v2 = a2^2
-	fq.mulByNonResidue(t[2], t[2]) // α * v2
-	fq.f.mul(t[3], a[0], a[1])     // v3 = a0 * a1
-	fq.f.sub(t[2], t[2], t[3])     // B = α * v2 - v3
-	fq.f.mul(t[3], a[2], t[2])     // B * a2
-	fq.f.mul(t[4], a[1], t[1])     // C * a1
-	fq.f.add(t[3], t[3], t[4])     // C * a1 + B * a2
-	fq.mulByNonResidue(t[3], t[3]) // α * (C * a1 + B * a2)
-	fq.f.mul(t[4], a[0], t[0])     // A * a0
-	fq.f.add(t[3], t[3], t[4])     // v6 = A * a0 * α * (C * a1 + B * a2)
-	if ok := fq.f.inverse(t[3], t[3]); !ok {
-		fq.copy(c, fq.zero())
+func (fq3 *fq3) isNonResidue(a *fe3, degree int) bool {
+	zero := big.NewInt(0)
+	result := fq3.new()
+	p := fq3.modulus()
+	exp := new(big.Int).Sub(p, big.NewInt(1))
+	exp, rem := new(big.Int).DivMod(exp, big.NewInt(int64(degree)), zero)
+	if rem.Cmp(zero) != 0 {
 		return false
-	} // F = v6^-1
-	fq.f.mul(c[0], t[0], t[3]) // c0 = A * F
-	fq.f.mul(c[1], t[2], t[3]) // c1 = B * F
-	fq.f.mul(c[2], t[1], t[3]) // c2 = C * F
+	}
+	fq3.exp(result, a, exp)
+	if fq3.equal(result, fq3.one()) {
+		return false
+	}
 	return true
 }
 
-func (fq *fq3) exp(c, a *fe3, e *big.Int) {
-	z := fq.one()
+func (fq3 *fq3) add(c, a, b *fe3) *fe3 {
+	fq := fq3.fq()
+	fq.add(c[0], a[0], b[0])
+	fq.add(c[1], a[1], b[1])
+	fq.add(c[2], a[2], b[2])
+	return c
+}
+
+func (fq3 *fq3) double(c, a *fe3) *fe3 {
+	fq := fq3.fq()
+	fq.double(c[0], a[0])
+	fq.double(c[1], a[1])
+	fq.double(c[2], a[2])
+	return c
+}
+
+func (fq3 *fq3) sub(c, a, b *fe3) *fe3 {
+	fq := fq3.fq()
+	fq.sub(c[0], a[0], b[0])
+	fq.sub(c[1], a[1], b[1])
+	fq.sub(c[2], a[2], b[2])
+	return c
+}
+
+func (fq3 *fq3) neg(c, a *fe3) *fe3 {
+	fq := fq3.fq()
+	fq.neg(c[0], a[0])
+	fq.neg(c[1], a[1])
+	fq.neg(c[2], a[2])
+	return c
+}
+
+func (fq3 *fq3) conjugate(c, a *fe3) *fe3 {
+	fq := fq3.fq()
+	fq3.copy(c, a)
+	fq.neg(c[1], a[1])
+	return c
+}
+
+func (fq3 *fq3) mulByNonResidue(c, a fe) {
+	fq := fq3.fq()
+	fq.mul(c, a, fq3.nonResidue)
+}
+
+func (fq3 *fq3) mul(c, a, b *fe3) {
+	fq, t := fq3.fq(), fq3.t
+	fq.mul(t[0], a[0], b[0])
+	fq.mul(t[1], a[1], b[1])
+	fq.mul(t[2], a[2], b[2])
+	fq.add(t[3], a[1], a[2])
+	fq.add(t[4], b[1], b[2])
+	fq.mul(t[3], t[3], t[4])
+	fq.add(t[4], t[1], t[2])
+	fq.sub(t[3], t[3], t[4])
+	fq3.mulByNonResidue(t[3], t[3])
+	fq.add(t[5], t[0], t[3])
+	fq.add(t[3], a[0], a[1])
+	fq.add(t[4], b[0], b[1])
+	fq.mul(t[3], t[3], t[4])
+	fq.add(t[4], t[0], t[1])
+	fq.sub(t[3], t[3], t[4])
+	fq3.mulByNonResidue(t[4], t[2])
+	fq.add(c[1], t[3], t[4])
+	fq.add(t[3], a[0], a[2])
+	fq.add(t[4], b[0], b[2])
+	fq.mul(t[3], t[3], t[4])
+	fq.add(t[4], t[0], t[2])
+	fq.sub(t[3], t[3], t[4])
+	fq.add(c[2], t[1], t[3])
+	fq.copy(c[0], t[5])
+}
+
+func (fq3 *fq3) square(c, a *fe3) {
+	fq, t := fq3.fq(), fq3.t
+	fq.square(t[0], a[0])
+	fq.mul(t[1], a[0], a[1])
+	fq.add(t[1], t[1], t[1])
+	fq.sub(t[2], a[0], a[1])
+	fq.add(t[2], t[2], a[2])
+	fq.square(t[2], t[2])
+	fq.mul(t[3], a[1], a[2])
+	fq.add(t[3], t[3], t[3])
+	fq.square(t[4], a[2])
+	fq3.mulByNonResidue(t[5], t[3])
+	fq.add(c[0], t[0], t[5])
+	fq3.mulByNonResidue(t[5], t[4])
+	fq.add(c[1], t[1], t[5])
+	fq.add(t[1], t[1], t[2])
+	fq.add(t[1], t[1], t[3])
+	fq.add(t[0], t[0], t[4])
+	fq.sub(c[2], t[1], t[0])
+}
+
+func (fq3 *fq3) inverse(c, a *fe3) bool {
+	fq, t := fq3.fq(), fq3.t
+	fq.square(t[0], a[0])           // v0 = a0^2
+	fq.mul(t[1], a[1], a[2])        // v5 = a1 * a2
+	fq3.mulByNonResidue(t[1], t[1]) // α * v5
+	fq.sub(t[0], t[0], t[1])        // A = v0 - α * v5
+	fq.square(t[1], a[1])           // v1 = a1^2
+	fq.mul(t[2], a[0], a[2])        // v4 = a0 * a2
+	fq.sub(t[1], t[1], t[2])        // C = v1 - v4
+	fq.square(t[2], a[2])           // v2 = a2^2
+	fq3.mulByNonResidue(t[2], t[2]) // α * v2
+	fq.mul(t[3], a[0], a[1])        // v3 = a0 * a1
+	fq.sub(t[2], t[2], t[3])        // B = α * v2 - v3
+	fq.mul(t[3], a[2], t[2])        // B * a2
+	fq.mul(t[4], a[1], t[1])        // C * a1
+	fq.add(t[3], t[3], t[4])        // C * a1 + B * a2
+	fq3.mulByNonResidue(t[3], t[3]) // α * (C * a1 + B * a2)
+	fq.mul(t[4], a[0], t[0])        // A * a0
+	fq.add(t[3], t[3], t[4])        // v6 = A * a0 * α * (C * a1 + B * a2)
+	if ok := fq.inverse(t[3], t[3]); !ok {
+		fq3.copy(c, fq3.zero())
+		return false
+	} // F = v6^-1
+	fq.mul(c[0], t[0], t[3]) // c0 = A * F
+	fq.mul(c[1], t[2], t[3]) // c1 = B * F
+	fq.mul(c[2], t[1], t[3]) // c2 = C * F
+	return true
+}
+
+func (fq3 *fq3) exp(c, a *fe3, e *big.Int) {
+	z := fq3.one()
 	found := false
 	for i := e.BitLen() - 1; i >= 0; i-- {
 		if found {
-			fq.square(z, z)
+			fq3.square(z, z)
 		} else {
 			found = e.Bit(i) == 1
 		}
 		if e.Bit(i) == 1 {
-			fq.mul(z, z, a)
+			fq3.mul(z, z, a)
 		}
 	}
-	fq.copy(c, z)
+	fq3.copy(c, z)
 }
 
-func (fq *fq3) mulByFq(c, a *fe3, b fieldElement) {
-	fq.f.mul(c[0], a[0], b)
-	fq.f.mul(c[1], a[1], b)
-	fq.f.mul(c[2], a[2], b)
+func (fq3 *fq3) mulByFq(c, a *fe3, b fe) {
+	fq := fq3.fq()
+	fq.mul(c[0], a[0], b)
+	fq.mul(c[1], a[1], b)
+	fq.mul(c[2], a[2], b)
 }
 
-func (fq *fq3) frobeniusMap(c, a *fe3, power uint) {
-	fq.copy(c, a)
-	fq.f.mul(c[1], a[1], fq.frobeniusCoeffs[0][power%3])
-	fq.f.mul(c[2], a[2], fq.frobeniusCoeffs[1][power%3])
+func (fq3 *fq3) frobeniusMap(c, a *fe3, power uint) {
+	fq := fq3.fq()
+	fq3.copy(c, a)
+	fq.mul(c[1], a[1], fq3.frobeniusCoeffs[0][power%3])
+	fq.mul(c[2], a[2], fq3.frobeniusCoeffs[1][power%3])
 }
 
-func (fq *fq3) calculateFrobeniusCoeffs() bool {
-	if fq.frobeniusCoeffs == nil {
-		fq.frobeniusCoeffs = new([2]*fe3)
-		fq.frobeniusCoeffs[0] = fq.newElement()
-		fq.frobeniusCoeffs[1] = fq.newElement()
+func (fq3 *fq3) calculateFrobeniusCoeffs() bool {
+	fq := fq3.fq()
+	if fq3.frobeniusCoeffs == nil {
+		fq3.frobeniusCoeffs = new([2]*fe3)
+		fq3.frobeniusCoeffs[0] = fq3.new()
+		fq3.frobeniusCoeffs[1] = fq3.new()
 	}
-	modulus := fq.f.pbig
-	bigOne, bigTwo, bigThree := big.NewInt(1), big.NewInt(2), big.NewInt(3)
+	modulus := fq.modulus()
+	zero, one, two, three := big.NewInt(0), big.NewInt(1), big.NewInt(2), big.NewInt(3)
 	qPower, rem, power := new(big.Int).Set(modulus), new(big.Int), new(big.Int)
 	for i := 1; i <= 2; i++ {
-		power.Sub(qPower, bigOne)
-		power.DivMod(power, bigThree, rem)
-		if !isBigZero(rem) {
+		power.Sub(qPower, one)
+		power.DivMod(power, three, rem)
+		if rem.Cmp(zero) != 0 {
 			return false
 		}
-		fq.f.exp(fq.frobeniusCoeffs[0][i], fq.nonResidue, power)
-		fq.f.exp(fq.frobeniusCoeffs[1][i], fq.frobeniusCoeffs[0][i], bigTwo)
+		fq.exp(fq3.frobeniusCoeffs[0][i], fq3.nonResidue, power)
+		fq.exp(fq3.frobeniusCoeffs[1][i], fq3.frobeniusCoeffs[0][i], two)
 		qPower.Mul(qPower, modulus)
 	}
-	fq.f.copy(fq.frobeniusCoeffs[0][0], fq.f.one)
-	fq.f.copy(fq.frobeniusCoeffs[1][0], fq.f.one)
+	fq.copy(fq3.frobeniusCoeffs[0][0], fq.one)
+	fq.copy(fq3.frobeniusCoeffs[1][0], fq.one)
 	return true
 }
 
-func (fq *fq3) calculateFrobeniusCoeffsWithPrecomputation(f1 fieldElement) {
-	if fq.frobeniusCoeffs == nil {
-		fq.frobeniusCoeffs = new([2]*fe3)
-		fq.frobeniusCoeffs[0] = fq.newElement()
-		fq.frobeniusCoeffs[1] = fq.newElement()
+func (fq3 *fq3) calculateFrobeniusCoeffsWithPrecomputation(f1 fe) {
+	fq := fq3.fq()
+	if fq3.frobeniusCoeffs == nil {
+		fq3.frobeniusCoeffs = new([2]*fe3)
+		fq3.frobeniusCoeffs[0] = fq3.new()
+		fq3.frobeniusCoeffs[1] = fq3.new()
 	}
+	fq.copy(fq3.frobeniusCoeffs[0][0], fq.one)
+	fq.copy(fq3.frobeniusCoeffs[1][0], fq.one)
+	fq.square(fq3.frobeniusCoeffs[0][1], f1)
+	fq.square(fq3.frobeniusCoeffs[0][2], fq3.frobeniusCoeffs[0][1])
+	fq.square(fq3.frobeniusCoeffs[1][1], fq3.frobeniusCoeffs[0][1])
+	fq.square(fq3.frobeniusCoeffs[1][2], fq3.frobeniusCoeffs[0][2])
+}
 
-	fq.f.copy(fq.frobeniusCoeffs[0][0], fq.f.one)
-	fq.f.copy(fq.frobeniusCoeffs[1][0], fq.f.one)
-	fq.f.square(fq.frobeniusCoeffs[0][1], f1)
-	fq.f.square(fq.frobeniusCoeffs[0][2], fq.frobeniusCoeffs[0][1])
-	for i := 1; i <= 2; i++ {
-		fq.f.square(fq.frobeniusCoeffs[1][i], fq.frobeniusCoeffs[0][i])
-		fq.f.square(fq.frobeniusCoeffs[1][i], fq.frobeniusCoeffs[0][i])
-	}
+func (fq3 *fq3) fq() *fq {
+	return fq3.f
 }

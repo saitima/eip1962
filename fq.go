@@ -12,47 +12,50 @@ import (
 	"golang.org/x/sys/cpu"
 )
 
-// fieldElement is a pointer that addresses
-// any field element in any limb size
-type fieldElement = unsafe.Pointer
+// fe is a pointer that addresses a field element given limb size
+type fe = unsafe.Pointer
 
+// for x86 we decide the instruction set in runtime
 var nonADXBMI2 = !(cpu.X86.HasADX && cpu.X86.HasBMI2) || forceNonADXBMI2()
 
-type field struct {
-	limbSize  int
-	bitLength uint64 // TODO: remove after fuzz testing
-	p         fieldElement
-	inp       uint64
-	one       fieldElement
-	_one      fieldElement
-	zero      fieldElement
-	r         fieldElement
-	r2        fieldElement
-	pbig      *big.Int
-	rbig      *big.Int
-	equal     func(a, b fieldElement) bool
-	cmp       func(a, b fieldElement) int8
-	copy      func(dst, stc fieldElement)
-	_mul      func(c, a, b, p fieldElement, inp uint64)
-	_add      func(c, a, b, p fieldElement)
-	_double   func(c, a, p fieldElement)
-	_sub      func(c, a, b, p fieldElement)
-	_neg      func(c, a, p fieldElement)
-	addn      func(a, b fieldElement) uint64
-	subn      func(a, b fieldElement) uint64
-	div_two   func(a fieldElement)
-	mul_two   func(a fieldElement)
+type fq struct {
+	limbSize       int
+	modulusBitLen  int
+	modulusByteLen int
+	p              fe
+	inp            uint64
+	one            fe
+	_one           fe
+	zero           fe
+	r              fe
+	r2             fe
+	pbig           *big.Int
+	rbig           *big.Int
+	equal          func(a, b fe) bool
+	cmp            func(a, b fe) int8
+	copy           func(dst, stc fe)
+	_mul           func(c, a, b, p fe, inp uint64)
+	_add           func(c, a, b, p fe)
+	_double        func(c, a, p fe)
+	_sub           func(c, a, b, p fe)
+	_neg           func(c, a, p fe)
+	addn           func(a, b fe) uint64
+	subn           func(a, b fe) uint64
+	div_two        func(a fe)
+	mul_two        func(a fe)
 }
 
-func newField(p []byte) (*field, error) {
+func newField(p []byte) (*fq, error) {
 	var err error
-	f := new(field)
-	f.pbig = new(big.Int).SetBytes(p)
+	f := new(fq)
+	pbig := new(big.Int).SetBytes(p)
+	f.modulusByteLen = len(pbig.Bytes())
+	f.modulusBitLen = pbig.BitLen()
+	f.pbig = pbig
 	f.p, f.limbSize, err = newFieldElementFromBytes(p)
 	if err != nil {
 		return nil, err
 	}
-	f.bitLength = uint64(f.pbig.BitLen())
 	R := new(big.Int)
 	R.SetBit(R, f.byteSize()*8, 1).Mod(R, f.pbig)
 	R2 := new(big.Int)
@@ -348,27 +351,27 @@ func newField(p []byte) (*field, error) {
 	return f, nil
 }
 
-func (f *field) toMont(c, a fieldElement) {
+func (f *fq) toMont(c, a fe) {
 	f._mul(c, a, f.r2, f.p, f.inp)
 }
 
-func (f *field) fromMont(c, a fieldElement) {
+func (f *fq) fromMont(c, a fe) {
 	f._mul(c, a, f._one, f.p, f.inp)
 }
 
-func (f *field) add(c, a, b fieldElement) {
+func (f *fq) add(c, a, b fe) {
 	f._add(c, a, b, f.p)
 }
 
-func (f *field) double(c, a fieldElement) {
+func (f *fq) double(c, a fe) {
 	f._double(c, a, f.p)
 }
 
-func (f *field) sub(c, a, b fieldElement) {
+func (f *fq) sub(c, a, b fe) {
 	f._sub(c, a, b, f.p)
 }
 
-func (f *field) neg(c, a fieldElement) {
+func (f *fq) neg(c, a fe) {
 	if f.equal(a, f.zero) {
 		f.copy(c, f.zero)
 		return
@@ -376,16 +379,16 @@ func (f *field) neg(c, a fieldElement) {
 	f._neg(c, a, f.p)
 }
 
-func (f *field) mul(c, a, b fieldElement) {
+func (f *fq) mul(c, a, b fe) {
 	f._mul(c, a, b, f.p, f.inp)
 }
 
-func (f *field) square(c, a fieldElement) {
+func (f *fq) square(c, a fe) {
 	f._mul(c, a, a, f.p, f.inp)
 }
 
-func (f *field) exp(c, a fieldElement, e *big.Int) {
-	z := f.newFieldElement()
+func (f *fq) exp(c, a fe, e *big.Int) {
+	z := f.new()
 	f.copy(z, f.r)
 	for i := e.BitLen(); i >= 0; i-- {
 		f.mul(z, z, z)
@@ -396,15 +399,30 @@ func (f *field) exp(c, a fieldElement, e *big.Int) {
 	f.copy(c, z)
 }
 
-func (f *field) isOne(fe fieldElement) bool {
+func (f *fq) isOne(fe fe) bool {
 	return f.equal(fe, f.one)
 }
 
-func (f *field) isZero(fe fieldElement) bool {
+func (f *fq) isZero(fe fe) bool {
 	return f.equal(fe, f.zero)
 }
 
-func (f *field) isValid(fe []byte) bool {
+func (f *fq) isNonResidue(a fe, degree int) bool {
+	zero := big.NewInt(0)
+	result := f.new()
+	exp := new(big.Int).Sub(f.pbig, big.NewInt(1))
+	exp, rem := new(big.Int).DivMod(exp, big.NewInt(int64(degree)), zero)
+	if rem.Cmp(zero) != 0 {
+		return false
+	}
+	f.exp(result, a, exp)
+	if f.equal(result, f.one) {
+		return false
+	}
+	return true
+}
+
+func (f *fq) isValid(fe []byte) bool {
 	feBig := new(big.Int).SetBytes(fe)
 	if feBig.Cmp(f.pbig) != -1 {
 		return false
@@ -412,7 +430,7 @@ func (f *field) isValid(fe []byte) bool {
 	return true
 }
 
-func (f *field) newFieldElement() fieldElement {
+func (f *fq) new() fe {
 	fe, err := newFieldElement(f.limbSize)
 	if err != nil {
 		// panic("this is unexpected")
@@ -420,7 +438,11 @@ func (f *field) newFieldElement() fieldElement {
 	return fe
 }
 
-func (f *field) randFieldElement(r io.Reader) fieldElement {
+func (f *fq) modulus() *big.Int {
+	return new(big.Int).Set(f.pbig)
+}
+
+func (f *fq) rand(r io.Reader) fe {
 	bi, err := rand.Int(r, f.pbig)
 	if err != nil {
 		panic(err)
@@ -428,7 +450,7 @@ func (f *field) randFieldElement(r io.Reader) fieldElement {
 	return newFieldElementFromBigUnchecked(f.limbSize, bi)
 }
 
-func (f *field) newFieldElementFromBytesNoTransform(in []byte) (fieldElement, error) {
+func (f *fq) fromBytesNoTransform(in []byte) (fe, error) {
 	if len(in) != f.byteSize() {
 		return nil, fmt.Errorf("bad input size")
 	}
@@ -442,7 +464,7 @@ func (f *field) newFieldElementFromBytesNoTransform(in []byte) (fieldElement, er
 	return fe, nil
 }
 
-func (f *field) newFieldElementFromBytes(in []byte) (fieldElement, error) {
+func (f *fq) fromBytes(in []byte) (fe, error) {
 	if len(in) != f.byteSize() {
 		return nil, fmt.Errorf("bad input size %d %d", len(in), f.byteSize())
 	}
@@ -460,7 +482,7 @@ func (f *field) newFieldElementFromBytes(in []byte) (fieldElement, error) {
 	return fe, nil
 }
 
-func (f *field) newFieldElementFromString(hexStr string) (fieldElement, error) {
+func (f *fq) fromString(hexStr string) (fe, error) {
 	str := hexStr
 	if len(str) > 1 && str[:2] == "0x" {
 		str = hexStr[:2]
@@ -486,7 +508,7 @@ func (f *field) newFieldElementFromString(hexStr string) (fieldElement, error) {
 	return fe, nil
 }
 
-func (f *field) newFieldElementFromBig(a *big.Int) (fieldElement, error) {
+func (f *fq) fromBig(a *big.Int) (fe, error) {
 	in := a.Bytes()
 	if !f.isValid(in) {
 		return nil, fmt.Errorf("input is a larger number than modulus")
@@ -505,13 +527,23 @@ func (f *field) newFieldElementFromBig(a *big.Int) (fieldElement, error) {
 	return fe, nil
 }
 
-func (f *field) toBytes(in fieldElement) []byte {
-	t := f.newFieldElement()
+func (f *fq) toBytes(in fe) []byte {
+	t := f.new()
 	f.fromMont(t, in)
 	return f.toBytesNoTransform(t)
 }
 
-func (f *field) toBytesNoTransform(in fieldElement) []byte {
+func (f *fq) toBytesDense(in fe) []byte {
+	t := f.new()
+	f.fromMont(t, in)
+	denseLength := f.modulusByteLen
+	out := make([]byte, denseLength)
+	sparse := f.toBytesNoTransform(t)
+	copy(out[:], sparse[f.byteSize()-denseLength:])
+	return out
+}
+
+func (f *fq) toBytesNoTransform(in fe) []byte {
 	switch f.limbSize {
 	case 1:
 		return toBytes((*[1]uint64)(in)[:])
@@ -550,23 +582,23 @@ func (f *field) toBytesNoTransform(in fieldElement) []byte {
 	}
 }
 
-func (f *field) toBig(in fieldElement) *big.Int {
+func (f *fq) toBig(in fe) *big.Int {
 	return new(big.Int).SetBytes(f.toBytes(in))
 }
 
-func (f *field) toBigNoTransform(in fieldElement) *big.Int {
+func (f *fq) toBigNoTransform(in fe) *big.Int {
 	return new(big.Int).SetBytes(f.toBytesNoTransform(in))
 }
 
-func (f *field) toString(in fieldElement) string {
+func (f *fq) toString(in fe) string {
 	return hex.EncodeToString(f.toBytes(in))
 }
 
-func (f *field) toStringNoTransform(in fieldElement) string {
+func (f *fq) toStringNoTransform(in fe) string {
 	return hex.EncodeToString(f.toBytesNoTransform(in))
 }
 
-func (f *field) byteSize() int {
+func (f *fq) byteSize() int {
 	return f.limbSize * 8
 }
 
@@ -591,7 +623,7 @@ func toBytes(fe []uint64) []byte {
 
 // newFieldElement returns pointer of an uint64 array.
 // limbSize is calculated according to size of input slice
-func newFieldElementFromBytes(in []byte) (fieldElement, int, error) {
+func newFieldElementFromBytes(in []byte) (fe, int, error) {
 	byteSize := len(in)
 	limbSize := byteSize / 8
 	if byteSize%8 != 0 {
@@ -616,7 +648,7 @@ func newFieldElementFromBytes(in []byte) (fieldElement, int, error) {
 	return a, limbSize, nil
 }
 
-func newFieldElement(limbSize int) (fieldElement, error) {
+func newFieldElement(limbSize int) (fe, error) {
 	switch limbSize {
 	case 1:
 		return unsafe.Pointer(&[1]uint64{}), nil
@@ -655,7 +687,7 @@ func newFieldElement(limbSize int) (fieldElement, error) {
 	}
 }
 
-func newFieldElementFromBigUnchecked(limbSize int, bi *big.Int) fieldElement {
+func newFieldElementFromBigUnchecked(limbSize int, bi *big.Int) fe {
 	in := bi.Bytes()
 	byteSize := limbSize * 8
 	fe, _, _ := newFieldElementFromBytes(padBytes(in, byteSize))
@@ -688,21 +720,18 @@ func padBytes(in []byte, size int) []byte {
 	return out
 }
 
-func (f *field) inverse(inv, e fieldElement) bool {
+func (f *fq) inverse(inv, e fe) bool {
 	if f.equal(e, f.zero) {
 		f.copy(inv, f.zero)
 		return false
 	}
-	u, v, s, r := f.newFieldElement(),
-		f.newFieldElement(),
-		f.newFieldElement(),
-		f.newFieldElement()
-	zero := f.newFieldElement()
+	u, v, s, r := f.new(), f.new(), f.new(), f.new()
+	zero := f.new()
 	f.copy(u, f.p)
 	f.copy(v, e)
 	f.copy(r, f.zero)
 	f.copy(s, f._one)
-	var k uint64
+	var k int
 	var found = false
 	byteSize := f.byteSize()
 	bitSize := byteSize * 8
@@ -741,9 +770,9 @@ func (f *field) inverse(inv, e fieldElement) bool {
 	}
 	f.copy(u, f.p)
 	f.subn(u, r)
-
-	montPower := uint64(f.limbSize * 64)
-	modulusBitsCeil := f.bitLength
+	// phase 2
+	montPower := f.limbSize * 64
+	modulusBitsCeil := f.modulusBitLen
 	kInRange := modulusBitsCeil <= k && k <= montPower+modulusBitsCeil
 	if !kInRange {
 		f.copy(inv, zero)
@@ -772,7 +801,7 @@ func (f *field) inverse(inv, e fieldElement) bool {
 	if len(xBytes) < f.limbSize*8 {
 		xBytes = padBytes(xBig.Bytes(), f.limbSize*8)
 	}
-	x, err := f.newFieldElementFromBytesNoTransform(xBytes)
+	x, err := f.fromBytesNoTransform(xBytes)
 	if err != nil {
 		f.copy(inv, zero)
 		return false
