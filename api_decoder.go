@@ -813,7 +813,7 @@ func (decoder *decoder) g22MultiExpRunner() (*g22MultiExpRunner, error) {
 	scalars := make([]*big.Int, numPairs)
 	points := make([]*pointG22, numPairs)
 	pointLen := modulusLen * 4
-	if decoder.remainingDataLen() != 2*(scalarLen+pointLen) {
+	if decoder.remainingDataLen() != numPairs*(scalarLen+pointLen) {
 		return nil, errors.New(ERR_MULTIEXP_NUM_PAIR_INPUT_LENGTH_NOT_MATCH)
 	}
 	for i := 0; i < numPairs; i++ {
