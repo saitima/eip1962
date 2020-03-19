@@ -7,26 +7,26 @@ import (
 	"math/big"
 )
 
-type pointG1 [3]fieldElement
+type pointG1 [3]fe
 
 type g1 struct {
-	f   *field
-	a   fieldElement
-	b   fieldElement
+	f   *fq
+	a   fe
+	b   fe
 	q   *big.Int
-	t   [9]fieldElement
+	t   [9]fe
 	inf *pointG1
 }
 
-func newG1(f *field, a, b fieldElement, q *big.Int) (*g1, error) {
-	t := [9]fieldElement{}
+func newG1(f *fq, a, b fe, q *big.Int) (*g1, error) {
+	t := [9]fe{}
 	for i := 0; i < 9; i++ {
-		t[i] = f.newFieldElement()
+		t[i] = f.new()
 	}
 	g := &g1{
 		f: f,
-		a: f.newFieldElement(),
-		b: f.newFieldElement(),
+		a: f.new(),
+		b: f.new(),
 		q: new(big.Int).Set(q),
 		t: t,
 	}
@@ -34,7 +34,7 @@ func newG1(f *field, a, b fieldElement, q *big.Int) (*g1, error) {
 		return nil, errors.New("a and b values should be provided")
 	}
 	if g.f.isZero(b) || (g.f.isZero(a) && g.f.isZero(b)) {
-		return nil, errors.New("Curve shape is not supported")
+		return nil, errors.New("curve shape is not supported")
 	}
 	g.f.copy(g.a, a)
 	g.f.copy(g.b, b)
@@ -46,7 +46,7 @@ func newG1(f *field, a, b fieldElement, q *big.Int) (*g1, error) {
 }
 
 func (g *g1) newPoint() *pointG1 {
-	p := &pointG1{g.f.newFieldElement(), g.f.newFieldElement(), g.f.newFieldElement()}
+	p := &pointG1{g.f.new(), g.f.new(), g.f.new()}
 	g.f.copy(p[0], g.f.zero)
 	g.f.copy(p[1], g.f.zero)
 	g.f.copy(p[2], g.f.zero)
@@ -58,11 +58,11 @@ func (g *g1) fromBytes(in []byte) (*pointG1, error) {
 	if len(in) < 2*byteLen {
 		return nil, fmt.Errorf("input string should be equal or larger than 96")
 	}
-	x, err := g.f.newFieldElementFromBytes(in[:byteLen])
+	x, err := g.f.fromBytes(in[:byteLen])
 	if err != nil {
 		return nil, err
 	}
-	y, err := g.f.newFieldElementFromBytes(in[byteLen:])
+	y, err := g.f.fromBytes(in[byteLen:])
 	if err != nil {
 		return nil, err
 	}
@@ -71,17 +71,6 @@ func (g *g1) fromBytes(in []byte) (*pointG1, error) {
 	g.f.copy(p[1], y)
 	g.f.copy(p[2], g.f.one)
 	return p, nil
-}
-
-func (g *g1) fromXY(x, y fieldElement) *pointG1 {
-	if g.f.isZero(x) && g.f.isZero(y) {
-		return g.zero()
-	}
-	p := g.newPoint()
-	g.f.copy(p[0], x)
-	g.f.copy(p[1], y)
-	g.f.copy(p[2], g.f.one)
-	return p
 }
 
 func (g *g1) toBytes(p *pointG1) []byte {
@@ -94,11 +83,15 @@ func (g *g1) toBytes(p *pointG1) []byte {
 	return out
 }
 
-func (g *g1) toBytesAllocated(out []byte, p *pointG1) []byte {
+func (g *g1) toBytesDense(p *pointG1) []byte {
 	a := g.newPoint()
 	g.affine(a, p)
-	copy(out[:len(out)/2], g.f.toBytes(a[0]))
-	copy(out[len(out)/2:], g.f.toBytes(a[1]))
+	a0 := g.f.toBytesDense(a[0])
+	a1 := g.f.toBytesDense(a[1])
+	byteLen := len(a0)
+	out := make([]byte, 2*byteLen)
+	copy(out[:byteLen], a0)
+	copy(out[byteLen:], a1)
 	return out
 }
 
@@ -120,15 +113,13 @@ func (g *g1) affine(r, p *pointG1) *pointG1 {
 		g.copy(r, p)
 		return r
 	}
-	t := g.t
-
+	t, q := g.t, g.newPoint()
 	if ok := g.f.inverse(t[0], p[2]); !ok {
 		g.f.copy(r[0], g.f.zero)
 		g.f.copy(r[1], g.f.zero)
 		g.f.copy(r[2], g.f.zero)
 		return r
 	}
-	q := g.newPoint()
 	g.f.square(t[1], t[0])
 	g.f.mul(q[0], p[0], t[1])
 	g.f.mul(t[0], t[0], t[1])
@@ -139,21 +130,11 @@ func (g *g1) affine(r, p *pointG1) *pointG1 {
 }
 
 func (g *g1) toString(p *pointG1) string {
-	return fmt.Sprintf(
-		"x: %s y: %s, z: %s",
-		g.f.toString(p[0]),
-		g.f.toString(p[1]),
-		g.f.toString(p[2]),
-	)
+	return fmt.Sprintf("%s\n%s\n%s", g.f.toString(p[0]), g.f.toString(p[1]), g.f.toString(p[2]))
 }
 
 func (g *g1) toStringNoTransform(p *pointG1) string {
-	return fmt.Sprintf(
-		"x: %s y: %s, z: %s",
-		g.f.toStringNoTransform(p[0]),
-		g.f.toStringNoTransform(p[1]),
-		g.f.toStringNoTransform(p[2]),
-	)
+	return fmt.Sprintf("%s\n%s\n%s", g.f.toStringNoTransform(p[0]), g.f.toStringNoTransform(p[1]), g.f.toStringNoTransform(p[2]))
 }
 
 func (g *g1) zero() *pointG1 {
@@ -374,7 +355,7 @@ func (g *g1) mulScalar(c, p *pointG1, e *big.Int) *pointG1 {
 	return c
 }
 
-func (g *g1) checkCorrectSubGroup(p *pointG1) bool {
+func (g *g1) checkCorrectSubgroup(p *pointG1) bool {
 	c := g.newPoint()
 	g.wnafMul(c, p, g.q)
 	if g.equal(c, g.inf) {
