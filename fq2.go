@@ -258,6 +258,57 @@ func (f *fq2) exp(c, a *fe2, e *big.Int) {
 	f.copy(c, z)
 }
 
+func (f *fq2) sqrt(c, a *fe2) bool {
+	// if p = 3 mod 4 then we can simply use righ-shift
+	// for division by multiples of two in order to get (p-3/4)
+
+	negOne, tmp, b := f.new(), f.new(), f.new()
+
+	pMinusThreeByFour := new(big.Int).Rsh(f.f.pbig, 2)
+	f.exp(b, a, pMinusThreeByFour)
+
+	f.square(tmp, b)
+	f.mul(tmp, tmp, a)
+	a0 := f.new()
+	f.frobeniusMap(a0, tmp, 1)
+	f.mul(a0, a0, tmp)
+
+	f.neg(negOne, f.one())
+	if f.equal(a0, negOne) {
+		f.copy(c, f.zero())
+		return false
+	}
+
+	f.mul(b, b, a)
+	if f.equal(tmp, negOne) {
+		zeroOne := f.new()
+		f.f.copy(zeroOne[0], f.f.zero)
+		f.f.copy(zeroOne[1], f.f.one)
+		f.mul(c, b, zeroOne)
+	} else {
+		f.add(tmp, tmp, f.one())
+		pMinusOneByTwo := new(big.Int).Rsh(f.f.pbig, 1)
+		f.exp(tmp, tmp, pMinusOneByTwo)
+		f.mul(c, b, tmp)
+	}
+	return true
+}
+
+func (f *fq2) sign(fe *fe2) int8 {
+	neg := f.new()
+	f.neg(neg, fe)
+
+	return f.cmp(fe, neg)
+}
+
+func (f *fq2) cmp(a, b *fe2) int8 {
+	cmp := f.f.cmp(a[1], b[1])
+	if cmp == 0 {
+		return f.f.cmp(a[0], b[0])
+	}
+	return cmp
+}
+
 func (f *fq2) mulByFq(c, a *fe2, b fe) {
 	fq := f.fq()
 	fq.mul(c[0], a[0], b)

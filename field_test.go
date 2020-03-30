@@ -33,6 +33,7 @@ type field interface {
 	square(c, a fieldElement)
 	exp(c, a fieldElement, e *big.Int)
 	inverse(c, a fieldElement) bool
+	sqrt(c, a fieldElement) bool
 }
 
 type fqTest struct {
@@ -125,6 +126,10 @@ func (t fqTest) exp(c, a fieldElement, e *big.Int) {
 
 func (t fqTest) inverse(c, a fieldElement) bool {
 	return t.fq.inverse(c.(fe), a.(fe))
+}
+
+func (t fqTest) sqrt(c, a fieldElement) bool {
+	return t.fq.sqrt(c.(fe), a.(fe))
 }
 
 type fq2Test struct {
@@ -223,6 +228,10 @@ func (t fq2Test) mulByFq(c, a fieldElement, b fieldElement) {
 	t.fq2.mulByFq(c.(*fe2), a.(*fe2), b.(fe))
 }
 
+func (t fq2Test) sqrt(c, a fieldElement) bool {
+	return t.fq2.sqrt(c.(*fe2), a.(*fe2))
+}
+
 type fq3Test struct {
 	*fq3
 }
@@ -319,6 +328,11 @@ func (t fq3Test) mulByFq(c, a fieldElement, b fieldElement) {
 	t.fq3.mulByFq(c.(*fe3), a.(*fe3), b.(fe))
 }
 
+func (t fq3Test) sqrt(c, a fieldElement) bool {
+	// return t.fq.sqrt(c.(*fe3), a.(*fe3))
+	return true
+}
+
 type fq4Test struct {
 	*fq4
 }
@@ -409,6 +423,11 @@ func (t fq4Test) exp(c, a fieldElement, e *big.Int) {
 
 func (t fq4Test) inverse(c, a fieldElement) bool {
 	return t.fq4.inverse(c.(*fe4), a.(*fe4))
+}
+
+func (t fq4Test) sqrt(c, a fieldElement) bool {
+	// return t.fq.sqrt(c.(*fe4), a.(*fe4))
+	return true
 }
 
 type fq6CTest struct {
@@ -503,6 +522,11 @@ func (t fq6CTest) inverse(c, a fieldElement) bool {
 	return t.fq6C.inverse(c.(*fe6C), a.(*fe6C))
 }
 
+func (t fq6CTest) sqrt(c, a fieldElement) bool {
+	// return t.fq.sqrt(c.(*fe6C), a.(*fe6C))
+	return true
+}
+
 type fq6QTest struct {
 	*fq6Q
 }
@@ -595,6 +619,11 @@ func (t fq6QTest) inverse(c, a fieldElement) bool {
 	return t.fq6Q.inverse(c.(*fe6Q), a.(*fe6Q))
 }
 
+func (t fq6QTest) sqrt(c, a fieldElement) bool {
+	// return t.fq.sqrt(c.(*fe6Q), a.(*fe6Q))
+	return true
+}
+
 type fq12Test struct {
 	*fq12
 }
@@ -685,6 +714,11 @@ func (t fq12Test) exp(c, a fieldElement, e *big.Int) {
 
 func (t fq12Test) inverse(c, a fieldElement) bool {
 	return t.fq12.inverse(c.(*fe12), a.(*fe12))
+}
+
+func (t fq12Test) sqrt(c, a fieldElement) bool {
+	// return t.fq.sqrt(c.(*fe12), a.(*fe12))
+	return true
 }
 
 func randFq(limbSize int) *fq {
@@ -1003,6 +1037,7 @@ func randFq2(limbSize int) *fq2 {
 			break
 		}
 	}
+	fq2.calculateFrobeniusCoeffs()
 	return fq2
 }
 
@@ -1377,6 +1412,48 @@ func TestFqInversion(t *testing.T) {
 					field.inverse(v, a)
 					if !field.equal(v, u) {
 						t.Fatalf("a^(p-2) == a^-1")
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestFqSquareRoot(t *testing.T) {
+	fields = []string{"FQ"}
+	for _, ext := range fields {
+		for limbSize := from; limbSize < 4; limbSize++ {
+			// for limbSize := from; limbSize < to+1; limbSize++ {
+			t.Run(fmt.Sprintf("%d_%s", limbSize*64, ext), func(t *testing.T) {
+				for i := 0; i < fuz; i++ {
+					field := randField(ext, limbSize)
+					u := field.new()
+					zero := field.zero()
+					one := field.one()
+					field.sqrt(u, zero)
+					if !field.equal(u, zero) {
+						t.Errorf("(0^(1/2)) == 0)")
+					}
+					field.sqrt(u, one)
+					if !field.equal(u, one) {
+						t.Errorf("(1^(1/2)) == 1)")
+					}
+					v, w, negA := field.new(), field.new(), field.new()
+					a := field.rand(rand.Reader)
+					field.neg(negA, a)
+					field.square(u, a)
+					field.square(w, negA)
+					if !field.equal(w, u) {
+						t.Errorf("square of r and -r is not same")
+					}
+					if hasRoot := field.sqrt(v, u); !hasRoot {
+						t.Errorf("elem has no square-root")
+					}
+					if !field.equal(a, v) && !field.equal(negA, v) {
+						field.debugElement(a)
+						field.debugElement(negA)
+						field.debugElement(v)
+						t.Errorf("((r)^2)^(1/2) == r)")
 					}
 				}
 			})

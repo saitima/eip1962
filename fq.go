@@ -399,6 +399,35 @@ func (f *fq) exp(c, a fe, e *big.Int) {
 	f.copy(c, z)
 }
 
+func (f *fq) sqrt(c, a fe) bool {
+	negOne, tmp, b := f.new(), f.new(), f.new()
+	f.neg(negOne, f.one)
+
+	// power = (p-3)/4
+	power := new(big.Int).Rsh(f.pbig, 2)
+	// b = a^((p-3)/4)
+	f.exp(b, a, power)
+	// tmp = b^2 = a^(p-3/2) = a^-1 * a^(p-1/2)
+	// if a is a square then a^(p-1/2) is 1 else -1
+	// so tmp = a^-1 or -a^-1
+	f.square(tmp, b)
+	// check that a*a^-1 is -1
+	f.mul(tmp, tmp, a)
+	if f.equal(tmp, negOne) {
+		f.copy(c, f.zero)
+		return false
+	}
+	// c = a^(p-3/4) * a = a^(p+1/4)
+	f.mul(c, b, a)
+	return true
+}
+
+func (f *fq) sign(fe fe) int8 {
+	neg := f.new()
+	f.neg(neg, fe)
+	return f.cmp(fe, neg)
+}
+
 func (f *fq) isOne(fe fe) bool {
 	return f.equal(fe, f.one)
 }
@@ -492,7 +521,7 @@ func (f *fq) fromBytes(in []byte) (fe, error) {
 func (f *fq) fromString(hexStr string) (fe, error) {
 	str := hexStr
 	if len(str) > 1 && str[:2] == "0x" {
-		str = hexStr[:2]
+		str = hexStr[2:]
 	}
 	in, err := hex.DecodeString(str)
 	if err != nil {
