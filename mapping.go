@@ -1,77 +1,6 @@
 package eip
 
-type g1SWUParams struct {
-	z           fe
-	zInv        fe
-	a           fe
-	b           fe
-	minusBOverA fe
-}
-
-type g2SWUParams struct {
-	z           *fe2
-	zInv        *fe2
-	a           *fe2
-	b           *fe2
-	minusBOverA *fe2
-}
-
-func computeSWUParamsForG1(fq *fq) *g1SWUParams {
-	z, _ := fq.fromString("0b")
-	a, _ := fq.fromString("00144698a3b8e9433d693a02c96d4982b0ea985383ee66a8d8e8981aefd881ac98936f8da0e0f97f5cf428082d584c1d")
-	b, _ := fq.fromString("12e2908d11688030018b12e8753eee3b2016c1f0f24f4070a0b9c14fcef35ef55a23215a316ceaa5d1cc48e98e172be0")
-
-	// z^1
-	zInv := fq.new()
-	if hasInverse := fq.inverse(zInv, z); !hasInverse {
-		panic("z has no inverse")
-	}
-	fq.neg(zInv, zInv)
-	// -b
-	minusBOverA, minusB, aInv := fq.new(), fq.new(), fq.new()
-	fq.neg(minusB, b)
-	fq.inverse(aInv, a)
-	fq.mul(minusBOverA, minusB, aInv)
-
-	return &g1SWUParams{
-		z,
-		zInv,
-		a,
-		b,
-		minusBOverA,
-	}
-
-}
-
-func computeSWUParamsForG2(fq2 *fq2) *g2SWUParams {
-	z, a, b := fq2.new(), fq2.new(), fq2.new()
-	z[0], _ = fq2.f.fromString("0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaa9")
-	z[1], _ = fq2.f.fromString("0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaaa")
-	a[0], _ = fq2.f.fromString("0x00")
-	a[1], _ = fq2.f.fromString("0xf0")
-	b[0], _ = fq2.f.fromString("0x03f4")
-	b[1], _ = fq2.f.fromString("0x03f4")
-
-	// z^1
-	zInv := fq2.new()
-	fq2.inverse(zInv, z)
-	// -b
-	minusBOverA, minusB, aInv := fq2.new(), fq2.new(), fq2.new()
-	fq2.neg(minusB, b)
-	fq2.inverse(aInv, a)
-	fq2.mul(minusBOverA, minusB, aInv)
-
-	return &g2SWUParams{
-		z,
-		zInv,
-		a,
-		b,
-		minusBOverA,
-	}
-
-}
-
-func swuMapForG1(u fe, fq *fq, params *g1SWUParams) (fe, fe) {
+func swuMapForG1(u fe, fq *fq, params *g1SWUParams) (fe, fe, bool) {
 	var tv [4]fe
 	for i := 0; i < 4; i++ {
 		tv[i] = fq.new()
@@ -151,7 +80,7 @@ func swuMapForG1(u fe, fq *fq, params *g1SWUParams) (fe, fe) {
 	// 19.   y = sqrt(y2)
 	y := fq.new()
 	if hasSquareRoot := fq.sqrt(y, y2); !hasSquareRoot {
-		panic("y2 is not a square")
+		return nil, nil, false
 	}
 	// 20.  e3 = sgn0(u) == sgn0(y)  # Fix sign of y
 	uSign := fq.sign(u)
@@ -160,10 +89,10 @@ func swuMapForG1(u fe, fq *fq, params *g1SWUParams) (fe, fe) {
 	if ((uSign == 1 && ySign == -1) || (uSign == -1 && ySign == 1)) || ((uSign == 0 && ySign == -1) || (uSign == -1 && ySign == 0)) {
 		fq.neg(y, y)
 	}
-	return x, y
+	return x, y, true
 }
 
-func swuMapForG2(u *fe2, fq2 *fq2, params *g2SWUParams) (*fe2, *fe2) {
+func swuMapForG2(u *fe2, fq2 *fq2, params *g2SWUParams) (*fe2, *fe2, bool) {
 	var tv [4]*fe2
 	for i := 0; i < 4; i++ {
 		tv[i] = fq2.new()
@@ -213,10 +142,10 @@ func swuMapForG2(u *fe2, fq2 *fq2, params *g2SWUParams) (*fe2, *fe2) {
 	x2 := fq2.new()
 	fq2.mul(x2, tv[0], x1)
 
-	//  // 14. tv2 = tv1 * tv2
+	// 14. tv2 = tv1 * tv2
 	fq2.mul(tv[1], tv[0], tv[1])
 
-	//  // 15. gx2 = gx1 * tv2           # gx2 = (Z * u^2)^3 * gx1
+	// 15. gx2 = gx1 * tv2           # gx2 = (Z * u^2)^3 * gx1
 	gx2 := fq2.new()
 	fq2.mul(gx2, gx1, tv[1])
 
@@ -242,7 +171,7 @@ func swuMapForG2(u *fe2, fq2 *fq2, params *g2SWUParams) (*fe2, *fe2) {
 	// 19.   y = sqrt(y2)
 	y := fq2.new()
 	if hasSquareRoot := fq2.sqrt(y, y2); !hasSquareRoot {
-		panic("y2 is not a square")
+		return nil, nil, false
 	}
 	// 20.  e3 = sgn0(u) == sgn0(y)  # Fix sign of y
 	uSign := fq2.sign(u)
@@ -251,7 +180,7 @@ func swuMapForG2(u *fe2, fq2 *fq2, params *g2SWUParams) (*fe2, *fe2) {
 	if ((uSign == 1 && ySign == -1) || (uSign == -1 && ySign == 1)) || ((uSign == 0 && ySign == -1) || (uSign == -1 && ySign == 0)) {
 		fq2.neg(y, y)
 	}
-	return x, y
+	return x, y, true
 }
 
 func legendreSymbolFq(fq *fq, elem fe) int {
@@ -332,6 +261,66 @@ func applyIsogenyMapForG2(fq2 *fq2, x, y *fe2, params *g2IsogenyParams) (*fe2, *
 	fq2.mul(yNum, yNum, y)
 
 	return xNum, yNum
+}
+
+type g1SWUParams struct {
+	z           fe
+	zInv        fe
+	a           fe
+	b           fe
+	minusBOverA fe
+}
+
+type g2SWUParams struct {
+	z           *fe2
+	zInv        *fe2
+	a           *fe2
+	b           *fe2
+	minusBOverA *fe2
+}
+
+func computeSWUParamsForG1(fq *fq) *g1SWUParams {
+	z, _ := fq.fromString("0x0b")
+	a, _ := fq.fromString("0x00144698a3b8e9433d693a02c96d4982b0ea985383ee66a8d8e8981aefd881ac98936f8da0e0f97f5cf428082d584c1d")
+	b, _ := fq.fromString("0x12e2908d11688030018b12e8753eee3b2016c1f0f24f4070a0b9c14fcef35ef55a23215a316ceaa5d1cc48e98e172be0")
+	// z^-1
+	zInv, _ := fq.fromString("0x025d302c90dd14f6c102839c34a9c9e509221e235bf4d328ac4a41b18aca44ec02c9d1743eaa8ba2e25cfffffffff83e")
+	// -b/a
+	minusBOverA, _ := fq.fromString("0x0793154fd85631d966ef2470460c78f6a928ad9f5bdbfac21df39753aa278ba751bdfcf95a84188e29d670675e4c9c7c")
+
+	return &g1SWUParams{
+		z,
+		zInv,
+		a,
+		b,
+		minusBOverA,
+	}
+
+}
+
+func computeSWUParamsForG2(fq2 *fq2) *g2SWUParams {
+	z, a, b, zInv, minusBOverA := fq2.new(), fq2.new(), fq2.new(), fq2.new(), fq2.new()
+
+	z[0], _ = fq2.f.fromString("0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaa9")
+	z[1], _ = fq2.f.fromString("0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaaa")
+	a[0], _ = fq2.f.fromString("0x00")
+	a[1], _ = fq2.f.fromString("0xf0")
+	b[0], _ = fq2.f.fromString("0x03f4")
+	b[1], _ = fq2.f.fromString("0x03f4")
+	// z^-1
+	zInv[0], _ = fq2.f.fromString("0x053369fba51994854238bb2473dbef5e474b0f1a971a9d597b09c3b9caf0313a6c88cccc89dd99998b99666666665555")
+	zInv[1], _ = fq2.f.fromString("0x0a66d3f74a33290a84717648e7b7debc8e961e352e353ab2f613877395e06274d911999913bb33331732ccccccccaaab")
+	// -b/a
+	minusBOverA[0], _ = fq2.f.fromString("0x083c12791abdd5d2fe2f284f0cc6e5aa9b8c2d3f6f3f792302cf75e62bfc4df1d6834443da498888725d8cccccccb1c3")
+	minusBOverA[1], _ = fq2.f.fromString("0x11c4ff711ec210c74cec7f673684c72cc8eb1e458445999c64615cbacab4a8324828bbbad70a777747a173333332f8e8")
+
+	return &g2SWUParams{
+		z,
+		zInv,
+		a,
+		b,
+		minusBOverA,
+	}
 }
 
 type g1IsogenyParams struct {

@@ -13,7 +13,10 @@ func TestMapToG1(t *testing.T) {
 	isoParams := prepareIsogenyParamsForG1(f)
 
 	u, _ := f.fromString("2a") // 42
-	x, y := swuMapForG1(u, f, swuParams)
+	x, y, ok := swuMapForG1(u, f, swuParams)
+	if !ok {
+		t.Fatal("element has no square root")
+	}
 	xx, yy := applyIsogenyMapForG1(f, x, y, isoParams)
 
 	a, _ := f.fromString("0x00")
@@ -61,13 +64,7 @@ func TestMapToG2(t *testing.T) {
 	u := fq2.new()
 	f.copy(u[0], el)
 	f.copy(u[1], el)
-
-	swuParams := computeSWUParamsForG2(fq2)
-	isoParams := prepareIsogenyParamsForG2(fq2)
-
-	x, y := swuMapForG2(u, fq2, swuParams)
-	xx, yy := applyIsogenyMapForG2(fq2, x, y, isoParams)
-
+	// construct g22
 	a0, _ := f.fromString("0x00")
 	a1, _ := f.fromString("0x00")
 	b0, _ := f.fromString("0x04")
@@ -77,7 +74,6 @@ func TestMapToG2(t *testing.T) {
 	f.copy(a[1], a1)
 	f.copy(b[0], b0)
 	f.copy(b[1], b1)
-
 	q := new(big.Int).SetBytes(fromHex(48, "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001"))
 	g2, err := newG22(fq2, a, b, q)
 	if err != nil {
@@ -95,6 +91,15 @@ func TestMapToG2(t *testing.T) {
 	f.copy(expected[1][0], y0)
 	f.copy(expected[1][1], y1)
 	fq2.copy(expected[2], fq2.one())
+
+	swuParams := computeSWUParamsForG2(fq2)
+	isoParams := prepareIsogenyParamsForG2(fq2)
+
+	x, y, ok := swuMapForG2(u, fq2, swuParams)
+	if !ok {
+		t.Fatal("element has no square root")
+	}
+	xx, yy := applyIsogenyMapForG2(fq2, x, y, isoParams)
 
 	p := g2.newPoint()
 	fq2.copy(p[0], xx)
