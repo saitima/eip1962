@@ -1456,6 +1456,24 @@ func TestMNT6Pairing(t *testing.T) {
 func TestBLSPairing(t *testing.T) {
 	opts := newBuilderOptPairing("BLS")
 	vectors := []*builder{
+		testBuilderFromVector(t, "bls12_377",
+			&vectorJSON{
+				FieldOrder:   "0x01ae3a4617c510eac63b05c06ca1493b1a22d9f300f5138f1ef3622fba094800170b5d44300000008508c00000000001",
+				GroupOrder:   "0x12ab655e9a2ca55660b44d1e5c37b00159aa76fed00000010a11800000000001",
+				A:            "0x00",
+				B:            "0x01",
+				G1x:          "0x008848defe740a67c8fc6225bf87ff5485951e2caa9d41bb188282c8bd37cb5cd5481512ffcd394eeab9b16eb21be9ef",
+				G1y:          "0x01914a69c5102eff1f674f5d30afeec4bd7fb348ca3e52d96d182ad44fb82305c2fe3d3634a9591afd82de55559c8ea6",
+				G2x0:         "0x018480be71c785fec89630a2a3841d01c565f071203e50317ea501f557db6b9b71889f52bb53540274e3e48f7c005196",
+				G2x1:         "0x00ea6040e700403170dc5a51b1b140d5532777ee6651cecbe7223ece0799c9de5cf89984bff76fe6b26bfefa6ea16afe",
+				G2y0:         "0x00690d665d446f7bd960736bcbb2efb4de03ed7274b49a58e458c282f832d204f2cf88886d8c7c2ef094094409fd4ddf",
+				G2y1:         "0x00f8169fd28355189e549da3151a70aa61ef11ac3d591bf12463b01acee304c24279b83f5e52270bd9a1cdd185eb8f93",
+				NonResidue:   "0x01ae3a4617c510eac63b05c06ca1493b1a22d9f300f5138f1ef3622fba094800170b5d44300000008508bffffffffffc",
+				NonResidue20: "0x00",
+				NonResidue21: "0x01",
+				IsDType:      "True",
+				Z:            "0x8508c00000000001",
+			}, opts),
 		testBuilderFromVector(t, "bls12_381",
 			&vectorJSON{
 				FieldOrder:   "0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab",
